@@ -179,6 +179,15 @@ impl Receiver {
         let receiver = Arc::new(Mutex::new(None));
         let receiver_ = Arc::downgrade(&receiver);
 
+        let player = Mutex::new(Some(AVFrameStreamPlayer::new(
+            AVFrameStreamPlayerOptions::All(VideoRenderOptions {
+                backend: VideoRenderBackend::WebGPU,
+                size: window.size(),
+                target: window.clone(),
+            }),
+            ViewObserver,
+        )?));
+
         // Find published senders through the LAN discovery service.
         let discovery = DiscoveryService::query(move |addrs, properties: Properties| {
             if let Some(receiver) = receiver_.upgrade() {
@@ -196,28 +205,22 @@ impl Receiver {
                     addr.set_ip(IpAddr::V4(addrs[0]));
                 }
 
-                if let Ok(it) = Hylarana::create_receiver(
-                    properties.id,
-                    HylaranaReceiverOptions {
-                        codec: HylaranaReceiverCodecOptions {
-                            video: video_decoder,
+                if let Some(player) = player.lock().take() {
+                    if let Ok(it) = Hylarana::create_receiver(
+                        properties.id,
+                        HylaranaReceiverOptions {
+                            codec: HylaranaReceiverCodecOptions {
+                                video: video_decoder,
+                            },
+                            transport: TransportOptions {
+                                strategy: properties.strategy,
+                                mtu: 1500,
+                            },
                         },
-                        transport: TransportOptions {
-                            strategy: properties.strategy,
-                            mtu: 1500,
-                        },
-                    },
-                    AVFrameStreamPlayer::new(
-                        AVFrameStreamPlayerOptions::All(VideoRenderOptions {
-                            backend: VideoRenderBackend::WebGPU,
-                            size: window.size(),
-                            target: window.clone(),
-                        }),
-                        ViewObserver,
-                    )
-                    .unwrap(),
-                ) {
-                    receiver.lock().replace(it);
+                        player,
+                    ) {
+                        receiver.lock().replace(it);
+                    }
                 }
             }
         })?;
@@ -238,11 +241,16 @@ struct App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+
         let configure = Configure::parse();
 
         (|| {
             let mut attr = Window::default_attributes();
             attr.title = "hylarana example".to_string();
+            attr.active = true;
             attr.inner_size = Some(winit::dpi::Size::Physical(PhysicalSize::new(
                 configure.width,
                 configure.height,
