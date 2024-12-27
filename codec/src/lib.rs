@@ -49,9 +49,13 @@ impl Into<Level> for LoggerLevel {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[allow(non_camel_case_types)]
 type va_list = *mut __va_list_tag;
+
+#[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
+#[allow(non_camel_case_types)]
+type va_list = [u64; 4];
 
 extern "C" {
     // Write formatted data from variable argument list to sized buffer
