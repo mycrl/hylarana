@@ -134,7 +134,7 @@ void (async () => {
             [`./target/${Profile.toLowerCase()}/hylarana-example`, "./build/bin/example"],
             [`./target/${Profile.toLowerCase()}/hylarana-server`, "./build/bin/hylarana-server"],
             [`./target/${Profile.toLowerCase()}/libhylarana.so`, "./build/bin/libhylarana.so"],
-            [`./target/ffmpeg/lib`, "./build/lib"],
+            // [`./target/ffmpeg/lib`, "./build/lib"],
         ]) {
             fs.cpSync(...item, { force: true, recursive: true });
         }

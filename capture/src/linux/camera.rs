@@ -131,8 +131,7 @@ impl CaptureHandler for CameraCapture {
 
 struct SWScale {
     sws_ctx: *mut SwsContext,
-    frame: *mut AVFrame,
-    scaled_frame: *mut AVFrame,
+    frames: [*mut AVFrame; 2],
 }
 
 unsafe impl Send for SWScale {}
@@ -141,33 +140,32 @@ unsafe impl Sync for SWScale {}
 impl SWScale {
     fn new(size: Size) -> Result<Self, CameraCaptureError> {
         let mut this = Self {
-            scaled_frame: unsafe { av_frame_alloc() },
-            frame: unsafe { av_frame_alloc() },
             sws_ctx: null_mut(),
+            frames: [unsafe { av_frame_alloc() }, unsafe { av_frame_alloc() }],
         };
 
         unsafe {
-            let scale_frame_mut = &mut *this.scaled_frame;
-            scale_frame_mut.format = AVPixelFormat::AV_PIX_FMT_NV12 as i32;
-            scale_frame_mut.width = size.width as i32;
-            scale_frame_mut.height = size.height as i32;
-
-            av_image_alloc(
-                scale_frame_mut.data.as_mut_ptr(),
-                scale_frame_mut.linesize.as_mut_ptr(),
-                scale_frame_mut.width,
-                scale_frame_mut.height,
-                AVPixelFormat::AV_PIX_FMT_NV12,
-                32,
-            );
+            let frame_mut = &mut *this.frames[0];
+            frame_mut.format = AVPixelFormat::AV_PIX_FMT_YUYV422 as i32;
+            frame_mut.width = size.width as i32;
+            frame_mut.height = size.height as i32;
         }
 
         // The captures are all YUYV, here converted to NV12.
         unsafe {
-            let frame_mut = &mut *this.frame;
-            frame_mut.format = AVPixelFormat::AV_PIX_FMT_YUYV422 as i32;
+            let frame_mut = &mut *this.frames[1];
+            frame_mut.format = AVPixelFormat::AV_PIX_FMT_NV12 as i32;
             frame_mut.width = size.width as i32;
             frame_mut.height = size.height as i32;
+
+            av_image_alloc(
+                frame_mut.data.as_mut_ptr(),
+                frame_mut.linesize.as_mut_ptr(),
+                frame_mut.width,
+                frame_mut.height,
+                AVPixelFormat::AV_PIX_FMT_NV12,
+                32,
+            );
         }
 
         this.sws_ctx = unsafe {
@@ -194,14 +192,14 @@ impl SWScale {
 
     fn scale(&mut self, buffer: &[u8]) -> &AVFrame {
         unsafe {
-            let frame_mut = &mut *self.frame;
+            let frame_mut = &mut *self.frames[0];
             frame_mut.linesize[0] = frame_mut.width * 2;
             frame_mut.data[0] = buffer.as_ptr() as *mut _;
         }
 
         unsafe {
-            let frame_mut = &mut *self.frame;
-            let scaled_frame_mut = &mut *self.scaled_frame;
+            let frame_mut = &mut *self.frames[0];
+            let scaled_frame_mut = &mut *self.frames[1];
             sws_scale(
                 self.sws_ctx,
                 frame_mut.data.as_ptr() as _,
@@ -213,21 +211,17 @@ impl SWScale {
             );
         }
 
-        unsafe { &*self.scaled_frame }
+        unsafe { &*self.frames[1] }
     }
 }
 
 impl Drop for SWScale {
     fn drop(&mut self) {
-        if !self.frame.is_null() {
-            unsafe {
-                av_frame_free(&mut self.frame);
-            }
-        }
-
-        if !self.scaled_frame.is_null() {
-            unsafe {
-                av_frame_free(&mut self.scaled_frame);
+        for frame in &mut self.frames {
+            if !frame.is_null() {
+                unsafe {
+                    av_frame_free(frame);
+                }
             }
         }
 

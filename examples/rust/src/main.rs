@@ -131,7 +131,7 @@ impl Sender {
             });
         }
 
-        let strategy = configure.get_strategy().unwrap();
+        let strategy = configure.get_strategy();
         let sender = Hylarana::create_sender(
             HylaranaSenderOptions {
                 transport: TransportOptions {
@@ -376,13 +376,23 @@ impl Configure {
     #[cfg(target_os = "linux")]
     const DEFAULT_DECODER: VideoDecoderType = VideoDecoderType::H264;
 
-    fn get_strategy(&self) -> Option<TransportStrategy> {
-        Some(match self.strategy.as_ref()?.as_str() {
-            "direct" => TransportStrategy::Direct(self.address?),
-            "relay" => TransportStrategy::Relay(self.address?),
-            "multicast" => TransportStrategy::Multicast(self.address?),
+    fn get_strategy(&self) -> TransportStrategy {
+        let address = self
+            .address
+            .unwrap_or_else(|| "127.0.0.1:8080".parse().unwrap());
+
+        let default_strategy = "direct".to_string();
+        match self
+            .strategy
+            .as_ref()
+            .unwrap_or_else(|| &default_strategy)
+            .as_str()
+        {
+            "direct" => TransportStrategy::Direct(address),
+            "relay" => TransportStrategy::Relay(address),
+            "multicast" => TransportStrategy::Multicast(address),
             _ => unreachable!(),
-        })
+        }
     }
 
     fn get_video_options(&self) -> VideoOptions {
