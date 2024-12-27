@@ -226,7 +226,7 @@ impl VideoDecoder {
                 self.frame.sub_format = VideoSubFormat::D3D11;
                 self.frame.format = VideoFormat::NV12;
             }
-            AVPixelFormat::AV_PIX_FMT_YUV420P => {
+            AVPixelFormat::AV_PIX_FMT_YUV420P | AVPixelFormat::AV_PIX_FMT_YUVJ420P => {
                 for i in 0..3 {
                     self.frame.data[i] = frame.data[i] as *const _;
                     self.frame.linesize[i] = frame.linesize[i] as usize;
