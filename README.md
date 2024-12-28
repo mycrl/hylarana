@@ -23,6 +23,10 @@
   <span>/</span>
   <a href="./examples/android">android</a>
 </div>
+<div align="center">
+  <span>watch the demo on youtube:</span>
+  <a href="https://www.youtube.com/shorts/npD_VgEKZmM">link</a>
+</div>
 <br/>
 <br/>
 
