@@ -42,7 +42,7 @@ Unlike traditional screen casting implementations, this project can work in forw
 
 First of all screen capture, this part of the implementation of each platform independently separate, currently windows and android capture the highest efficiency, because the use of hardware-accelerated textures, android uses the virtual display, windows uses the WGC, and linux only uses the x11grab, so the efficiency of linux is poorer.
 
-For audio and video codecs, H264 is used for video and Opus is used for audio, again, hardware accelerated codecs are available for both windows and android. Currently, the hardware codecs on windows are adapted to Qsv, while android is adapted to Qualcomm, Kirin, and RK series of socs.
+For audio and video codecs, H264 is used for video and Opus is used for audio, again, hardware accelerated codecs are available for both windows and android. Currently, the hardware codecs on windows are adapted to Qsv and D3D11VA, while android is adapted to Qualcomm, Kirin, and RK series of socs.
 
 Both SRT and UDP multicast schemes are used for the transport layer of the data. The audio and video data transmitted by the transport layer are bare streams and do not contain similar encapsulations such as FLV. For SRT, many parameters have been adjusted in detail to suit the LAN environment, so that when using the SRT transport layer, the delay can be controlled at about 20-40 ms. The UDP multicast scheme has only a receive buffer and no transmit buffer, and the fixed maximum delay of UDP multicast is 40 ms, which is used to sort and wait for packets in the buffer.
 
