@@ -1,0 +1,40 @@
+/*
+Copyright (C) 2014 by Leonhard Oelke <leonhard@in-verted.de>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+#include "xcomposite-input.h"
+
+extern struct obs_source_info xshm_input;
+extern struct obs_source_info xshm_input_v2;
+
+bool obs_module_load(void)
+{
+    enum obs_nix_platform_type platform = obs_get_nix_platform();
+
+    if (platform == OBS_NIX_PLATFORM_X11_EGL)
+    {
+        obs_register_source(&xshm_input);
+        obs_register_source(&xshm_input_v2);
+        xcomposite_load();
+    }
+
+    return true;
+}
+
+void obs_module_unload(void)
+{
+    if (obs_get_nix_platform() == OBS_NIX_PLATFORM_X11_EGL)
+        xcomposite_unload();
+}
