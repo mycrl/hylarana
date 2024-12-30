@@ -142,7 +142,11 @@ impl Sender {
             },
             AVFrameStreamPlayer::new(
                 AVFrameStreamPlayerOptions::OnlyVideo(VideoRenderOptions {
-                    backend: VideoRenderBackend::WebGPU,
+                    backend: if cfg!(target_os = "windows") {
+                        VideoRenderBackend::Direct3D11
+                    } else {
+                        VideoRenderBackend::WebGPU
+                    },
                     size: window.size(),
                     target: window,
                 }),
@@ -181,7 +185,11 @@ impl Receiver {
 
         let player = Mutex::new(Some(AVFrameStreamPlayer::new(
             AVFrameStreamPlayerOptions::All(VideoRenderOptions {
-                backend: VideoRenderBackend::WebGPU,
+                backend: if cfg!(target_os = "windows") {
+                    VideoRenderBackend::Direct3D11
+                } else {
+                    VideoRenderBackend::WebGPU
+                },
                 size: window.size(),
                 target: window.clone(),
             }),
