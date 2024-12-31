@@ -253,15 +253,13 @@ impl ApplicationHandler for App {
             return;
         }
 
-        let configure = Configure::parse();
-
         (|| {
             let mut attr = Window::default_attributes();
             attr.title = "hylarana example".to_string();
             attr.active = true;
             attr.inner_size = Some(winit::dpi::Size::Physical(PhysicalSize::new(
-                configure.width,
-                configure.height,
+                1280,
+                720,
             )));
 
             self.window
@@ -399,7 +397,7 @@ impl Configure {
             frame_rate: self.fps,
             width: self.width,
             height: self.height,
-            bit_rate: 500 * 1024 * 8,
+            bit_rate: 10000000,
             key_frame_interval: 21,
         }
     }
