@@ -195,6 +195,8 @@ impl Transport {
                     SocketAddr::new("0.0.0.0".parse().unwrap(), port),
                 ) {
                     Ok(socket) => {
+                        log::info!("multicast socket bind to ip={}, port={}", multicast_, port);
+
                         let socket = Arc::new(socket);
                         if let Some(socket) = current_mcast_rceiver_.lock().replace(socket.clone())
                         {
@@ -204,6 +206,8 @@ impl Transport {
                         socket
                     }
                     Err(e) => {
+                        log::error!("multicast socket bind failed, err={:?}", e);
+
                         if let Some(receiver) = receiver_.upgrade() {
                             receiver.close();
                         }
@@ -215,6 +219,8 @@ impl Transport {
                 thread::Builder::new()
                     .name("HylaranaStreamMulticastReceiverThread".to_string())
                     .spawn(move || {
+                        log::info!("HylaranaStreamMulticastReceiverThread start");
+
                         while let Some((seq, bytes)) = socket.read() {
                             log::info!("[patch log] - multicast transport recv a packet");
 
@@ -277,6 +283,8 @@ impl Transport {
                 loop {
                     match receiver.read(&mut buf) {
                         Ok(size) => {
+                            log::info!("[patch log] - srt transport recv buf, size={}", size);
+
                             if size == 0 {
                                 break;
                             }
