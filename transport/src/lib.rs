@@ -216,7 +216,10 @@ impl Transport {
                     .name("HylaranaStreamMulticastReceiverThread".to_string())
                     .spawn(move || {
                         while let Some((seq, bytes)) = socket.read() {
+                            log::info!("[patch log] - multicast transport recv a packet");
+
                             if bytes.is_empty() {
+                                log::warn!("[patch log] - multicast transport recv a emnpty packet");
                                 break;
                             }
 
@@ -226,6 +229,8 @@ impl Transport {
                                 if let Some(sequence) = sequence_.upgrade() {
                                     if seq == 0 || seq - 1 == sequence.get() {
                                         if let Some((info, package)) = UnPackage::unpack(bytes) {
+                                            log::info!("[patch log] - multicast transport package unpack a package");
+
                                             if !adapter.send(
                                                 package,
                                                 info.kind,

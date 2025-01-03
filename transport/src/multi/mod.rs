@@ -92,6 +92,8 @@ impl Socket {
             'a: loop {
                 tokio::select! {
                     Ok(size) = socket.recv(&mut buf[..]) => {
+                        log::info!("[patch log] - multicast udp recv buf size={}", size);
+
                         if size == 0 {
                             break;
                         }
@@ -99,13 +101,21 @@ impl Socket {
                         if let Ok(packet) = Fragment::try_from(&buf[..size]) {
                             queue.push(packet);
 
+                            log::info!("[patch log] - multicast queue push a chunk");
+
                             while let Some(chunk) = queue.pop() {
+                                log::info!("[patch log] - multicast queue pop a chunk");
+
                                 if let Some(packet) = decoder.decode(chunk) {
+                                    log::info!("[patch log] - multicast decoder decode a packet");
+
                                     if tx.send(packet).is_err() {
                                         break 'a;
                                     }
                                 }
                             }
+                        } else {
+                            log::warn!("[patch log] - multicast udp recv buf parser failed");
                         }
                     }
                     Some(_) = closed.recv() => {
@@ -114,6 +124,8 @@ impl Socket {
                     else => break
                 }
             }
+
+            log::warn!("[patch log] - multicast udp buf receiver is closed");
         });
 
         Ok(Self { close_signal, rx })
