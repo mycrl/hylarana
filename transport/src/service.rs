@@ -36,7 +36,7 @@ where
                 let pong_bytes = Signal::Pong.encode();
 
                 while let Ok(size) = socket.read(&mut buf) {
-                    log::trace!("signal socket read buf, size={}", size);
+                    log::info!("signal socket read buf, size={}", size);
 
                     if size == 0 {
                         break;
@@ -68,13 +68,17 @@ where
                                     }
                                 }
                                 Signal::Ping => {
-                                    if socket.write_all(&pong_bytes).is_err() {
+                                    if let Err(e) = socket.write_all(&pong_bytes) {
+                                        log::error!("service socket send buf failed, err={:?}", e);
+
                                         break;
                                     }
                                 }
                                 _ => (),
                             }
                         } else {
+                            log::error!("transport service is closed!");
+
                             break;
                         }
                     }
