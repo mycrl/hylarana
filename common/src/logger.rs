@@ -1,4 +1,4 @@
-#[cfg(all(not(debug_assertions)))]
+#[cfg(all(debug_assertions))]
 use std::fs::{create_dir, metadata};
 
 #[cfg(target_os = "android")]
@@ -8,13 +8,13 @@ use fern::Dispatch;
 use log::LevelFilter;
 use thiserror::Error;
 
-#[cfg(not(debug_assertions))]
+#[cfg(debug_assertions)]
 use chrono::Local;
 
-#[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
 use fern::colors::{Color, ColoredLevelConfig};
 
-#[cfg(all(not(debug_assertions)))]
+#[cfg(all(debug_assertions))]
 use fern::DateBased;
 
 #[derive(Debug, Error)]
@@ -34,7 +34,7 @@ pub fn init_logger(level: LevelFilter, path: Option<&str>) -> Result<(), LoggerI
         .level_for("wgpu_hal", LevelFilter::Warn)
         .level_for("wgpu_hal::auxil::dxgi::exception", LevelFilter::Error);
 
-    #[cfg(debug_assertions)]
+    #[cfg(not(debug_assertions))]
     {
         let colors = ColoredLevelConfig::new()
             .info(Color::Blue)
@@ -52,8 +52,8 @@ pub fn init_logger(level: LevelFilter, path: Option<&str>) -> Result<(), LoggerI
             })
             .chain(std::io::stdout());
     }
-
-    #[cfg(not(debug_assertions))]
+    
+    #[cfg(debug_assertions)]
     {
         logger = logger.format(move |out, message, record| {
             out.finish(format_args!(
@@ -78,7 +78,6 @@ pub fn init_logger(level: LevelFilter, path: Option<&str>) -> Result<(), LoggerI
 
     logger.apply()?;
 
-    #[cfg(not(debug_assertions))]
     std::panic::set_hook(Box::new(|info| {
         log::error!(
             "pnaic: location={:?}, message={:?}",

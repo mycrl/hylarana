@@ -607,7 +607,7 @@ pub mod desktop {
     #[no_mangle]
     pub extern "C" fn hylarana_startup() -> bool {
         let func = || {
-            logger::init_logger(log::LevelFilter::Info, None)?;
+            logger::init_logger(log::LevelFilter::Info, Some("./logs/"))?;
 
             startup()?;
             Ok::<_, anyhow::Error>(())
