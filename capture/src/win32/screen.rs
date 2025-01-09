@@ -144,8 +144,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
                     height: flags.options.size.height,
                 },
             ),
-        })
-        .unwrap();
+        })?;
 
         let status_ = Arc::downgrade(&status);
         thread::Builder::new()
