@@ -13,7 +13,7 @@ use hylarana_common::{
     Size,
 };
 
-use hylarana_resample::win32::{Resource, VideoResampler, VideoResamplerDescriptor};
+use hylarana_resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
 use parking_lot::Mutex;
 use thiserror::Error;
 use windows::{
@@ -23,7 +23,7 @@ use windows::{
             ID3D11DeviceContext, ID3D11Texture2D, D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC,
             D3D11_USAGE_DEFAULT,
         },
-        Dxgi::Common::{DXGI_FORMAT_NV12, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC},
+        Dxgi::Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC},
     },
 };
 
@@ -128,23 +128,24 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
         };
 
         // Convert texture formats and scale sizes.
-        let mut transform = VideoResampler::new(VideoResamplerDescriptor {
+        let mut transform = VideoResampler::new(VideoResamplerOptions {
             direct3d: flags.options.direct3d,
             input: Resource::Default(
-                DXGI_FORMAT_R8G8B8A8_UNORM,
+                VideoFormat::RGBA,
                 Size {
                     width: flags.source.width()?,
                     height: flags.source.height()?,
                 },
             ),
             output: Resource::Default(
-                DXGI_FORMAT_NV12,
+                VideoFormat::NV12,
                 Size {
                     width: flags.options.size.width,
                     height: flags.options.size.height,
                 },
             ),
-        })?;
+        })
+        .unwrap();
 
         let status_ = Arc::downgrade(&status);
         thread::Builder::new()
