@@ -39,6 +39,7 @@ class Video {
             format.setInteger(MediaFormat.KEY_CAPTURE_RATE, configure.frameRate)
             format.setInteger(MediaFormat.KEY_FRAME_RATE, configure.frameRate)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, configure.format)
+            format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
             format.setInteger(MediaFormat.KEY_BIT_RATE, configure.bitRate)
             format.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL, 0.4F)
             format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)

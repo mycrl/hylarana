@@ -257,10 +257,7 @@ impl ApplicationHandler for App {
             let mut attr = Window::default_attributes();
             attr.title = "hylarana example".to_string();
             attr.active = true;
-            attr.inner_size = Some(winit::dpi::Size::Physical(PhysicalSize::new(
-                1280,
-                720,
-            )));
+            attr.inner_size = Some(winit::dpi::Size::Physical(PhysicalSize::new(1280, 720)));
 
             self.window
                 .replace(Arc::new(event_loop.create_window(attr)?));
@@ -337,6 +334,7 @@ struct Configure {
     /// connect to the hylarana service.
     #[arg(long)]
     address: Option<SocketAddr>,
+    /// direct, relay, multicast
     #[arg(long)]
     strategy: Option<String>,
     #[arg(long, default_value_t = 1280)]

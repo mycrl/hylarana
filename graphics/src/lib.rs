@@ -200,15 +200,16 @@ impl<'a> Renderer<'a> {
 #[cfg(target_os = "windows")]
 pub mod dx11 {
     use hylarana_common::{
+        frame::VideoFormat,
         win32::{
             windows::Win32::{
                 Foundation::HWND,
                 Graphics::{
                     Direct3D11::{ID3D11RenderTargetView, ID3D11Texture2D, D3D11_VIEWPORT},
                     Dxgi::{
-                        Common::{DXGI_FORMAT_NV12, DXGI_FORMAT_R8G8B8A8_UNORM},
-                        CreateDXGIFactory, IDXGIFactory, IDXGISwapChain, DXGI_PRESENT,
-                        DXGI_SWAP_CHAIN_DESC, DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                        Common::DXGI_FORMAT_R8G8B8A8_UNORM, CreateDXGIFactory, IDXGIFactory,
+                        IDXGISwapChain, DXGI_PRESENT, DXGI_SWAP_CHAIN_DESC,
+                        DXGI_USAGE_RENDER_TARGET_OUTPUT,
                     },
                 },
             },
@@ -309,14 +310,15 @@ pub mod dx11 {
                     .ClearRenderTargetView(&self.render_target_view, &[0.0, 0.0, 0.0, 1.0]);
             }
 
+            let format = match texture {
+                Texture::Nv12(_) => VideoFormat::NV12,
+                Texture::Rgba(_) => VideoFormat::RGBA,
+                Texture::Bgra(_) => VideoFormat::BGRA,
+                Texture::I420(_) => VideoFormat::I420,
+            };
+
             if self.video_processor.is_none() {
                 let size = texture.size();
-                let format = match texture {
-                    Texture::Nv12(_) => DXGI_FORMAT_NV12,
-                    Texture::Rgba(_) => DXGI_FORMAT_R8G8B8A8_UNORM,
-                    _ => unimplemented!("not supports texture format"),
-                };
-
                 self.video_processor
                     .replace(VideoResampler::new(VideoResamplerOptions {
                         direct3d: self.direct3d.clone(),
@@ -328,20 +330,29 @@ pub mod dx11 {
             }
 
             if let Some(processor) = self.video_processor.as_mut() {
-                let texture = match texture {
-                    Texture::Rgba(texture) | Texture::Nv12(texture) => texture,
-                    _ => unimplemented!("not supports texture format"),
-                };
-
                 let view = match texture {
-                    Texture2DResource::Texture(texture) => match texture {
-                        Texture2DRaw::ID3D11Texture2D(texture, index) => {
-                            Some(processor.create_input_view(&texture, index)?)
+                    Texture::Nv12(resource) | Texture::Rgba(resource) | Texture::Bgra(resource) => {
+                        match resource {
+                            Texture2DResource::Texture(texture) => match texture {
+                                Texture2DRaw::ID3D11Texture2D(texture, index) => {
+                                    Some(processor.create_input_view(&texture, index)?)
+                                }
+                            },
+                            Texture2DResource::Buffer(texture) => {
+                                processor.update_input_from_buffer(
+                                    format,
+                                    texture.buffers,
+                                    texture.size.width,
+                                )?;
+
+                                None
+                            }
                         }
-                    },
-                    Texture2DResource::Buffer(texture) => {
+                    }
+                    Texture::I420(texture) => {
                         processor.update_input_from_buffer(
-                            texture.buffers[0].as_ptr(),
+                            format,
+                            texture.buffers,
                             texture.size.width,
                         )?;
 

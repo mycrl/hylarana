@@ -75,6 +75,7 @@ pub mod win32 {
     use std::mem::ManuallyDrop;
 
     use hylarana_common::{
+        frame::VideoFormat,
         win32::{
             windows::{
                 core::{Error, Interface},
@@ -86,8 +87,10 @@ pub mod win32 {
                             ID3D11VideoDevice, ID3D11VideoProcessor,
                             ID3D11VideoProcessorEnumerator, ID3D11VideoProcessorInputView,
                             ID3D11VideoProcessorOutputView, D3D11_BIND_RENDER_TARGET,
-                            D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ,
-                            D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+                            D3D11_BIND_SHADER_RESOURCE, D3D11_CPU_ACCESS_READ,
+                            D3D11_CPU_ACCESS_WRITE, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ,
+                            D3D11_MAP_WRITE_DISCARD, D3D11_RESOURCE_MISC_SHARED,
+                            D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, D3D11_USAGE_DYNAMIC,
                             D3D11_USAGE_STAGING, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
                             D3D11_VIDEO_PROCESSOR_COLOR_SPACE, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
                             D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC,
@@ -95,7 +98,10 @@ pub mod win32 {
                             D3D11_VIDEO_USAGE_PLAYBACK_NORMAL, D3D11_VPIV_DIMENSION_TEXTURE2D,
                             D3D11_VPOV_DIMENSION_TEXTURE2D,
                         },
-                        Dxgi::Common::DXGI_FORMAT,
+                        Dxgi::Common::{
+                            DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12,
+                            DXGI_FORMAT_R8G8B8A8_UNORM,
+                        },
                     },
                 },
             },
@@ -104,8 +110,9 @@ pub mod win32 {
         Size,
     };
 
+    #[derive(Clone)]
     pub enum Resource {
-        Default(DXGI_FORMAT, Size),
+        Default(VideoFormat, Size),
         Texture(ID3D11Texture2D),
     }
 
@@ -128,7 +135,9 @@ pub mod win32 {
         video_device: ID3D11VideoDevice,
         video_context: ID3D11VideoContext,
         input_texture: ID3D11Texture2D,
+        input_sw_texture: Option<ID3D11Texture2D>,
         output_texture: ID3D11Texture2D,
+        output_sw_texture: Option<ID3D11Texture2D>,
         video_enumerator: ID3D11VideoProcessorEnumerator,
         video_processor: ID3D11VideoProcessor,
         input_view: ID3D11VideoProcessorInputView,
@@ -148,7 +157,7 @@ pub mod win32 {
             let video_device = d3d_device.cast::<ID3D11VideoDevice>()?;
             let video_context = d3d_context.cast::<ID3D11VideoContext>()?;
 
-            let input_texture = match options.input {
+            let input_texture = match options.input.clone() {
                 Resource::Texture(texture) => texture,
                 Resource::Default(format, size) => unsafe {
                     let mut desc = D3D11_TEXTURE2D_DESC::default();
@@ -156,18 +165,45 @@ pub mod win32 {
                     desc.Height = size.height;
                     desc.MipLevels = 1;
                     desc.ArraySize = 1;
-                    desc.Format = format.into();
                     desc.SampleDesc.Count = 1;
                     desc.SampleDesc.Quality = 0;
                     desc.Usage = D3D11_USAGE_DEFAULT;
                     desc.BindFlags = D3D11_BIND_RENDER_TARGET.0 as u32;
                     desc.CPUAccessFlags = 0;
                     desc.MiscFlags = 0;
+                    desc.Format = video_fmt_to_dxgi_fmt(format);
 
                     let mut texture = None;
                     d3d_device.CreateTexture2D(&desc, None, Some(&mut texture))?;
                     texture.unwrap()
                 },
+            };
+
+            let input_sw_texture = match options.input {
+                Resource::Default(format, size)
+                    if format == VideoFormat::NV12 || format == VideoFormat::I420 =>
+                {
+                    let mut desc = D3D11_TEXTURE2D_DESC::default();
+                    desc.Width = size.width;
+                    desc.Height = size.height;
+                    desc.MipLevels = 1;
+                    desc.ArraySize = 1;
+                    desc.SampleDesc.Count = 1;
+                    desc.SampleDesc.Quality = 0;
+                    desc.Usage = D3D11_USAGE_DYNAMIC;
+                    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE.0 as u32;
+                    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE.0 as u32;
+                    desc.MiscFlags = 0;
+                    desc.Format = video_fmt_to_dxgi_fmt(format);
+
+                    let mut texture = None;
+                    unsafe {
+                        d3d_device.CreateTexture2D(&desc, None, Some(&mut texture))?;
+                    }
+
+                    Some(texture.unwrap())
+                }
+                _ => None,
             };
 
             let output_texture = match options.output {
@@ -178,13 +214,13 @@ pub mod win32 {
                     desc.Height = size.height;
                     desc.MipLevels = 1;
                     desc.ArraySize = 1;
-                    desc.Format = format.into();
                     desc.SampleDesc.Count = 1;
                     desc.SampleDesc.Quality = 0;
                     desc.Usage = D3D11_USAGE_DEFAULT;
                     desc.BindFlags = D3D11_BIND_RENDER_TARGET.0 as u32;
                     desc.CPUAccessFlags = 0;
                     desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED.0 as u32;
+                    desc.Format = video_fmt_to_dxgi_fmt(format);
 
                     let mut texture = None;
                     d3d_device.CreateTexture2D(&desc, None, Some(&mut texture))?;
@@ -282,6 +318,8 @@ pub mod win32 {
             }
 
             Ok(Self {
+                output_sw_texture: None,
+                input_sw_texture,
                 d3d_device,
                 d3d_context,
                 video_device,
@@ -309,19 +347,114 @@ pub mod win32 {
         /// fixed to RGBA, the external texture can only be RGBA.
         pub fn update_input_from_buffer(
             &mut self,
-            buf: *const u8,
+            format: VideoFormat,
+            data: &[&[u8]],
             stride: u32,
         ) -> Result<(), Error> {
-            unsafe {
-                self.d3d_context.UpdateSubresource(
-                    &self.input_texture,
-                    0,
-                    None,
-                    buf as *const _,
-                    stride,
-                    0,
-                );
-            }
+            match format {
+                VideoFormat::BGRA | VideoFormat::RGBA => unsafe {
+                    self.d3d_context.UpdateSubresource(
+                        &self.input_texture,
+                        0,
+                        None,
+                        data[0].as_ptr() as *const _,
+                        stride,
+                        0,
+                    );
+                },
+                // Although NV12 separates the two planes, usually memory is contiguous and
+                // is treated uniformly here, but of course there are contingencies, and
+                // this is not a good implementation here, but in most cases there will be
+                // one less copy step.
+                VideoFormat::NV12 => {
+                    if is_single_allocation(&data[0..2]) {
+                        unsafe {
+                            self.d3d_context.UpdateSubresource(
+                                &self.input_texture,
+                                0,
+                                None,
+                                data[0].as_ptr() as *const _,
+                                stride,
+                                0,
+                            );
+                        }
+                    } else {
+                        if let Some(texture) = &self.input_sw_texture {
+                            let mut mappend = D3D11_MAPPED_SUBRESOURCE::default();
+                            unsafe {
+                                self.d3d_context.Map(
+                                    texture,
+                                    0,
+                                    D3D11_MAP_WRITE_DISCARD,
+                                    0,
+                                    Some(&mut mappend),
+                                )?;
+                            }
+
+                            unsafe {
+                                std::slice::from_raw_parts_mut(
+                                    mappend.pData as *mut u8,
+                                    data[0].len(),
+                                )
+                            }
+                            .copy_from_slice(data[0]);
+
+                            unsafe {
+                                std::slice::from_raw_parts_mut(
+                                    mappend.pData.add(data[0].len()) as *mut u8,
+                                    data[1].len(),
+                                )
+                            }
+                            .copy_from_slice(data[1]);
+
+                            unsafe {
+                                self.d3d_context.Unmap(texture, 0);
+                                self.d3d_context.CopyResource(&self.input_texture, texture);
+                            }
+                        }
+                    }
+                }
+                VideoFormat::I420 => {
+                    if let Some(texture) = &self.input_sw_texture {
+                        let mut mappend = D3D11_MAPPED_SUBRESOURCE::default();
+                        unsafe {
+                            self.d3d_context.Map(
+                                texture,
+                                0,
+                                D3D11_MAP_WRITE_DISCARD,
+                                0,
+                                Some(&mut mappend),
+                            )?;
+                        }
+
+                        unsafe {
+                            std::slice::from_raw_parts_mut(mappend.pData as *mut u8, data[0].len())
+                        }
+                        .copy_from_slice(data[0]);
+
+                        {
+                            let buffer = unsafe {
+                                std::slice::from_raw_parts_mut(
+                                    mappend.pData.add(data[0].len()) as *mut u8,
+                                    data[1].len() + data[2].len(),
+                                )
+                            };
+
+                            let mut index = 0;
+                            for i in 0..data[1].len() {
+                                buffer[index] = data[1][i];
+                                buffer[index + 1] = data[2][i];
+                                index += 2;
+                            }
+                        }
+
+                        unsafe {
+                            self.d3d_context.Unmap(texture, 0);
+                            self.d3d_context.CopyResource(&self.input_texture, texture);
+                        }
+                    }
+                }
+            };
 
             Ok(())
         }
@@ -360,11 +493,30 @@ pub mod win32 {
         }
 
         pub fn get_output_buffer(&mut self) -> Result<TextureBuffer, Error> {
-            Ok(TextureBuffer::new(
-                &self.d3d_device,
-                &self.d3d_context,
-                &self.output_texture,
-            )?)
+            if self.output_sw_texture.is_none() {
+                unsafe {
+                    let mut desc = D3D11_TEXTURE2D_DESC::default();
+                    self.output_texture.GetDesc(&mut desc);
+
+                    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+                    desc.Usage = D3D11_USAGE_STAGING;
+                    desc.BindFlags = 0;
+                    desc.MiscFlags = 0;
+
+                    let mut texture = None;
+                    self.d3d_device
+                        .CreateTexture2D(&desc, None, Some(&mut texture))?;
+
+                    self.output_sw_texture = Some(texture.unwrap());
+                };
+            }
+
+            let texture = self.output_sw_texture.as_ref().unwrap();
+            unsafe {
+                self.d3d_context.CopyResource(texture, &self.output_texture);
+            }
+
+            Ok(TextureBuffer::new(&self.d3d_context, texture)?)
         }
 
         pub fn process(
@@ -395,7 +547,7 @@ pub mod win32 {
 
     pub struct TextureBuffer<'a> {
         d3d_context: &'a ID3D11DeviceContext,
-        texture: ID3D11Texture2D,
+        texture: &'a ID3D11Texture2D,
         resource: D3D11_MAPPED_SUBRESOURCE,
     }
 
@@ -404,31 +556,12 @@ pub mod win32 {
 
     impl<'a> TextureBuffer<'a> {
         pub fn new(
-            d3d_device: &ID3D11Device,
             d3d_context: &'a ID3D11DeviceContext,
-            source_texture: &ID3D11Texture2D,
+            texture: &'a ID3D11Texture2D,
         ) -> Result<Self, Error> {
-            let texture = unsafe {
-                let mut desc = D3D11_TEXTURE2D_DESC::default();
-                source_texture.GetDesc(&mut desc);
-
-                desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
-                desc.Usage = D3D11_USAGE_STAGING;
-                desc.BindFlags = 0;
-                desc.MiscFlags = 0;
-
-                let mut texture = None;
-                d3d_device.CreateTexture2D(&desc, None, Some(&mut texture))?;
-                texture.unwrap()
-            };
-
-            unsafe {
-                d3d_context.CopyResource(&texture, source_texture);
-            }
-
             let mut resource = D3D11_MAPPED_SUBRESOURCE::default();
             unsafe {
-                d3d_context.Map(&texture, 0, D3D11_MAP_READ, 0, Some(&mut resource))?;
+                d3d_context.Map(texture, 0, D3D11_MAP_READ, 0, Some(&mut resource))?;
             }
 
             Ok(Self {
@@ -454,8 +587,34 @@ pub mod win32 {
     impl Drop for TextureBuffer<'_> {
         fn drop(&mut self) {
             unsafe {
-                self.d3d_context.Unmap(&self.texture, 0);
+                self.d3d_context.Unmap(self.texture, 0);
             }
+        }
+    }
+
+    fn is_single_allocation<T>(source: &[&[T]]) -> bool {
+        let mut size = 0;
+        let mut offset = 0;
+
+        for it in source {
+            if size > 0 {
+                if offset + size != it.as_ptr() as usize {
+                    return false;
+                }
+            }
+
+            size = it.len();
+            offset = it.as_ptr() as usize;
+        }
+
+        true
+    }
+
+    fn video_fmt_to_dxgi_fmt(format: VideoFormat) -> DXGI_FORMAT {
+        match format {
+            VideoFormat::NV12 | VideoFormat::I420 => DXGI_FORMAT_NV12,
+            VideoFormat::RGBA => DXGI_FORMAT_R8G8B8A8_UNORM,
+            VideoFormat::BGRA => DXGI_FORMAT_B8G8R8A8_UNORM,
         }
     }
 }

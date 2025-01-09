@@ -608,13 +608,13 @@ impl<'a> VideoRender<'a> {
                         unsafe {
                             from_raw_parts(
                                 frame.data[1] as *const _,
-                                frame.linesize[1] * frame.height as usize,
+                                frame.linesize[1] * (frame.height as usize / 2),
                             )
                         },
                         unsafe {
                             from_raw_parts(
                                 frame.data[2] as *const _,
-                                frame.linesize[2] * frame.height as usize,
+                                frame.linesize[2] * (frame.height as usize / 2),
                             )
                         },
                     ],
