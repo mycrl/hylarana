@@ -274,7 +274,7 @@ impl CaptureHandler for ScreenCapture {
     ) -> Result<(), Self::Error> {
         let source = Monitor::enumerate()?
             .into_iter()
-            .find(|it| it.name().ok() == Some(options.source.name.clone()))
+            .find(|it| it.device_name().ok() == Some(options.source.id.clone()))
             .ok_or_else(|| ScreenCaptureError::NotFoundScreenSource)?;
 
         // Start capturing the screen. This runs in a free thread. If it runs in the
