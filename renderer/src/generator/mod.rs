@@ -33,7 +33,7 @@ use wgpu::{
 };
 
 #[derive(Debug, Error)]
-pub enum FromNativeResourceError {
+pub enum GeneratorError {
     #[error(transparent)]
     TransformError(#[from] TransformError),
 }
@@ -275,7 +275,7 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new(options: GeneratorOptions) -> Result<Self, FromNativeResourceError> {
+    pub fn new(options: GeneratorOptions) -> Result<Self, GeneratorError> {
         #[cfg(target_os = "windows")]
         let transformer = Transformer::new(options.device.clone(), options.direct3d);
 
@@ -300,7 +300,7 @@ impl Generator {
     pub fn get_view(
         &mut self,
         texture: Texture,
-    ) -> Result<Option<(&RenderPipeline, BindGroup)>, FromNativeResourceError> {
+    ) -> Result<Option<(&RenderPipeline, BindGroup)>, GeneratorError> {
         // Not yet initialized, initialize the environment first.
         if self.sample.is_none() {
             let size = texture.size();

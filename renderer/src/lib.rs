@@ -7,7 +7,7 @@ use std::sync::Arc;
 use self::vertex::Vertex;
 
 pub use self::generator::{
-    FromNativeResourceError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
+    GeneratorError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
 };
 
 use common::Size;
@@ -37,7 +37,7 @@ pub enum GraphicsError {
     #[error(transparent)]
     CreateSurfaceError(#[from] wgpu::CreateSurfaceError),
     #[error(transparent)]
-    FromNativeResourceError(#[from] FromNativeResourceError),
+    GeneratorError(#[from] GeneratorError),
 }
 
 #[derive(Debug)]
