@@ -33,9 +33,6 @@ use hylarana_common::win32::{
     startup as win32_startup, windows::Win32::Foundation::HWND, Direct3DDevice, ProcessPriority,
 };
 
-#[cfg(target_os = "macos")]
-use hylarana_common::macos::{CVPixelBufferRef, PixelBufferRef};
-
 use parking_lot::Mutex;
 
 #[cfg(target_os = "windows")]
@@ -514,29 +511,29 @@ impl<'a> VideoRender<'a> {
             }
             #[cfg(target_os = "macos")]
             VideoSubFormat::CvPixelBufferRef => {
-                let pixel_buffer = PixelBufferRef::from(frame.data[0] as CVPixelBufferRef);
-                let linesize = pixel_buffer.linesize();
-                let data = pixel_buffer.data();
-                let size = pixel_buffer.size();
+                // let pixel_buffer = PixelBufferRef::from(frame.data[0] as CVPixelBufferRef);
+                // let linesize = pixel_buffer.linesize();
+                // let data = pixel_buffer.data();
+                // let size = pixel_buffer.size();
 
-                let buffers = [
-                    unsafe {
-                        from_raw_parts(data[0] as *const _, linesize[0] * size.height as usize)
-                    },
-                    unsafe {
-                        from_raw_parts(data[1] as *const _, linesize[1] * size.height as usize)
-                    },
-                    &[],
-                ];
+                // let buffers = [
+                //     unsafe {
+                //         from_raw_parts(data[0] as *const _, linesize[0] * size.height as usize)
+                //     },
+                //     unsafe {
+                //         from_raw_parts(data[1] as *const _, linesize[1] * size.height as usize)
+                //     },
+                //     &[],
+                // ];
 
-                match self {
-                    Self::WebGPU(render) => render.submit(Texture::Nv12(
-                        Texture2DResource::Buffer(Texture2DBuffer {
-                            buffers: &buffers,
-                            size,
-                        }),
-                    ))?,
-                }
+                // match self {
+                //     Self::WebGPU(render) => render.submit(Texture::Nv12(
+                //         Texture2DResource::Buffer(Texture2DBuffer {
+                //             buffers: &buffers,
+                //             size,
+                //         }),
+                //     ))?,
+                // }
             }
             VideoSubFormat::SW => {
                 let buffers = match frame.format {
