@@ -1,8 +1,8 @@
 #[cfg(target_os = "windows")]
-mod direct3d;
+pub mod direct3d;
 
 #[cfg(target_os = "macos")]
-mod metal;
+pub mod metal;
 
 use thiserror::Error;
 
@@ -10,7 +10,7 @@ use thiserror::Error;
 pub enum TransformError {
     #[cfg(target_os = "windows")]
     #[error(transparent)]
-    DxError(#[from] hylarana_common::win32::windows::core::Error),
+    DxError(#[from] common::win32::windows::core::Error),
     #[error("not found wgpu dx12 device")]
     NotFoundDxBackend,
     #[error("dx11 shared handle is invalid")]

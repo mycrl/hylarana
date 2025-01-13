@@ -6,7 +6,7 @@ use std::{
     thread,
 };
 
-use hylarana_common::{
+use common::{
     atomic::EasyAtomic,
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
     Size,

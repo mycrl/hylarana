@@ -7,7 +7,7 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use hylarana_common::atomic::{AtomicOption, EasyAtomic};
+use common::atomic::{AtomicOption, EasyAtomic};
 use parking_lot::Mutex;
 
 struct Channel<T>(Sender<Option<T>>, Mutex<Receiver<Option<T>>>);

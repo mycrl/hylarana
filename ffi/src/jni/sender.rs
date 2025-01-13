@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bytes::BytesMut;
-use hylarana_transport::{
+use transport::{
     create_sender, with_capacity as package_with_capacity, StreamBufferInfo, StreamSenderAdapter,
     TransportOptions, TransportSender,
 };

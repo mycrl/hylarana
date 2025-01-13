@@ -3,8 +3,8 @@ use std::{
     mem::ManuallyDrop,
 };
 
+use common::strings::PSTR;
 use hylarana::{Capture, Source, SourceType};
-use hylarana_common::strings::PSTR;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -66,7 +66,7 @@ struct RawSources {
 
 /// Get capture sources from sender.
 #[no_mangle]
-extern "C" fn hylarana_get_sources(kind: RawSourceType) -> RawSources {
+extern "C" fn get_sources(kind: RawSourceType) -> RawSources {
     log::info!("extern api: hylarana get sources: kind={:?}", kind);
 
     let mut items = ManuallyDrop::new(
@@ -97,7 +97,7 @@ extern "C" fn hylarana_get_sources(kind: RawSourceType) -> RawSources {
 /// Because `Sources` are allocated internally, they also need to be
 /// released internally.
 #[no_mangle]
-extern "C" fn hylarana_sources_destroy(sources: *const RawSources) {
+extern "C" fn sources_destroy(sources: *const RawSources) {
     assert!(!sources.is_null());
 
     let sources = unsafe { &*sources };

@@ -4,11 +4,11 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use hylarana_transport::{StreamBufferInfo, StreamKind, TransportOptions, TransportStrategy};
 use jni::{
     objects::{JMap, JObject, JObjectArray, JString, JValueGen},
     JNIEnv,
 };
+use transport::{StreamBufferInfo, StreamKind, TransportOptions, TransportStrategy};
 
 pub trait TransformObject: Sized {
     #[allow(unused)]

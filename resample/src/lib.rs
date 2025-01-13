@@ -74,7 +74,7 @@ impl AudioResampler {
 pub mod win32 {
     use std::mem::ManuallyDrop;
 
-    use hylarana_common::{
+    use common::{
         frame::VideoFormat,
         win32::{
             windows::{

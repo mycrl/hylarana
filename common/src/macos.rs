@@ -4,9 +4,9 @@
 
 // use core_video_sys::{
 //     kCVPixelBufferLock_ReadOnly, CVPixelBufferGetBaseAddressOfPlane,
-//     CVPixelBufferGetBytesPerRowOfPlane, CVPixelBufferGetHeight, CVPixelBufferGetWidth,
-//     CVPixelBufferLockBaseAddress, CVPixelBufferUnlockBaseAddress,
-// };
+//     CVPixelBufferGetBytesPerRowOfPlane, CVPixelBufferGetHeight,
+// CVPixelBufferGetWidth,     CVPixelBufferLockBaseAddress,
+// CVPixelBufferUnlockBaseAddress, };
 
 // pub use core_video_sys::CVPixelBufferRef;
 
@@ -34,8 +34,8 @@
 // impl From<CVPixelBufferRef> for PixelBufferRef {
 //     fn from(buffer: CVPixelBufferRef) -> Self {
 //         unsafe {
-//             CVPixelBufferLockBaseAddress(buffer, kCVPixelBufferLock_ReadOnly);
-//         }
+//             CVPixelBufferLockBaseAddress(buffer,
+// kCVPixelBufferLock_ReadOnly);         }
 
 //         let mut this = Self {
 //             size: Size {
@@ -48,8 +48,9 @@
 //         };
 
 //         for i in 0..2 {
-//             this.data[i] = unsafe { CVPixelBufferGetBaseAddressOfPlane(buffer, i) as *const _ };
-//             this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(buffer, i) };
+//             this.data[i] = unsafe {
+// CVPixelBufferGetBaseAddressOfPlane(buffer, i) as *const _ };
+// this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(buffer, i) };
 //         }
 
 //         this
@@ -59,7 +60,7 @@
 // impl Drop for PixelBufferRef {
 //     fn drop(&mut self) {
 //         unsafe {
-//             CVPixelBufferUnlockBaseAddress(self.buffer, kCVPixelBufferLock_ReadOnly);
-//         }
+//             CVPixelBufferUnlockBaseAddress(self.buffer,
+// kCVPixelBufferLock_ReadOnly);         }
 //     }
 // }

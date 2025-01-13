@@ -5,25 +5,23 @@ use std::{
     thread,
 };
 
-use hylarana_codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings, VideoDecoderType};
-use hylarana_common::atomic::EasyAtomic;
-use hylarana_transport::{
-    StreamKind, StreamMultiReceiverAdapter, TransportOptions, TransportReceiver,
-};
+use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings, VideoDecoderType};
+use common::atomic::EasyAtomic;
+use transport::{StreamKind, StreamMultiReceiverAdapter, TransportOptions, TransportReceiver};
 
 use thiserror::Error;
 
 #[cfg(target_os = "windows")]
-use hylarana_common::win32::MediaThreadClass;
+use common::win32::MediaThreadClass;
 
 #[derive(Debug, Error)]
 pub enum HylaranaReceiverError {
     #[error(transparent)]
     CreateThreadError(#[from] std::io::Error),
     #[error(transparent)]
-    VideoDecoderError(#[from] hylarana_codec::VideoDecoderError),
+    VideoDecoderError(#[from] codec::VideoDecoderError),
     #[error(transparent)]
-    AudioDecoderError(#[from] hylarana_codec::AudioDecoderError),
+    AudioDecoderError(#[from] codec::AudioDecoderError),
 }
 
 /// Receiver media codec configuration.
@@ -167,7 +165,7 @@ impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
     ) -> Result<Self, HylaranaReceiverError> {
         log::info!("create receiver");
 
-        let transport = hylarana_transport::create_split_receiver(id, options.transport)?;
+        let transport = transport::create_split_receiver(id, options.transport)?;
         let status = Arc::new(AtomicBool::new(false));
         let sink = Arc::new(sink);
 

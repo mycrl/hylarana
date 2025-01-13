@@ -11,14 +11,13 @@ use self::{
     player::{Player, RawPlayerOptions},
 };
 
+use common::{logger, strings::PSTR};
 use hylarana::{
-    shutdown, startup, AudioOptions, Hylarana, HylaranaReceiver, HylaranaReceiverCodecOptions,
+    AudioOptions, Hylarana, HylaranaReceiver, HylaranaReceiverCodecOptions,
     HylaranaReceiverOptions, HylaranaSender, HylaranaSenderMediaOptions, HylaranaSenderOptions,
     HylaranaSenderTrackOptions, TransportOptions, TransportStrategy, VideoDecoderType,
     VideoEncoderType, VideoOptions,
 };
-
-use hylarana_common::{logger, strings::PSTR};
 
 // In fact, this is a package that is convenient for recording errors. If the
 // result is an error message, it is output to the log. This function does not
@@ -43,10 +42,10 @@ extern "system" fn DllMain(
     reserved: *const std::ffi::c_void,
 ) -> bool {
     match call_reason {
-        1 /* DLL_PROCESS_ATTACH */ => hylarana_startup(),
+        1 /* DLL_PROCESS_ATTACH */ => startup(),
         0 /* DLL_PROCESS_DETACH */ => {
             if reserved.is_null() {
-                hylarana_shutdown();
+                shutdown();
             }
 
             true
@@ -58,11 +57,11 @@ extern "system" fn DllMain(
 /// Initialize the environment, which must be initialized before using the
 /// SDK.
 #[no_mangle]
-extern "C" fn hylarana_startup() -> bool {
+extern "C" fn startup() -> bool {
     log_error((|| {
         logger::init_logger(log::LevelFilter::Info, None)?;
 
-        startup()?;
+        hylarana::startup()?;
         Ok::<_, anyhow::Error>(())
     })())
     .is_ok()
@@ -71,10 +70,10 @@ extern "C" fn hylarana_startup() -> bool {
 /// Cleans up the environment when the SDK exits, and is recommended to be
 /// called when the application exits.
 #[no_mangle]
-extern "C" fn hylarana_shutdown() {
+extern "C" fn shutdown() {
     log::info!("extern api: hylarana quit");
 
-    let _ = log_error(shutdown());
+    let _ = log_error(hylarana::shutdown());
 }
 
 #[repr(C)]
@@ -238,7 +237,7 @@ struct RawSender(HylaranaSender<RawAVFrameStream>);
 /// get the device screen or sound callback, callback can be null, if it is
 /// null then it means no callback data is needed.
 #[no_mangle]
-extern "C" fn hylarana_create_sender(
+extern "C" fn create_sender(
     options: RawSenderOptions,
     sink: RawAVFrameStream,
     id: *mut c_char,
@@ -262,7 +261,7 @@ extern "C" fn hylarana_create_sender(
 
 /// Destroy sender.
 #[no_mangle]
-extern "C" fn hylarana_sender_destroy(sender: *mut RawSender) {
+extern "C" fn sender_destroy(sender: *mut RawSender) {
     assert!(!sender.is_null());
 
     log::info!("extern api: hylarana close sender");
@@ -277,7 +276,7 @@ struct RawSenderWithPlayer(HylaranaSender<Player>);
 /// together, you don't need to implement the stream sink manually, the player
 /// manages it automatically.
 #[no_mangle]
-extern "C" fn hylarana_create_sender_with_player(
+extern "C" fn create_sender_with_player(
     options: RawSenderOptions,
     player_options: RawPlayerOptions,
     id: *mut c_char,
@@ -301,7 +300,7 @@ extern "C" fn hylarana_create_sender_with_player(
 
 /// Destroy sender with player.
 #[no_mangle]
-extern "C" fn hylarana_sender_with_player_destroy(sender: *mut RawSenderWithPlayer) {
+extern "C" fn sender_with_player_destroy(sender: *mut RawSenderWithPlayer) {
     assert!(!sender.is_null());
 
     log::info!("extern api: hylarana close sender with player");
@@ -346,7 +345,7 @@ struct RawReceiver(HylaranaReceiver<RawAVFrameStream>);
 /// Create a receiver, specify a bound NIC address, you can pass callback to
 /// get the sender's screen or sound callback, callback can not be null.
 #[no_mangle]
-extern "C" fn hylarana_create_receiver(
+extern "C" fn create_receiver(
     id: *const c_char,
     options: RawReceiverOptions,
     sink: RawAVFrameStream,
@@ -373,7 +372,7 @@ extern "C" fn hylarana_create_receiver(
 
 /// Destroy receiver.
 #[no_mangle]
-extern "C" fn hylarana_receiver_destroy(receiver: *mut RawReceiver) {
+extern "C" fn receiver_destroy(receiver: *mut RawReceiver) {
     assert!(!receiver.is_null());
 
     log::info!("extern api: hylarana close receiver");
@@ -388,7 +387,7 @@ struct RawReceiverWithPlayer(HylaranaReceiver<Player>);
 /// together, you don't need to implement the stream sink manually, the player
 /// manages it automatically.
 #[no_mangle]
-extern "C" fn hylarana_create_receiver_with_player(
+extern "C" fn create_receiver_with_player(
     id: *const c_char,
     options: RawReceiverOptions,
     player_options: RawPlayerOptions,
@@ -415,7 +414,7 @@ extern "C" fn hylarana_create_receiver_with_player(
 
 /// Destroy receiver with player.
 #[no_mangle]
-extern "C" fn hylarana_receiver_with_player_destroy(receiver: *mut RawReceiverWithPlayer) {
+extern "C" fn receiver_with_player_destroy(receiver: *mut RawReceiverWithPlayer) {
     assert!(!receiver.is_null());
 
     log::info!("extern api: hylarana close receiver with player");

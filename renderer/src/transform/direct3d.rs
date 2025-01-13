@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::TransformError;
 
-use hylarana_common::win32::{
+use common::win32::{
     windows::Win32::Graphics::{
         Direct3D11::{ID3D11Texture2D, D3D11_RESOURCE_MISC_SHARED, D3D11_USAGE_DEFAULT},
         Direct3D12::ID3D12Resource,
@@ -12,38 +12,38 @@ use hylarana_common::win32::{
 };
 
 use wgpu::{
-    hal::api::Dx12, Device, Extent3d, Texture, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureUsages,
+    hal::api::Dx12, Device, Extent3d, Texture, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages,
 };
 
-pub struct Interop {
+pub struct Transformer {
     device: Arc<Device>,
     direct3d: Direct3DDevice,
-    dx_texture: Option<ID3D11Texture2D>,
+    hal_texture: Option<ID3D11Texture2D>,
     texture: Option<Texture>,
 }
 
-unsafe impl Sync for Interop {}
-unsafe impl Send for Interop {}
+unsafe impl Sync for Transformer {}
+unsafe impl Send for Transformer {}
 
-impl Interop {
+impl Transformer {
     pub fn new(device: Arc<Device>, direct3d: Direct3DDevice) -> Self {
         Self {
-            dx_texture: None,
+            hal_texture: None,
             texture: None,
             direct3d,
             device,
         }
     }
 
-    pub fn from_hal(
+    pub fn transform(
         &mut self,
         texture: &ID3D11Texture2D,
         index: u32,
     ) -> Result<&Texture, TransformError> {
         // The first texture received, the texture is not initialized yet, initialize
         // the texture here.
-        if self.dx_texture.is_none() {
+        if self.hal_texture.is_none() {
             // Gets the incoming texture properties, the new texture contains only an array
             // of textures and is a shareable texture resource.
             let mut desc = texture.desc();
@@ -72,7 +72,7 @@ impl Interop {
             if handle.is_invalid() {
                 return Err(TransformError::InvalidDxSharedHandle);
             } else {
-                self.dx_texture = Some(tex);
+                self.hal_texture = Some(tex);
             }
 
             // dx12 device opens dx11 shared resource handle
@@ -128,7 +128,7 @@ impl Interop {
         }
 
         // Copies the input texture to the internal texture.
-        if let Some(dest_tex) = self.dx_texture.as_ref() {
+        if let Some(dest_tex) = self.hal_texture.as_ref() {
             unsafe {
                 self.direct3d
                     .context

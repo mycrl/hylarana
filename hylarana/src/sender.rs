@@ -6,23 +6,23 @@ use std::{
 };
 
 use bytes::BytesMut;
-use hylarana_capture::{
+use capture::{
     AudioCaptureSourceDescription, Capture, CaptureOptions, FrameArrived, Source,
     SourceCaptureOptions, VideoCaptureSourceDescription,
 };
 
-use hylarana_common::{
+use common::{
     atomic::EasyAtomic,
     frame::{AudioFrame, VideoFrame},
     Size,
 };
 
-use hylarana_codec::{
+use codec::{
     create_opus_identification_header, AudioEncoder, AudioEncoderSettings, CodecType, VideoEncoder,
     VideoEncoderSettings, VideoEncoderType,
 };
 
-use hylarana_transport::{
+use transport::{
     copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
     TransportOptions, TransportSender,
 };
@@ -34,11 +34,11 @@ pub enum HylaranaSenderError {
     #[error(transparent)]
     TransportError(#[from] std::io::Error),
     #[error(transparent)]
-    CaptureError(#[from] hylarana_capture::CaptureError),
+    CaptureError(#[from] capture::CaptureError),
     #[error(transparent)]
-    VideoEncoderError(#[from] hylarana_codec::VideoEncoderError),
+    VideoEncoderError(#[from] codec::VideoEncoderError),
     #[error(transparent)]
-    AudioEncoderError(#[from] hylarana_codec::AudioEncoderError),
+    AudioEncoderError(#[from] codec::AudioEncoderError),
 }
 
 /// Description of video coding.
@@ -315,7 +315,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
         log::info!("create sender");
 
         let mut capture_options = CaptureOptions::default();
-        let transport = hylarana_transport::create_sender(options.transport)?;
+        let transport = transport::create_sender(options.transport)?;
         let status = Arc::new(AtomicBool::new(false));
         let sink = Arc::new(sink);
 

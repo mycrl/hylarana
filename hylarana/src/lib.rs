@@ -16,19 +16,19 @@ pub use self::{
     },
 };
 
-pub use hylarana_capture::{Capture, Source, SourceType};
-pub use hylarana_codec::{VideoDecoderType, VideoEncoderType};
-pub use hylarana_common::{
+pub use capture::{Capture, Source, SourceType};
+pub use codec::{VideoDecoderType, VideoEncoderType};
+pub use common::{
     frame::{AudioFrame, VideoFormat, VideoFrame, VideoSubFormat},
     Size,
 };
 
-pub use hylarana_discovery::{DiscoveryError, DiscoveryService};
-pub use hylarana_graphics::{raw_window_handle, SurfaceTarget};
-pub use hylarana_transport::{TransportOptions, TransportStrategy};
+pub use discovery::{DiscoveryError, DiscoveryService};
+pub use renderer::{raw_window_handle, SurfaceTarget};
+pub use transport::{TransportOptions, TransportStrategy};
 
 #[cfg(target_os = "windows")]
-use hylarana_common::win32::{
+use common::win32::{
     d3d_texture_borrowed_raw, set_process_priority, shutdown as win32_shutdown,
     startup as win32_startup, windows::Win32::Foundation::HWND, Direct3DDevice, ProcessPriority,
 };
@@ -39,9 +39,9 @@ use parking_lot::Mutex;
 use parking_lot::RwLock;
 
 #[cfg(target_os = "windows")]
-use hylarana_graphics::dx11::Dx11Renderer;
+use renderer::dx11::Dx11Renderer;
 
-use hylarana_graphics::{
+use renderer::{
     Renderer as WgpuRenderer, RendererOptions as WgpuRendererOptions, Texture, Texture2DBuffer,
     Texture2DResource,
 };
@@ -53,7 +53,7 @@ use thiserror::Error;
 pub enum HylaranaError {
     #[error(transparent)]
     #[cfg(target_os = "windows")]
-    Win32Error(#[from] hylarana_common::win32::windows::core::Error),
+    Win32Error(#[from] common::win32::windows::core::Error),
     #[error(transparent)]
     TransportError(#[from] std::io::Error),
 }
@@ -78,12 +78,12 @@ pub fn startup() -> Result<(), HylaranaError> {
     }
 
     #[cfg(target_os = "linux")]
-    hylarana_capture::startup();
+    capture::startup();
 
-    hylarana_codec::startup();
+    codec::startup();
     log::info!("codec initialized");
 
-    hylarana_transport::startup();
+    transport::startup();
     log::info!("transport initialized");
 
     log::info!("all initialized");
@@ -95,8 +95,8 @@ pub fn startup() -> Result<(), HylaranaError> {
 pub fn shutdown() -> Result<(), HylaranaError> {
     log::info!("hylarana shutdown");
 
-    hylarana_codec::shutdown();
-    hylarana_transport::shutdown();
+    codec::shutdown();
+    transport::shutdown();
 
     #[cfg(target_os = "windows")]
     if let Err(e) = win32_shutdown() {
@@ -297,9 +297,9 @@ where
 pub enum VideoRenderError {
     #[error(transparent)]
     #[cfg(target_os = "windows")]
-    Dx11GraphicsError(#[from] hylarana_graphics::dx11::Dx11GraphicsError),
+    Dx11GraphicsError(#[from] renderer::dx11::Dx11GraphicsError),
     #[error(transparent)]
-    GraphicsError(#[from] hylarana_graphics::GraphicsError),
+    GraphicsError(#[from] renderer::GraphicsError),
     #[error("invalid d3d11texture2d texture")]
     #[cfg(target_os = "windows")]
     InvalidD3D11Texture,
@@ -489,13 +489,12 @@ impl<'a> VideoRender<'a> {
         match frame.sub_format {
             #[cfg(target_os = "windows")]
             VideoSubFormat::D3D11 => {
-                let texture =
-                    Texture2DResource::Texture(hylarana_graphics::Texture2DRaw::ID3D11Texture2D(
-                        d3d_texture_borrowed_raw(&(frame.data[0] as *mut _))
-                            .ok_or_else(|| VideoRenderError::InvalidD3D11Texture)?
-                            .clone(),
-                        frame.data[1] as u32,
-                    ));
+                let texture = Texture2DResource::Texture(renderer::Texture2DRaw::ID3D11Texture2D(
+                    d3d_texture_borrowed_raw(&(frame.data[0] as *mut _))
+                        .ok_or_else(|| VideoRenderError::InvalidD3D11Texture)?
+                        .clone(),
+                    frame.data[1] as u32,
+                ));
 
                 let texture = match frame.format {
                     VideoFormat::BGRA => Texture::Bgra(texture),
@@ -511,18 +510,19 @@ impl<'a> VideoRender<'a> {
             }
             #[cfg(target_os = "macos")]
             VideoSubFormat::CvPixelBufferRef => {
-                // let pixel_buffer = PixelBufferRef::from(frame.data[0] as CVPixelBufferRef);
-                // let linesize = pixel_buffer.linesize();
-                // let data = pixel_buffer.data();
-                // let size = pixel_buffer.size();
+                // let pixel_buffer = PixelBufferRef::from(frame.data[0] as
+                // CVPixelBufferRef); let linesize =
+                // pixel_buffer.linesize(); let data =
+                // pixel_buffer.data(); let size =
+                // pixel_buffer.size();
 
                 // let buffers = [
                 //     unsafe {
-                //         from_raw_parts(data[0] as *const _, linesize[0] * size.height as usize)
-                //     },
+                //         from_raw_parts(data[0] as *const _, linesize[0] *
+                // size.height as usize)     },
                 //     unsafe {
-                //         from_raw_parts(data[1] as *const _, linesize[1] * size.height as usize)
-                //     },
+                //         from_raw_parts(data[1] as *const _, linesize[1] *
+                // size.height as usize)     },
                 //     &[],
                 // ];
 

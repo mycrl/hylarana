@@ -1,25 +1,22 @@
-mod bgra;
-mod i420;
-mod nv12;
-mod rgba;
+mod texture;
 
 use std::{borrow::Cow, sync::Arc};
 
-use self::{bgra::Bgra, i420::I420, nv12::Nv12, rgba::Rgba};
+use self::texture::{bgra::Bgra, i420::I420, nv12::Nv12, rgba::Rgba};
 use crate::{transform::TransformError, Vertex};
 
 #[cfg(target_os = "windows")]
-use crate::transform::direct3d::Transform;
+use crate::transform::direct3d::Transformer;
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-type Transform = ();
+type Transformer = ();
 
-use hylarana_common::Size;
+use common::Size;
 use smallvec::SmallVec;
 use thiserror::Error;
 
 #[cfg(target_os = "windows")]
-use hylarana_common::win32::{
+use common::win32::{
     windows::Win32::Graphics::Direct3D11::ID3D11Texture2D, Direct3DDevice, EasyTexture,
 };
 
@@ -49,16 +46,6 @@ pub enum Texture2DRaw {
 
 impl Texture2DRaw {
     #[cfg(target_os = "windows")]
-    pub(crate) fn texture<'b>(
-        &self,
-        interop: &'b mut Interop,
-    ) -> Result<&'b WGPUTexture, FromNativeResourceError> {
-        Ok(match self {
-            Self::ID3D11Texture2D(dx11, index) => interop.from_hal(dx11, *index)?,
-        })
-    }
-
-    #[cfg(target_os = "windows")]
     pub(crate) fn size(&self) -> Size {
         match self {
             Self::ID3D11Texture2D(dx11, _) => {
@@ -86,20 +73,6 @@ pub enum Texture2DResource<'a> {
 }
 
 impl<'a> Texture2DResource<'a> {
-    /// Get the hardware texture, here does not deal with software texture, so
-    /// if it is software texture directly return None.
-    #[allow(unused_variables)]
-    pub(crate) fn texture<'b>(
-        &self,
-        interop: &'b mut Transform,
-    ) -> Result<Option<&'b WGPUTexture>, FromNativeResourceError> {
-        Ok(match self {
-            #[cfg(target_os = "windows")]
-            Texture2DResource::Texture(texture) => Some(texture.texture(interop)?),
-            Texture2DResource::Buffer(_) => None,
-        })
-    }
-
     pub(crate) fn size(&self) -> Size {
         match self {
             #[cfg(target_os = "windows")]
@@ -118,18 +91,6 @@ pub enum Texture<'a> {
 }
 
 impl<'a> Texture<'a> {
-    pub(crate) fn texture<'b>(
-        &self,
-        interop: &'b mut Transform,
-    ) -> Result<Option<&'b WGPUTexture>, FromNativeResourceError> {
-        Ok(match self {
-            Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
-                texture.texture(interop)?
-            }
-            Texture::I420(_) => None,
-        })
-    }
-
     pub(crate) fn size(&self) -> Size {
         match self {
             Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
@@ -297,58 +258,29 @@ enum Texture2DSourceSample {
     I420(I420),
 }
 
-impl Texture2DSourceSample {
-    fn from_texture(device: &Device, texture: &Texture, size: Size) -> Self {
-        match texture {
-            Texture::Bgra(_) => Self::Bgra(Bgra::new(device, size)),
-            Texture::Rgba(_) => Self::Rgba(Rgba::new(device, size)),
-            Texture::Nv12(_) => Self::Nv12(Nv12::new(device, size)),
-            Texture::I420(_) => Self::I420(I420::new(device, size)),
-        }
-    }
-
-    fn fragment(&self) -> ShaderModuleDescriptor {
-        match self {
-            Texture2DSourceSample::Rgba(_) => Rgba::fragment_shader(),
-            Texture2DSourceSample::Bgra(_) => Bgra::fragment_shader(),
-            Texture2DSourceSample::Nv12(_) => Nv12::fragment_shader(),
-            Texture2DSourceSample::I420(_) => I420::fragment_shader(),
-        }
-    }
-
-    fn bind_group_layout(&self, device: &Device) -> BindGroupLayout {
-        match self {
-            Self::Bgra(texture) => texture.bind_group_layout(device),
-            Self::Rgba(texture) => texture.bind_group_layout(device),
-            Self::Nv12(texture) => texture.bind_group_layout(device),
-            Self::I420(texture) => texture.bind_group_layout(device),
-        }
-    }
-}
-
-pub struct Texture2DSourceOptions {
+pub struct GeneratorOptions {
     #[cfg(target_os = "windows")]
     pub direct3d: Direct3DDevice,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
 }
 
-pub struct Texture2DSource {
+pub struct Generator {
     device: Arc<Device>,
     queue: Arc<Queue>,
     pipeline: Option<RenderPipeline>,
     sample: Option<Texture2DSourceSample>,
     bind_group_layout: Option<BindGroupLayout>,
-    transform: Transform,
+    transformer: Transformer,
 }
 
-impl Texture2DSource {
-    pub fn new(options: Texture2DSourceOptions) -> Result<Self, FromNativeResourceError> {
+impl Generator {
+    pub fn new(options: GeneratorOptions) -> Result<Self, FromNativeResourceError> {
         #[cfg(target_os = "windows")]
-        let transform = Transform::new(options.device.clone(), options.direct3d);
+        let transformer = Transformer::new(options.device.clone(), options.direct3d);
 
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        let transform = ();
+        let transformer = ();
 
         Ok(Self {
             device: options.device,
@@ -356,7 +288,7 @@ impl Texture2DSource {
             bind_group_layout: None,
             pipeline: None,
             sample: None,
-            transform,
+            transformer,
         })
     }
 
@@ -372,8 +304,19 @@ impl Texture2DSource {
         // Not yet initialized, initialize the environment first.
         if self.sample.is_none() {
             let size = texture.size();
-            let sample = Texture2DSourceSample::from_texture(&self.device, &texture, size);
-            let bind_group_layout = sample.bind_group_layout(&self.device);
+            let sample = match texture {
+                Texture::Bgra(_) => Texture2DSourceSample::Bgra(Bgra::new(&self.device, size)),
+                Texture::Rgba(_) => Texture2DSourceSample::Rgba(Rgba::new(&self.device, size)),
+                Texture::Nv12(_) => Texture2DSourceSample::Nv12(Nv12::new(&self.device, size)),
+                Texture::I420(_) => Texture2DSourceSample::I420(I420::new(&self.device, size)),
+            };
+
+            let bind_group_layout = match &sample {
+                Texture2DSourceSample::Bgra(texture) => texture.bind_group_layout(&self.device),
+                Texture2DSourceSample::Rgba(texture) => texture.bind_group_layout(&self.device),
+                Texture2DSourceSample::Nv12(texture) => texture.bind_group_layout(&self.device),
+                Texture2DSourceSample::I420(texture) => texture.bind_group_layout(&self.device),
+            };
 
             let pipeline =
                 self.device
@@ -397,7 +340,12 @@ impl Texture2DSource {
                         },
                         fragment: Some(FragmentState {
                             entry_point: Some("main"),
-                            module: &self.device.create_shader_module(sample.fragment()),
+                            module: &self.device.create_shader_module(match &sample {
+                                Texture2DSourceSample::Rgba(_) => Rgba::fragment_shader(),
+                                Texture2DSourceSample::Bgra(_) => Bgra::fragment_shader(),
+                                Texture2DSourceSample::Nv12(_) => Nv12::fragment_shader(),
+                                Texture2DSourceSample::I420(_) => I420::fragment_shader(),
+                            }),
                             compilation_options: PipelineCompilationOptions::default(),
                             targets: &[Some(ColorTargetState {
                                 blend: Some(BlendState::REPLACE),
@@ -453,7 +401,21 @@ impl Texture2DSource {
             if let (Some(layout), Some(sample), Some(pipeline)) =
                 (&self.bind_group_layout, &self.sample, &self.pipeline)
             {
-                let texture = texture.texture(&mut self.transform)?;
+                let texture = match &texture {
+                    Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
+                        match texture {
+                            #[cfg(target_os = "windows")]
+                            Texture2DResource::Texture(texture) => Some(match &texture {
+                                &Texture2DRaw::ID3D11Texture2D(it, index) => {
+                                    self.transformer.transform(it, *index)?
+                                }
+                            }),
+                            Texture2DResource::Buffer(_) => None,
+                        }
+                    }
+                    Texture::I420(_) => None,
+                };
+
                 Some((
                     pipeline,
                     match sample {
