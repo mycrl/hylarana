@@ -27,7 +27,7 @@ pub mod win32 {
         windows::Win32::Graphics::{
             Direct3D11::{ID3D11Texture2D, D3D11_RESOURCE_MISC_SHARED, D3D11_USAGE_DEFAULT},
             Direct3D12::ID3D12Resource,
-            Dxgi::Common::{DXGI_FORMAT_NV12, DXGI_FORMAT_R8G8B8A8_UNORM},
+            Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12, DXGI_FORMAT_R8G8B8A8_UNORM},
         },
         Direct3DDevice, EasyTexture,
     };
@@ -121,6 +121,7 @@ pub mod win32 {
                     format: match desc.Format {
                         DXGI_FORMAT_NV12 => TextureFormat::NV12,
                         DXGI_FORMAT_R8G8B8A8_UNORM => TextureFormat::Rgba8Unorm,
+                        DXGI_FORMAT_B8G8R8A8_UNORM => TextureFormat::Bgra8Unorm,
                         _ => unimplemented!("not supports texture format"),
                     },
                     view_formats: &[],
