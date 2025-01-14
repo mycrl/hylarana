@@ -432,7 +432,7 @@ impl FromStr for VideoRenderBackend {
         Ok(match s {
             "d3d11" => Self::Direct3D11,
             "webgpu" => Self::WebGPU,
-            _ => return VideoRenderError::InvalidBackend,
+            _ => return Err(VideoRenderError::InvalidBackend),
         })
     }
 }
