@@ -14,8 +14,6 @@ use std::{
 
 use anyhow::Result;
 use common::logger;
-use discovery::DiscoveryService;
-use discovery::DiscoveryServiceObserver;
 use jni::{
     objects::{JByteArray, JClass, JObject, JString},
     sys::{jint, JNI_VERSION_1_6},
@@ -23,6 +21,7 @@ use jni::{
 };
 
 use self::{
+    discovery::{DiscoveryServiceObserver, DiscoveryService},
     object::{TransformArray, TransformMap},
     receiver::Receiver,
     sender::Sender,

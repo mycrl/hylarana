@@ -2,6 +2,7 @@ use std::{collections::HashMap, net::Ipv4Addr};
 
 use anyhow::Result;
 use jni::objects::{GlobalRef, JValue};
+pub use discovery::DiscoveryService;
 
 use super::{get_current_env, object::TransformMap, TransformArray};
 
