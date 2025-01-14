@@ -21,7 +21,7 @@ use jni::{
 };
 
 use self::{
-    discovery::{DiscoveryServiceObserver, DiscoveryService},
+    discovery::{DiscoveryService, DiscoveryServiceObserver},
     object::{TransformArray, TransformMap},
     receiver::Receiver,
     sender::Sender,
@@ -176,7 +176,7 @@ where
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Hylarana_createTransportSender(
+extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportSender(
     mut env: JNIEnv,
     _this: JClass,
     options: JObject,
@@ -196,7 +196,7 @@ extern "system" fn Java_com_github_mycrl_Hylarana_createTransportSender(
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Hylarana_getTransportSenderId<'a>(
+extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_getTransportSenderId<'a>(
     mut env: JNIEnv<'a>,
     _this: JClass,
     sender: *const Sender,
@@ -220,7 +220,7 @@ extern "system" fn Java_com_github_mycrl_Hylarana_getTransportSenderId<'a>(
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Hylarana_sendStreamBufferToTransportSender(
+extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_sendStreamBufferToTransportSender(
     mut env: JNIEnv,
     _this: JClass,
     sender: *const Sender,
@@ -242,7 +242,7 @@ extern "system" fn Java_com_github_mycrl_Hylarana_sendStreamBufferToTransportSen
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Hylarana_releaseTransportSender(
+extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportSender(
     _env: JNIEnv,
     _this: JClass,
     sender: *mut Sender,
@@ -264,7 +264,7 @@ extern "system" fn Java_com_github_mycrl_Hylarana_releaseTransportSender(
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Hylarana_createTransportReceiver(
+extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportReceiver(
     mut env: JNIEnv,
     _this: JClass,
     id: JString,
@@ -308,7 +308,7 @@ extern "system" fn Java_com_github_mycrl_Hylarana_createTransportReceiver(
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Hylarana_releaseTransportReceiver(
+extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportReceiver(
     _env: JNIEnv,
     _this: JClass,
     receiver: *mut Arc<Receiver>,
@@ -326,7 +326,7 @@ extern "system" fn Java_com_github_mycrl_Hylarana_releaseTransportReceiver(
 /// customized data to the published service.
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Discovery_registerDiscoveryService(
+extern "system" fn Java_com_github_mycrl_hylarana_Discovery_registerDiscoveryService(
     mut env: JNIEnv,
     _this: JClass,
     port: jint,
@@ -348,7 +348,7 @@ extern "system" fn Java_com_github_mycrl_Discovery_registerDiscoveryService(
 /// addresses of the service publisher as well as the attribute information.
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Discovery_queryDiscoveryService(
+extern "system" fn Java_com_github_mycrl_hylarana_Discovery_queryDiscoveryService(
     mut env: JNIEnv,
     _this: JClass,
     observer: JObject,
@@ -374,7 +374,7 @@ extern "system" fn Java_com_github_mycrl_Discovery_queryDiscoveryService(
 /// ```
 #[no_mangle]
 #[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_Discovery_releaseDiscoveryService(
+extern "system" fn Java_com_github_mycrl_hylarana_Discovery_releaseDiscoveryService(
     _env: JNIEnv,
     _this: JClass,
     discovery: *mut DiscoveryService,

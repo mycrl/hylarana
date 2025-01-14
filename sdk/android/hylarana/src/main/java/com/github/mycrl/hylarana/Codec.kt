@@ -53,6 +53,8 @@ class Video {
                 }
             )
 
+            Log.i("================", "==================================== ${codec.name}")
+
             if (codec.name.indexOf(".rk.") >= 0) {
                 format.setInteger(MediaFormat.KEY_COMPLEXITY, 0)
                 format.setInteger(MediaFormat.KEY_PRIORITY, 0)

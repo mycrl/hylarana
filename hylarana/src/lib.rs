@@ -3,7 +3,7 @@
 mod receiver;
 mod sender;
 
-use std::slice::from_raw_parts;
+use std::{slice::from_raw_parts, str::FromStr};
 
 pub use self::{
     receiver::{
@@ -303,6 +303,8 @@ pub enum VideoRenderError {
     #[error("invalid d3d11texture2d texture")]
     #[cfg(target_os = "windows")]
     InvalidD3D11Texture,
+    #[error("invalid backend")]
+    InvalidBackend,
 }
 
 #[derive(Debug, Error)]
@@ -412,6 +414,27 @@ pub enum VideoRenderBackend {
     /// Cross-platform graphics backends implemented using WebGPUs are supported
     /// on a number of common platforms or devices.
     WebGPU,
+}
+
+impl ToString for VideoRenderBackend {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Direct3D11 => "d3d11",
+            Self::WebGPU => "webgpu",
+        }.to_string()
+    }
+}
+
+impl FromStr for VideoRenderBackend {
+    type Err = VideoRenderError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "d3d11" => Self::Direct3D11,
+            "webgpu" => Self::WebGPU,
+            _ => return VideoRenderError::InvalidBackend,
+        })
+    }
 }
 
 /// Video renderer configuration.
