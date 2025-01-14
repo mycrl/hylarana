@@ -95,7 +95,7 @@ impl<'a> Renderer<'a> {
             .request_device(
                 &DeviceDescriptor {
                     label: None,
-                    memory_hints: MemoryHints::Performance,
+                    memory_hints: MemoryHints::MemoryUsage,
                     required_features: adapter.features(),
                     required_limits: adapter.limits(),
                 },
