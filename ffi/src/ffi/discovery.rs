@@ -4,8 +4,8 @@ use std::{
     ptr::null_mut,
 };
 
+use common::strings::PSTR;
 use hylarana::DiscoveryService;
-use hylarana_common::strings::PSTR;
 
 use super::log_error;
 
@@ -13,13 +13,13 @@ type Properties = HashMap<String, String>;
 
 /// Create a properties.
 #[no_mangle]
-extern "C" fn hylarana_create_properties() -> *const Properties {
+extern "C" fn create_properties() -> *const Properties {
     Box::into_raw(Box::new(Properties::default()))
 }
 
 /// Adds key pair values to the property list, which is Map inside.
 #[no_mangle]
-extern "C" fn hylarana_properties_insert(
+extern "C" fn properties_insert(
     properties: *mut Properties,
     key: *const c_char,
     value: *const c_char,
@@ -39,7 +39,7 @@ extern "C" fn hylarana_properties_insert(
 
 /// Get value from the property list, which is Map inside.
 #[no_mangle]
-extern "C" fn hylarana_properties_get(
+extern "C" fn properties_get(
     properties: *mut Properties,
     key: *const c_char,
     value: *mut c_char,
@@ -65,7 +65,7 @@ extern "C" fn hylarana_properties_get(
 
 /// Destroy the properties.
 #[no_mangle]
-extern "C" fn hylarana_properties_destroy(properties: *mut Properties) {
+extern "C" fn properties_destroy(properties: *mut Properties) {
     assert!(!properties.is_null());
 
     drop(unsafe { Box::from_raw(properties) });
@@ -79,10 +79,7 @@ struct RawDiscovery(DiscoveryService);
 /// distinguish between different publishers, in properties you can add
 /// customized data to the published service.
 #[no_mangle]
-extern "C" fn hylarana_discovery_register(
-    port: u16,
-    properties: *const Properties,
-) -> *const RawDiscovery {
+extern "C" fn discovery_register(port: u16, properties: *const Properties) -> *const RawDiscovery {
     log_error((|| {
         Ok::<_, anyhow::Error>(DiscoveryService::register(port, unsafe { &*properties })?)
     })())
@@ -125,10 +122,7 @@ impl CallbackWrap {
 /// is published the callback function will call back all the network
 /// addresses of the service publisher as well as the attribute information.
 #[no_mangle]
-extern "C" fn hylarana_discovery_query(
-    callback: Callback,
-    ctx: *const c_void,
-) -> *const RawDiscovery {
+extern "C" fn discovery_query(callback: Callback, ctx: *const c_void) -> *const RawDiscovery {
     let callback = CallbackWrap { callback, ctx };
 
     log_error((|| {
@@ -145,7 +139,7 @@ extern "C" fn hylarana_discovery_query(
 
 /// Destroy the discovery.
 #[no_mangle]
-extern "C" fn hylarana_discovery_destroy(discovery: *mut RawDiscovery) {
+extern "C" fn discovery_destroy(discovery: *mut RawDiscovery) {
     assert!(!discovery.is_null());
 
     drop(unsafe { Box::from_raw(discovery) });

@@ -1,17 +1,20 @@
 package com.github.mycrl.hylarana
 
+import android.R.attr.mimeType
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Build
 import android.os.Process
 import android.util.Log
 import android.view.Surface
-import java.lang.Exception
 import java.nio.ByteBuffer
+import java.util.Locale
+
 
 abstract class ByteArraySinker {
     abstract fun sink(info: StreamBufferInfo, buf: ByteArray)
@@ -158,11 +161,34 @@ class Video {
     class VideoDecoder(surface: Surface) {
         var isRunning: Boolean = false
 
-        private var codec: MediaCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        private lateinit var codec: MediaCodec
         private val bufferInfo = MediaCodec.BufferInfo()
         private var worker: Thread
 
         init {
+
+            var codecName: String? = null
+            run {
+                val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                val codecInfos = codecList.codecInfos
+
+                for (codecInfo in codecInfos) {
+                    if (!codecInfo.isEncoder && codecInfo.isHardwareAccelerated) {
+                        for (type in codecInfo.supportedTypes) {
+                            if (type == "video/avc" && codecInfo.name.indexOf("low_latency") > 0) {
+                                codecName = codecInfo.name
+                            }
+                        }
+                    }
+                }
+            }
+
+            codec = if (codecName != null) {
+                MediaCodec.createByCodecName(codecName!!)
+            } else {
+                MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            }
+
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 2560, 1660)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)

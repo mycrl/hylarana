@@ -1,18 +1,18 @@
-mod interop;
-mod texture;
+mod generator;
+mod transform;
 mod vertex;
 
 use std::sync::Arc;
 
 use self::vertex::Vertex;
 
-pub use self::texture::{
-    FromNativeResourceError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
+pub use self::generator::{
+    GeneratorError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
 };
 
-use hylarana_common::Size;
+use common::Size;
+use generator::{Generator, GeneratorOptions};
 use pollster::FutureExt;
-use texture::{Texture2DSource, Texture2DSourceOptions};
 use thiserror::Error;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -37,13 +37,13 @@ pub enum GraphicsError {
     #[error(transparent)]
     CreateSurfaceError(#[from] wgpu::CreateSurfaceError),
     #[error(transparent)]
-    FromNativeResourceError(#[from] FromNativeResourceError),
+    GeneratorError(#[from] GeneratorError),
 }
 
 #[derive(Debug)]
 pub struct RendererOptions<T> {
     #[cfg(target_os = "windows")]
-    pub direct3d: hylarana_common::win32::Direct3DDevice,
+    pub direct3d: common::win32::Direct3DDevice,
     pub window: T,
     pub size: Size,
 }
@@ -62,7 +62,7 @@ pub struct Renderer<'a> {
     queue: Arc<Queue>,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
-    source: Texture2DSource,
+    generator: Generator,
 }
 
 impl<'a> Renderer<'a> {
@@ -95,7 +95,7 @@ impl<'a> Renderer<'a> {
             .request_device(
                 &DeviceDescriptor {
                     label: None,
-                    memory_hints: MemoryHints::Performance,
+                    memory_hints: MemoryHints::MemoryUsage,
                     required_features: adapter.features(),
                     required_limits: adapter.limits(),
                 },
@@ -140,7 +140,7 @@ impl<'a> Renderer<'a> {
         });
 
         Ok(Self {
-            source: Texture2DSource::new(Texture2DSourceOptions {
+            generator: Generator::new(GeneratorOptions {
                 #[cfg(target_os = "windows")]
                 direct3d: options.direct3d,
                 device: device.clone(),
@@ -159,7 +159,7 @@ impl<'a> Renderer<'a> {
     // render queue and wait for the queue to automatically schedule the rendering
     // to the surface.
     pub fn submit(&mut self, texture: Texture) -> Result<(), GraphicsError> {
-        if let Some((pipeline, bind_group)) = self.source.get_view(texture)? {
+        if let Some((pipeline, bind_group)) = self.generator.get_view(texture)? {
             let output = self.surface.get_current_texture()?;
             let view = output
                 .texture
@@ -198,8 +198,8 @@ impl<'a> Renderer<'a> {
 }
 
 #[cfg(target_os = "windows")]
-pub mod dx11 {
-    use hylarana_common::{
+pub mod win32 {
+    use common::{
         frame::VideoFormat,
         win32::{
             windows::Win32::{
@@ -218,33 +218,33 @@ pub mod dx11 {
         Size,
     };
 
-    use hylarana_resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
+    use resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
     use thiserror::Error;
 
     use crate::{Texture, Texture2DRaw, Texture2DResource};
 
     #[derive(Debug, Error)]
-    pub enum Dx11GraphicsError {
+    pub enum D3D11RendererError {
         #[error(transparent)]
-        WindowsError(#[from] hylarana_common::win32::windows::core::Error),
+        WindowsError(#[from] common::win32::windows::core::Error),
     }
 
-    pub struct Dx11Renderer {
+    pub struct D3D11Renderer {
         direct3d: Direct3DDevice,
         swap_chain: IDXGISwapChain,
         render_target_view: ID3D11RenderTargetView,
         video_processor: Option<VideoResampler>,
     }
 
-    unsafe impl Send for Dx11Renderer {}
-    unsafe impl Sync for Dx11Renderer {}
+    unsafe impl Send for D3D11Renderer {}
+    unsafe impl Sync for D3D11Renderer {}
 
-    impl Dx11Renderer {
+    impl D3D11Renderer {
         pub fn new(
             window: HWND,
             size: Size,
             direct3d: Direct3DDevice,
-        ) -> Result<Self, Dx11GraphicsError> {
+        ) -> Result<Self, D3D11RendererError> {
             let swap_chain = unsafe {
                 let dxgi_factory = CreateDXGIFactory::<IDXGIFactory>()?;
 
@@ -303,7 +303,7 @@ pub mod dx11 {
         }
 
         /// Draw this pixel buffer to the configured SurfaceTexture.
-        pub fn submit(&mut self, texture: Texture) -> Result<(), Dx11GraphicsError> {
+        pub fn submit(&mut self, texture: Texture) -> Result<(), D3D11RendererError> {
             unsafe {
                 self.direct3d
                     .context

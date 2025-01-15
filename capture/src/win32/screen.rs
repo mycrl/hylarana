@@ -6,15 +6,15 @@ use std::{
     time::Duration,
 };
 
-use hylarana_common::{
+use common::{
     atomic::EasyAtomic,
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
     win32::{EasyTexture, MediaThreadClass},
     Size,
 };
 
-use hylarana_resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
 use parking_lot::Mutex;
+use resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
 use thiserror::Error;
 use windows::{
     core::Interface,

@@ -1,6 +1,6 @@
 use crate::{CaptureHandler, FrameArrived, Source, VideoCaptureSourceDescription};
 
-use hylarana_common::frame::VideoFrame;
+use common::frame::VideoFrame;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use hylarana_common::{
+use common::{
     atomic::EasyAtomic,
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
     strings::PSTR,

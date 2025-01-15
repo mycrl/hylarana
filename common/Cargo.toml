@@ -34,4 +34,6 @@ features = [
 ]
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-video-sys = { version = "0.1.4", default-features = false }
+core-video = { version = "0.4.3", features = ["metal"] }
+core-foundation-sys = "0.8"
+metal = "0.29"

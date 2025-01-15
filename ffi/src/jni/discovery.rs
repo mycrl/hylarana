@@ -1,6 +1,7 @@
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use anyhow::Result;
+pub use discovery::DiscoveryService;
 use jni::objects::{GlobalRef, JValue};
 
 use super::{get_current_env, object::TransformMap, TransformArray};

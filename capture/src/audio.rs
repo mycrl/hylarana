@@ -1,10 +1,10 @@
 use crate::{AudioCaptureSourceDescription, CaptureHandler, Source, SourceType};
 
+use common::frame::AudioFrame;
 use cpal::{traits::*, Host, Stream, StreamConfig};
-use hylarana_common::frame::AudioFrame;
-use hylarana_resample::AudioResampler;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use resample::AudioResampler;
 use thiserror::Error;
 
 // Just use a default audio port globally.

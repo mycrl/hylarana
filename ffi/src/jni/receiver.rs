@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use hylarana_transport::{
+use transport::{
     create_mix_receiver, StreamKind, StreamReceiverAdapter, TransportOptions, TransportReceiver,
 };
 

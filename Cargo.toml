@@ -14,7 +14,7 @@ members = [
     "codec",
     "resample",
     "capture",
-    "graphics",
+    "renderer",
     "hylarana",
     "server",
     "transport",

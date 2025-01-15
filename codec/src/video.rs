@@ -5,15 +5,18 @@ use crate::codec::{
 
 use std::{ffi::c_int, ptr::null_mut};
 
-use hylarana_common::frame::{VideoFormat, VideoFrame, VideoSubFormat};
+use common::frame::{VideoFormat, VideoFrame, VideoSubFormat};
 use mirror_ffmpeg_sys::*;
 use thiserror::Error;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-use hylarana_common::Size;
+use common::Size;
 
 #[cfg(target_os = "windows")]
-use hylarana_common::win32::Direct3DDevice;
+use common::win32::Direct3DDevice;
+
+#[cfg(target_os = "macos")]
+use common::macos::{get_pixel_buffer_format, CVPixelBufferRef};
 
 #[derive(Debug, Clone)]
 pub struct VideoDecoderSettings {
@@ -240,7 +243,7 @@ impl VideoDecoder {
                 self.frame.data[0] = frame.data[3] as _;
 
                 self.frame.sub_format = VideoSubFormat::CvPixelBufferRef;
-                self.frame.format = VideoFormat::BGRA;
+                self.frame.format = get_pixel_buffer_format(frame.data[3] as CVPixelBufferRef);
             }
             _ => unimplemented!("unsupported video frame format = {:?}", format),
         };

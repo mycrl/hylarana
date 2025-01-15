@@ -13,9 +13,7 @@ use std::{
 };
 
 use anyhow::Result;
-use discovery::DiscoveryServiceObserver;
-use hylarana_common::logger;
-use hylarana_discovery::DiscoveryService;
+use common::logger;
 use jni::{
     objects::{JByteArray, JClass, JObject, JString},
     sys::{jint, JNI_VERSION_1_6},
@@ -23,6 +21,7 @@ use jni::{
 };
 
 use self::{
+    discovery::{DiscoveryService, DiscoveryServiceObserver},
     object::{TransformArray, TransformMap},
     receiver::Receiver,
     sender::Sender,
@@ -102,7 +101,7 @@ pub(crate) fn get_current_env<'local>() -> JNIEnv<'local> {
 #[allow(non_snake_case)]
 extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> i32 {
     logger::init_with_android("com.github.mycrl.hylarana", log::LevelFilter::Info);
-    hylarana_transport::startup();
+    transport::startup();
     JVM.lock().unwrap().replace(vm);
 
     JNI_VERSION_1_6
@@ -151,7 +150,7 @@ extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> i32 {
 #[no_mangle]
 #[allow(non_snake_case)]
 extern "system" fn JNI_OnUnload(_: JavaVM, _: *mut c_void) {
-    hylarana_transport::shutdown();
+    transport::shutdown();
 }
 
 fn ok_or_check<'a, F, T>(env: &mut JNIEnv<'a>, func: F) -> Option<T>

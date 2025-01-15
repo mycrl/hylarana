@@ -38,7 +38,7 @@ pub use self::macos::{
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
-use hylarana_common::{
+use common::{
     frame::{AudioFrame, VideoFrame},
     Size,
 };
@@ -46,7 +46,7 @@ use hylarana_common::{
 use thiserror::Error;
 
 #[cfg(target_os = "windows")]
-use hylarana_common::win32::Direct3DDevice;
+use common::win32::Direct3DDevice;
 
 #[cfg(target_os = "linux")]
 pub fn startup() {

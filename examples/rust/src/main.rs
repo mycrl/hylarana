@@ -142,11 +142,7 @@ impl Sender {
             },
             AVFrameStreamPlayer::new(
                 AVFrameStreamPlayerOptions::OnlyVideo(VideoRenderOptions {
-                    backend: if cfg!(target_os = "windows") {
-                        VideoRenderBackend::Direct3D11
-                    } else {
-                        VideoRenderBackend::WebGPU
-                    },
+                    backend: configure.backend,
                     size: window.size(),
                     target: window,
                 }),
@@ -185,11 +181,7 @@ impl Receiver {
 
         let player = Mutex::new(Some(AVFrameStreamPlayer::new(
             AVFrameStreamPlayerOptions::All(VideoRenderOptions {
-                backend: if cfg!(target_os = "windows") {
-                    VideoRenderBackend::Direct3D11
-                } else {
-                    VideoRenderBackend::WebGPU
-                },
+                backend: configure.backend,
                 size: window.size(),
                 target: window.clone(),
             }),
@@ -359,6 +351,12 @@ struct Configure {
         default_value_t = Self::DEFAULT_DECODER,
     )]
     decoder: VideoDecoderType,
+    #[arg(
+        long,
+        value_parser = clap::value_parser!(VideoRenderBackend),
+        default_value_t = Self::DEFAULT_BACKEND,
+    )]
+    backend: VideoRenderBackend,
 }
 
 impl Configure {
@@ -379,6 +377,8 @@ impl Configure {
 
     #[cfg(target_os = "linux")]
     const DEFAULT_DECODER: VideoDecoderType = VideoDecoderType::H264;
+
+    const DEFAULT_BACKEND: VideoRenderBackend = VideoRenderBackend::WebGPU;
 
     fn get_strategy(&self) -> Option<TransportStrategy> {
         Some(match self.strategy.as_ref()?.as_str() {
