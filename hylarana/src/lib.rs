@@ -33,6 +33,9 @@ use common::win32::{
     startup as win32_startup, windows::Win32::Foundation::HWND, Direct3DDevice, ProcessPriority,
 };
 
+#[cfg(target_os = "macos")]
+use common::macos::CVPixelBufferRef;
+
 use parking_lot::Mutex;
 
 #[cfg(target_os = "windows")]
@@ -43,7 +46,7 @@ use renderer::dx11::Dx11Renderer;
 
 use renderer::{
     Renderer as WgpuRenderer, RendererOptions as WgpuRendererOptions, Texture, Texture2DBuffer,
-    Texture2DResource,
+    Texture2DRaw, Texture2DResource,
 };
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -421,7 +424,8 @@ impl ToString for VideoRenderBackend {
         match self {
             Self::Direct3D11 => "d3d11",
             Self::WebGPU => "webgpu",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -532,32 +536,13 @@ impl<'a> VideoRender<'a> {
                 }
             }
             #[cfg(target_os = "macos")]
-            VideoSubFormat::CvPixelBufferRef => {
-                // let pixel_buffer = PixelBufferRef::from(frame.data[0] as
-                // CVPixelBufferRef); let linesize =
-                // pixel_buffer.linesize(); let data =
-                // pixel_buffer.data(); let size =
-                // pixel_buffer.size();
-
-                // let buffers = [
-                //     unsafe {
-                //         from_raw_parts(data[0] as *const _, linesize[0] *
-                // size.height as usize)     },
-                //     unsafe {
-                //         from_raw_parts(data[1] as *const _, linesize[1] *
-                // size.height as usize)     },
-                //     &[],
-                // ];
-
-                // match self {
-                //     Self::WebGPU(render) => render.submit(Texture::Nv12(
-                //         Texture2DResource::Buffer(Texture2DBuffer {
-                //             buffers: &buffers,
-                //             size,
-                //         }),
-                //     ))?,
-                // }
-            }
+            VideoSubFormat::CvPixelBufferRef => match self {
+                Self::WebGPU(render) => {
+                    render.submit(Texture::Nv12(Texture2DResource::Texture(
+                        Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
+                    )))?
+                }
+            },
             VideoSubFormat::SW => {
                 let buffers = match frame.format {
                     // RGBA stands for red green blue alpha. While it is sometimes described as a

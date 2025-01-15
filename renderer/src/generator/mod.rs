@@ -8,12 +8,18 @@ use crate::{transform::TransformError, Vertex};
 #[cfg(target_os = "windows")]
 use crate::transform::direct3d::Transformer;
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(target_os = "macos")]
+use crate::transform::metal::Transformer;
+
+#[cfg(any(target_os = "linux"))]
 type Transformer = ();
 
 use common::Size;
 use smallvec::SmallVec;
 use thiserror::Error;
+
+#[cfg(target_os = "macos")]
+use common::macos::{CVPixelBufferRef, EasyTexture};
 
 #[cfg(target_os = "windows")]
 use common::win32::{
@@ -42,19 +48,23 @@ pub enum GeneratorError {
 pub enum Texture2DRaw {
     #[cfg(target_os = "windows")]
     ID3D11Texture2D(ID3D11Texture2D, u32),
+    #[cfg(target_os = "macos")]
+    CVPixelBufferRef(CVPixelBufferRef),
 }
 
 impl Texture2DRaw {
-    #[cfg(target_os = "windows")]
     pub(crate) fn size(&self) -> Size {
         match self {
-            Self::ID3D11Texture2D(dx11, _) => {
-                let desc = dx11.desc();
+            #[cfg(target_os = "windows")]
+            Self::ID3D11Texture2D(texture, _) => {
+                let desc = texture.desc();
                 Size {
                     width: desc.Width,
                     height: desc.Height,
                 }
             }
+            #[cfg(target_os = "macos")]
+            Self::CVPixelBufferRef(texture) => texture.size(),
         }
     }
 }
@@ -67,7 +77,6 @@ pub struct Texture2DBuffer<'a> {
 
 #[derive(Debug)]
 pub enum Texture2DResource<'a> {
-    #[cfg(target_os = "windows")]
     Texture(Texture2DRaw),
     Buffer(Texture2DBuffer<'a>),
 }
@@ -75,7 +84,6 @@ pub enum Texture2DResource<'a> {
 impl<'a> Texture2DResource<'a> {
     pub(crate) fn size(&self) -> Size {
         match self {
-            #[cfg(target_os = "windows")]
             Texture2DResource::Texture(texture) => texture.size(),
             Texture2DResource::Buffer(texture) => texture.size,
         }
@@ -279,7 +287,10 @@ impl Generator {
         #[cfg(target_os = "windows")]
         let transformer = Transformer::new(options.device.clone(), options.direct3d);
 
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(target_os = "macos")]
+        let transformer = Transformer::new(options.device.clone())?;
+
+        #[cfg(any(target_os = "linux"))]
         let transformer = ();
 
         Ok(Self {
@@ -404,10 +415,14 @@ impl Generator {
                 let texture = match &texture {
                     Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
                         match texture {
-                            #[cfg(target_os = "windows")]
                             Texture2DResource::Texture(texture) => Some(match &texture {
-                                &Texture2DRaw::ID3D11Texture2D(it, index) => {
+                                #[cfg(target_os = "windows")]
+                                Texture2DRaw::ID3D11Texture2D(it, index) => {
                                     self.transformer.transform(it, *index)?
+                                }
+                                #[cfg(target_os = "macos")]
+                                Texture2DRaw::CVPixelBufferRef(it) => {
+                                    self.transformer.transform(it.clone())?
                                 }
                             }),
                             Texture2DResource::Buffer(_) => None,

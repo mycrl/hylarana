@@ -21,4 +21,8 @@ pub enum TransformError {
     CreateMetalTextureCacheError,
     #[error("failed to create metal texture")]
     CreateMetalTextureError,
+    #[error("failed to create cv texture cache")]
+    CreateCVTextureCacheError,
+    #[error("failed to create cv metal texture")]
+    CreateCVMetalTextureError,
 }
