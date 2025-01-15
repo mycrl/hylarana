@@ -42,10 +42,10 @@ extern "system" fn DllMain(
     reserved: *const std::ffi::c_void,
 ) -> bool {
     match call_reason {
-        1 /* DLL_PROCESS_ATTACH */ => startup(),
+        1 /* DLL_PROCESS_ATTACH */ => hylarana_startup(),
         0 /* DLL_PROCESS_DETACH */ => {
             if reserved.is_null() {
-                shutdown();
+                hylarana_shutdown();
             }
 
             true
@@ -57,7 +57,7 @@ extern "system" fn DllMain(
 /// Initialize the environment, which must be initialized before using the
 /// SDK.
 #[no_mangle]
-extern "C" fn startup() -> bool {
+extern "C" fn hylarana_startup() -> bool {
     log_error((|| {
         logger::init_logger(log::LevelFilter::Info, None)?;
 
@@ -70,7 +70,7 @@ extern "C" fn startup() -> bool {
 /// Cleans up the environment when the SDK exits, and is recommended to be
 /// called when the application exits.
 #[no_mangle]
-extern "C" fn shutdown() {
+extern "C" fn hylarana_shutdown() {
     log::info!("extern api: hylarana quit");
 
     let _ = log_error(hylarana::shutdown());

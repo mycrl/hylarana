@@ -198,7 +198,7 @@ impl<'a> Renderer<'a> {
 }
 
 #[cfg(target_os = "windows")]
-pub mod dx11 {
+pub mod win32 {
     use common::{
         frame::VideoFormat,
         win32::{
@@ -224,27 +224,27 @@ pub mod dx11 {
     use crate::{Texture, Texture2DRaw, Texture2DResource};
 
     #[derive(Debug, Error)]
-    pub enum Dx11GraphicsError {
+    pub enum D3D11RendererError {
         #[error(transparent)]
         WindowsError(#[from] common::win32::windows::core::Error),
     }
 
-    pub struct Dx11Renderer {
+    pub struct D3D11Renderer {
         direct3d: Direct3DDevice,
         swap_chain: IDXGISwapChain,
         render_target_view: ID3D11RenderTargetView,
         video_processor: Option<VideoResampler>,
     }
 
-    unsafe impl Send for Dx11Renderer {}
-    unsafe impl Sync for Dx11Renderer {}
+    unsafe impl Send for D3D11Renderer {}
+    unsafe impl Sync for D3D11Renderer {}
 
-    impl Dx11Renderer {
+    impl D3D11Renderer {
         pub fn new(
             window: HWND,
             size: Size,
             direct3d: Direct3DDevice,
-        ) -> Result<Self, Dx11GraphicsError> {
+        ) -> Result<Self, D3D11RendererError> {
             let swap_chain = unsafe {
                 let dxgi_factory = CreateDXGIFactory::<IDXGIFactory>()?;
 
@@ -303,7 +303,7 @@ pub mod dx11 {
         }
 
         /// Draw this pixel buffer to the configured SurfaceTexture.
-        pub fn submit(&mut self, texture: Texture) -> Result<(), Dx11GraphicsError> {
+        pub fn submit(&mut self, texture: Texture) -> Result<(), D3D11RendererError> {
             unsafe {
                 self.direct3d
                     .context

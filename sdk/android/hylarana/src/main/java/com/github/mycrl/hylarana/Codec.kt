@@ -161,20 +161,32 @@ class Video {
     class VideoDecoder(surface: Surface) {
         var isRunning: Boolean = false
 
-        private var codec: MediaCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        private lateinit var codec: MediaCodec
         private val bufferInfo = MediaCodec.BufferInfo()
         private var worker: Thread
 
         init {
+
+            var codecName: String? = null
             run {
                 val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
                 val codecInfos = codecList.codecInfos
 
                 for (codecInfo in codecInfos) {
                     if (!codecInfo.isEncoder && codecInfo.isHardwareAccelerated) {
-                        Log.i("================", "============= ${codecInfo.name}");
+                        for (type in codecInfo.supportedTypes) {
+                            if (type == "video/avc" && codecInfo.name.indexOf("low_latency") > 0) {
+                                codecName = codecInfo.name
+                            }
+                        }
                     }
                 }
+            }
+
+            codec = if (codecName != null) {
+                MediaCodec.createByCodecName(codecName!!)
+            } else {
+                MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
             }
 
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 2560, 1660)

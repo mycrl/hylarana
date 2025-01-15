@@ -42,11 +42,14 @@ use parking_lot::Mutex;
 use parking_lot::RwLock;
 
 #[cfg(target_os = "windows")]
-use renderer::dx11::Dx11Renderer;
+use renderer::win32::D3D11Renderer;
+
+#[cfg(target_os = "macos")]
+use renderer::Texture2DRaw;
 
 use renderer::{
     Renderer as WgpuRenderer, RendererOptions as WgpuRendererOptions, Texture, Texture2DBuffer,
-    Texture2DRaw, Texture2DResource,
+    Texture2DResource,
 };
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
@@ -300,7 +303,7 @@ where
 pub enum VideoRenderError {
     #[error(transparent)]
     #[cfg(target_os = "windows")]
-    Dx11GraphicsError(#[from] renderer::dx11::Dx11GraphicsError),
+    D3D11RendererError(#[from] renderer::win32::D3D11RendererError),
     #[error(transparent)]
     GraphicsError(#[from] renderer::GraphicsError),
     #[error("invalid d3d11texture2d texture")]
@@ -455,7 +458,7 @@ pub struct VideoRenderOptions<T> {
 pub enum VideoRender<'a> {
     WebGPU(WgpuRenderer<'a>),
     #[cfg(target_os = "windows")]
-    Direct3D11(Dx11Renderer),
+    Direct3D11(D3D11Renderer),
 }
 
 impl<'a> VideoRender<'a> {
@@ -481,7 +484,7 @@ impl<'a> VideoRender<'a> {
 
         Ok(match backend {
             #[cfg(target_os = "windows")]
-            VideoRenderBackend::Direct3D11 => Self::Direct3D11(Dx11Renderer::new(
+            VideoRenderBackend::Direct3D11 => Self::Direct3D11(D3D11Renderer::new(
                 match target.into() {
                     SurfaceTarget::Window(window) => match window.window_handle().unwrap().as_raw()
                     {
