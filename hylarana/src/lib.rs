@@ -34,7 +34,7 @@ use common::win32::{
 };
 
 #[cfg(target_os = "macos")]
-use common::macos::CVPixelBufferRef;
+use common::macos::{CVPixelBufferRef, PixelBufferRef};
 
 use parking_lot::Mutex;
 
@@ -540,11 +540,39 @@ impl<'a> VideoRender<'a> {
             }
             #[cfg(target_os = "macos")]
             VideoSubFormat::CvPixelBufferRef => match self {
-                Self::WebGPU(render) => {
-                    render.submit(Texture::Nv12(Texture2DResource::Texture(
-                        Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
-                    )))?
-                }
+                Self::WebGPU(render) => match frame.format {
+                    VideoFormat::BGRA | VideoFormat::RGBA => {
+                        render.submit(Texture::Nv12(Texture2DResource::Texture(
+                            Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
+                        )))?;
+                    }
+                    _ => {
+                        let pixel_buffer = PixelBufferRef::from(frame.data[0] as CVPixelBufferRef);
+                        let linesize = pixel_buffer.linesize();
+                        let data = pixel_buffer.data();
+                        let size = pixel_buffer.size();
+
+                        render.submit(Texture::Nv12(Texture2DResource::Buffer(
+                            Texture2DBuffer {
+                                buffers: &[
+                                    unsafe {
+                                        from_raw_parts(
+                                            data[0] as *const _,
+                                            linesize[0] * size.height as usize,
+                                        )
+                                    },
+                                    unsafe {
+                                        from_raw_parts(
+                                            data[1] as *const _,
+                                            linesize[1] * size.height as usize,
+                                        )
+                                    },
+                                ],
+                                size,
+                            },
+                        )))?;
+                    }
+                },
             },
             VideoSubFormat::SW => {
                 let buffers = match frame.format {

@@ -16,7 +16,7 @@ use common::Size;
 use common::win32::Direct3DDevice;
 
 #[cfg(target_os = "macos")]
-use common::macos::{CVPixelBufferRef, EasyTexture};
+use common::macos::{get_pixel_buffer_format, CVPixelBufferRef};
 
 #[derive(Debug, Clone)]
 pub struct VideoDecoderSettings {
@@ -243,7 +243,7 @@ impl VideoDecoder {
                 self.frame.data[0] = frame.data[3] as _;
 
                 self.frame.sub_format = VideoSubFormat::CvPixelBufferRef;
-                self.frame.format = (frame.data[3] as CVPixelBufferRef).format();
+                self.frame.format = get_pixel_buffer_format(frame.data[3] as CVPixelBufferRef);
             }
             _ => unimplemented!("unsupported video frame format = {:?}", format),
         };

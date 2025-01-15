@@ -19,7 +19,7 @@ use smallvec::SmallVec;
 use thiserror::Error;
 
 #[cfg(target_os = "macos")]
-use common::macos::{CVPixelBufferRef, EasyTexture};
+use common::macos::{get_pixel_buffer_size, CVPixelBufferRef};
 
 #[cfg(target_os = "windows")]
 use common::win32::{
@@ -64,7 +64,7 @@ impl Texture2DRaw {
                 }
             }
             #[cfg(target_os = "macos")]
-            Self::CVPixelBufferRef(texture) => texture.size(),
+            Self::CVPixelBufferRef(texture) => get_pixel_buffer_size(*texture),
         }
     }
 }

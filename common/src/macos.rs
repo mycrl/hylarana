@@ -13,10 +13,12 @@ use core_video::{
         CVMetalTextureCacheFlush,
     },
     pixel_buffer::{
-        kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
+        kCVPixelBufferLock_ReadOnly, kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
         kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
         kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
+        CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane,
         CVPixelBufferGetHeight, CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth,
+        CVPixelBufferLockBaseAddress, CVPixelBufferUnlockBaseAddress,
     },
     r#return::kCVReturnSuccess,
 };
@@ -27,31 +29,73 @@ pub use metal::{
 
 use crate::{frame::VideoFormat, Size};
 
-pub trait EasyTexture {
-    fn size(&self) -> Size;
-    fn format(&self) -> VideoFormat;
+pub struct PixelBufferRef {
+    size: Size,
+    data: [*const u8; 2],
+    linesize: [usize; 2],
+    buffer: CVPixelBufferRef,
 }
 
-impl EasyTexture for CVPixelBufferRef {
-    fn size(&self) -> Size {
-        unsafe {
-            Size {
-                width: CVPixelBufferGetWidth(self.clone()) as u32,
-                height: CVPixelBufferGetHeight(self.clone()) as u32,
-            }
-        }
+impl PixelBufferRef {
+    pub fn size(&self) -> Size {
+        self.size
     }
 
-    #[allow(non_upper_case_globals)]
-    fn format(&self) -> VideoFormat {
-        match unsafe { CVPixelBufferGetPixelFormatType(self.clone()) } {
-            kCVPixelFormatType_32RGBA => VideoFormat::RGBA,
-            kCVPixelFormatType_32BGRA => VideoFormat::BGRA,
-            kCVPixelFormatType_420YpCbCr8Planar => VideoFormat::I420,
-            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-            | kCVPixelFormatType_420YpCbCr8BiPlanarFullRange => VideoFormat::NV12,
-            _ => unimplemented!(),
+    pub fn data(&self) -> &[*const u8; 2] {
+        &self.data
+    }
+
+    pub fn linesize(&self) -> &[usize; 2] {
+        &self.linesize
+    }
+}
+
+impl From<CVPixelBufferRef> for PixelBufferRef {
+    fn from(buffer: CVPixelBufferRef) -> Self {
+        unsafe {
+            CVPixelBufferLockBaseAddress(buffer, kCVPixelBufferLock_ReadOnly);
         }
+
+        let mut this = Self {
+            size: get_pixel_buffer_size(buffer),
+            buffer,
+            data: [null(); 2],
+            linesize: [0; 2],
+        };
+
+        for i in 0..2 {
+            this.data[i] = unsafe { CVPixelBufferGetBaseAddressOfPlane(buffer, i) as *const _ };
+            this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(buffer, i) };
+        }
+
+        this
+    }
+}
+
+impl Drop for PixelBufferRef {
+    fn drop(&mut self) {
+        unsafe {
+            CVPixelBufferUnlockBaseAddress(self.buffer, kCVPixelBufferLock_ReadOnly);
+        }
+    }
+}
+
+#[allow(non_upper_case_globals)]
+pub fn get_pixel_buffer_format(buffer: CVPixelBufferRef) -> VideoFormat {
+    match unsafe { CVPixelBufferGetPixelFormatType(buffer) } {
+        kCVPixelFormatType_32RGBA => VideoFormat::RGBA,
+        kCVPixelFormatType_32BGRA => VideoFormat::BGRA,
+        kCVPixelFormatType_420YpCbCr8Planar => VideoFormat::I420,
+        kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        | kCVPixelFormatType_420YpCbCr8BiPlanarFullRange => VideoFormat::NV12,
+        format => unimplemented!("unsupports format = {:?}", format),
+    }
+}
+
+pub fn get_pixel_buffer_size(buffer: CVPixelBufferRef) -> Size {
+    Size {
+        width: unsafe { CVPixelBufferGetWidth(buffer) } as u32,
+        height: unsafe { CVPixelBufferGetHeight(buffer) } as u32,
     }
 }
 
@@ -89,7 +133,7 @@ pub fn create_cv_metal_texture(
             match format {
                 VideoFormat::BGRA => MTLPixelFormat::BGRA8Unorm,
                 VideoFormat::RGBA => MTLPixelFormat::RGBA8Unorm,
-                _ => unimplemented!(),
+                _ => unimplemented!("unsupports format = {:?}", format),
             },
             size.width as usize,
             size.height as usize,
