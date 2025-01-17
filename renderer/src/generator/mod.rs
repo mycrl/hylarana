@@ -11,9 +11,6 @@ use crate::transform::direct3d::Transformer;
 #[cfg(target_os = "macos")]
 use crate::transform::metal::Transformer;
 
-#[cfg(any(target_os = "linux"))]
-type Transformer = ();
-
 use common::Size;
 use smallvec::SmallVec;
 use thiserror::Error;
@@ -54,17 +51,25 @@ pub enum Texture2DRaw {
 
 impl Texture2DRaw {
     pub(crate) fn size(&self) -> Size {
-        match self {
-            #[cfg(target_os = "windows")]
-            Self::ID3D11Texture2D(texture, _) => {
-                let desc = texture.desc();
-                Size {
-                    width: desc.Width,
-                    height: desc.Height,
+        #[cfg(target_os = "linux")]
+        {
+            unreachable!()
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            match self {
+                #[cfg(target_os = "windows")]
+                Self::ID3D11Texture2D(texture, _) => {
+                    let desc = texture.desc();
+                    Size {
+                        width: desc.Width,
+                        height: desc.Height,
+                    }
                 }
+                #[cfg(target_os = "macos")]
+                Self::CVPixelBufferRef(texture) => get_pixel_buffer_size(*texture),
             }
-            #[cfg(target_os = "macos")]
-            Self::CVPixelBufferRef(texture) => get_pixel_buffer_size(*texture),
         }
     }
 }
@@ -279,6 +284,7 @@ pub struct Generator {
     pipeline: Option<RenderPipeline>,
     sample: Option<Texture2DSourceSample>,
     bind_group_layout: Option<BindGroupLayout>,
+    #[cfg(not(target_os = "linux"))]
     transformer: Transformer,
 }
 
@@ -290,15 +296,13 @@ impl Generator {
         #[cfg(target_os = "macos")]
         let transformer = Transformer::new(options.device.clone())?;
 
-        #[cfg(any(target_os = "linux"))]
-        let transformer = ();
-
         Ok(Self {
             device: options.device,
             queue: options.queue,
             bind_group_layout: None,
             pipeline: None,
             sample: None,
+            #[cfg(not(target_os = "linux"))]
             transformer,
         })
     }
@@ -415,7 +419,8 @@ impl Generator {
                 let texture = match &texture {
                     Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
                         match texture {
-                            Texture2DResource::Texture(texture) => Some(match &texture {
+                            #[cfg(not(target_os = "linux"))]
+                            Texture2DResource::Texture(texture) => Some(match texture {
                                 #[cfg(target_os = "windows")]
                                 Texture2DRaw::ID3D11Texture2D(it, index) => {
                                     self.transformer.transform(it, *index)?
@@ -426,6 +431,7 @@ impl Generator {
                                 }
                             }),
                             Texture2DResource::Buffer(_) => None,
+                            _ => None,
                         }
                     }
                     Texture::I420(_) => None,

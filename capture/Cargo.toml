@@ -25,6 +25,8 @@ features = ["Win32_Media", "Win32_Media_MediaFoundation"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = "0.14.0"
+scrap = "0.5.0"
+yuvutils-rs = { version = "0.5.14",  features = ["rayon"]}
 
 [target.'cfg(target_os = "linux")'.dependencies.mirror-ffmpeg-sys]
 default-features = false
