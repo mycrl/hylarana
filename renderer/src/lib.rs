@@ -10,7 +10,10 @@ pub use self::generator::{
     GeneratorError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
 };
 
-use common::Size;
+use common::{
+    frame::{VideoFormat, VideoSubFormat},
+    Size,
+};
 use generator::{Generator, GeneratorOptions};
 use pollster::FutureExt;
 use thiserror::Error;
@@ -41,11 +44,24 @@ pub enum GraphicsError {
 }
 
 #[derive(Debug)]
+pub struct RendererSurfaceOptions<T> {
+    pub window: T,
+    pub size: Size,
+}
+
+#[derive(Debug)]
+pub struct RendererSourceOptions {
+    pub size: Size,
+    pub format: VideoFormat,
+    pub sub_format: VideoSubFormat,
+}
+
+#[derive(Debug)]
 pub struct RendererOptions<T> {
     #[cfg(target_os = "windows")]
     pub direct3d: common::win32::Direct3DDevice,
-    pub window: T,
-    pub size: Size,
+    pub surface: RendererSurfaceOptions<T>,
+    pub source: RendererSourceOptions,
 }
 
 /// Window Renderer.
@@ -80,7 +96,7 @@ impl<'a> Renderer<'a> {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(options.window)?;
+        let surface = instance.create_surface(options.surface.window)?;
         let adapter = instance
             .request_adapter(&RequestAdapterOptions {
                 power_preference: PowerPreference::LowPower,
@@ -110,7 +126,11 @@ impl<'a> Renderer<'a> {
         // order to unnecessary trouble, directly fixed to BGRA is the best.
         {
             let mut config = surface
-                .get_default_config(&adapter, options.size.width, options.size.height)
+                .get_default_config(
+                    &adapter,
+                    options.surface.size.width,
+                    options.surface.size.height,
+                )
                 .ok_or_else(|| GraphicsError::NotFoundSurfaceDefaultConfig)?;
 
             config.present_mode = if cfg!(target_os = "windows") {
@@ -145,6 +165,9 @@ impl<'a> Renderer<'a> {
                 direct3d: options.direct3d,
                 device: device.clone(),
                 queue: queue.clone(),
+                size: options.source.size,
+                format: options.source.format,
+                sub_format: options.source.sub_format,
             })?,
             vertex_buffer,
             index_buffer,
@@ -159,39 +182,38 @@ impl<'a> Renderer<'a> {
     // render queue and wait for the queue to automatically schedule the rendering
     // to the surface.
     pub fn submit(&mut self, texture: Texture) -> Result<(), GraphicsError> {
-        if let Some((pipeline, bind_group)) = self.generator.get_view(texture)? {
-            let output = self.surface.get_current_texture()?;
-            let view = output
-                .texture
-                .create_view(&TextureViewDescriptor::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
-            let mut encoder = self
-                .device
-                .create_command_encoder(&CommandEncoderDescriptor { label: None });
+        let (pipeline, bind_group) = self.generator.get_view(&mut encoder, texture)?;
+        let output = self.surface.get_current_texture()?;
+        let view = output
+            .texture
+            .create_view(&TextureViewDescriptor::default());
 
-            {
-                let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                    color_attachments: &[Some(RenderPassColorAttachment {
-                        view: &view,
-                        resolve_target: None,
-                        ops: Operations {
-                            load: LoadOp::Clear(Color::BLACK),
-                            store: StoreOp::Store,
-                        },
-                    })],
-                    ..Default::default()
-                });
+        {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
 
-                render_pass.set_pipeline(pipeline);
-                render_pass.set_bind_group(0, Some(&bind_group), &[]);
-                render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
-                render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
-            }
-
-            self.queue.submit(Some(encoder.finish()));
-            output.present();
+            render_pass.set_pipeline(pipeline);
+            render_pass.set_bind_group(0, Some(&bind_group), &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
+            render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
         }
+
+        self.queue.submit(Some(encoder.finish()));
+        output.present();
 
         Ok(())
     }

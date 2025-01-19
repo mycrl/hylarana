@@ -18,10 +18,7 @@ resample = { path = "../resample", version = "0.2.0", package = "hylarana-resamp
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-capture = { version = "1.4.0" }
-
-[target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.58.0"
-features = ["Win32_Media", "Win32_Media_MediaFoundation"]
+windows = { version = "0.58.0", features = ["Win32_Media", "Win32_Media_MediaFoundation"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = "0.14.0"
@@ -40,3 +37,8 @@ features = [
     "postproc",
     "swresample"
 ]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = "0.3.2"
+core-foundation = "0.10"
+core-media-rs = "0.3"

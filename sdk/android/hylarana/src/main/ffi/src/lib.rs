@@ -1,3 +1,5 @@
+#![cfg(target_os = "android")]
+
 mod discovery;
 mod object;
 mod receiver;

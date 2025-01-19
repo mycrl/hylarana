@@ -7,7 +7,7 @@ use std::{slice::from_raw_parts, str::FromStr};
 
 pub use self::{
     receiver::{
-        HylaranaReceiver, HylaranaReceiverCodecOptions, HylaranaReceiverError,
+        HylaranaReceiver, HylaranaReceiverError, HylaranaReceiverMediaOptions,
         HylaranaReceiverOptions,
     },
     sender::{
@@ -34,7 +34,7 @@ use common::win32::{
 };
 
 #[cfg(target_os = "macos")]
-use common::macos::{CVPixelBufferRef, PixelBufferRef};
+use common::macos::{CVPixelBufferRef, PixelMomeryBuffer};
 
 use parking_lot::Mutex;
 
@@ -502,12 +502,16 @@ impl<'a> VideoRender<'a> {
                 size,
                 direct3d,
             )?),
-            VideoRenderBackend::WebGPU => Self::WebGPU(WgpuRenderer::new(WgpuRendererOptions {
-                window: target,
-                #[cfg(target_os = "windows")]
-                direct3d,
-                size,
-            })?),
+            VideoRenderBackend::WebGPU => {
+                // Self::WebGPU(WgpuRenderer::new(WgpuRendererOptions {
+                //     window: target,
+                //     #[cfg(target_os = "windows")]
+                //     direct3d,
+                //     size,
+                // })?)
+
+                todo!()
+            }
             #[allow(unreachable_patterns)]
             _ => unimplemented!("not supports the {:?} backend", backend),
         })
@@ -541,36 +545,32 @@ impl<'a> VideoRender<'a> {
             #[cfg(target_os = "macos")]
             VideoSubFormat::CvPixelBufferRef => match self {
                 Self::WebGPU(render) => match frame.format {
-                    VideoFormat::BGRA | VideoFormat::RGBA => {
-                        render.submit(Texture::Nv12(Texture2DResource::Texture(
+                    VideoFormat::BGRA => {
+                        render.submit(Texture::Bgra(Texture2DResource::Texture(
+                            Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
+                        )))?;
+                    }
+                    VideoFormat::RGBA => {
+                        render.submit(Texture::Rgba(Texture2DResource::Texture(
                             Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
                         )))?;
                     }
                     _ => {
-                        let pixel_buffer = PixelBufferRef::from(frame.data[0] as CVPixelBufferRef);
-                        let linesize = pixel_buffer.linesize();
-                        let data = pixel_buffer.data();
-                        let size = pixel_buffer.size();
-
-                        render.submit(Texture::Nv12(Texture2DResource::Buffer(
-                            Texture2DBuffer {
-                                buffers: &[
-                                    unsafe {
-                                        from_raw_parts(
-                                            data[0] as *const _,
-                                            linesize[0] * size.height as usize,
-                                        )
-                                    },
-                                    unsafe {
-                                        from_raw_parts(
-                                            data[1] as *const _,
-                                            linesize[1] * size.height as usize,
-                                        )
-                                    },
-                                ],
-                                size,
+                        let pixel_buffer = PixelMomeryBuffer::from((
+                            frame.data[0] as CVPixelBufferRef,
+                            frame.format,
+                            Size {
+                                width: frame.width,
+                                height: frame.height,
                             },
-                        )))?;
+                        ));
+
+                        let buffer = Texture2DBuffer(&pixel_buffer.data);
+                        render.submit(match frame.format {
+                            VideoFormat::NV12 => Texture::Nv12(Texture2DResource::Buffer(buffer)),
+                            VideoFormat::I420 => Texture::I420(buffer),
+                            _ => unreachable!(),
+                        })?;
                     }
                 },
             },
@@ -656,14 +656,7 @@ impl<'a> VideoRender<'a> {
                     ],
                 };
 
-                let texture = Texture2DBuffer {
-                    buffers: &buffers,
-                    size: Size {
-                        width: frame.width,
-                        height: frame.height,
-                    },
-                };
-
+                let texture = Texture2DBuffer(&buffers);
                 let texture = match frame.format {
                     VideoFormat::BGRA => Texture::Bgra(Texture2DResource::Buffer(texture)),
                     VideoFormat::RGBA => Texture::Rgba(Texture2DResource::Buffer(texture)),

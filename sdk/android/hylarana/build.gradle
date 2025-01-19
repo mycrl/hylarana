@@ -82,7 +82,7 @@ cargoNdk {
 
     apiLevel = 29
     targets = ["arm64"]
-    module = "../../ffi"
+    module = "./ffi"
     targetDirectory = "../target"
     librariesNames = ["libhylarana.so"]
 }

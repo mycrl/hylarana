@@ -9,7 +9,7 @@ use clap::Parser;
 use hylarana::{
     shutdown, startup, AVFrameObserver, AVFrameStreamPlayer, AVFrameStreamPlayerOptions,
     AudioOptions, Capture, DiscoveryService, Hylarana, HylaranaReceiver,
-    HylaranaReceiverCodecOptions, HylaranaReceiverOptions, HylaranaSender,
+    HylaranaReceiverMediaOptions, HylaranaReceiverOptions, HylaranaSender,
     HylaranaSenderMediaOptions, HylaranaSenderOptions, HylaranaSenderTrackOptions, Size,
     SourceType, TransportOptions, TransportStrategy, VideoDecoderType, VideoEncoderType,
     VideoOptions, VideoRenderBackend, VideoRenderOptions,
@@ -121,14 +121,16 @@ impl Sender {
 
         // Get the first audio input device that can be captured.
         let mut audio = None;
-        if let Some(source) = Capture::get_sources(SourceType::Audio)?.get(0) {
-            audio = Some(HylaranaSenderTrackOptions {
-                source: source.clone(),
-                options: AudioOptions {
-                    sample_rate: 48000,
-                    bit_rate: 64000,
-                },
-            });
+        if !cfg!(target_os = "macos") {
+            if let Some(source) = Capture::get_sources(SourceType::Audio)?.get(0) {
+                audio = Some(HylaranaSenderTrackOptions {
+                    source: source.clone(),
+                    options: AudioOptions {
+                        sample_rate: 48000,
+                        bit_rate: 64000,
+                    },
+                });
+            }
         }
 
         let strategy = configure.get_strategy().unwrap();
@@ -209,7 +211,7 @@ impl Receiver {
                     if let Ok(it) = Hylarana::create_receiver(
                         properties.id,
                         HylaranaReceiverOptions {
-                            codec: HylaranaReceiverCodecOptions {
+                            media: HylaranaReceiverMediaOptions {
                                 video: video_decoder,
                             },
                             transport: TransportOptions {

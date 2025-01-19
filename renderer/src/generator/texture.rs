@@ -5,7 +5,7 @@ pub mod bgra {
 
     use std::borrow::Cow;
 
-    use common::Size;
+    use common::{frame::VideoSubFormat, Size};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -18,11 +18,11 @@ pub mod bgra {
         return textureSample(texture_, sampler_, coords);
     }"#;
 
-    pub struct Bgra(Texture);
+    pub struct Bgra(Option<Texture>);
 
     impl Bgra {
-        pub(crate) fn new(device: &Device, size: Size) -> Self {
-            Self(Self::create(device, size).next().unwrap())
+        pub(crate) fn new(device: &Device, size: Size, sub_format: VideoSubFormat) -> Self {
+            Self(Self::create(device, size, sub_format).next())
         }
     }
 
@@ -36,8 +36,13 @@ pub mod bgra {
 
         fn create_texture_descriptor(
             size: Size,
+            sub_format: VideoSubFormat,
         ) -> impl IntoIterator<Item = (Size, TextureFormat)> {
-            [(size, TextureFormat::Bgra8Unorm)]
+            if sub_format == VideoSubFormat::SW {
+                vec![(size, TextureFormat::Bgra8Unorm)]
+            } else {
+                Vec::new()
+            }
         }
 
         fn views_descriptors<'a>(
@@ -45,7 +50,7 @@ pub mod bgra {
             texture: Option<&'a Texture>,
         ) -> impl IntoIterator<Item = (&'a Texture, TextureFormat, TextureAspect)> {
             [(
-                texture.unwrap_or_else(|| &self.0),
+                texture.unwrap_or_else(|| self.0.as_ref().unwrap()),
                 TextureFormat::Bgra8Unorm,
                 TextureAspect::All,
             )]
@@ -55,10 +60,11 @@ pub mod bgra {
             &self,
             buffers: &'a [&'a [u8]],
         ) -> impl IntoIterator<Item = (&'a [u8], &Texture, TextureAspect, Size)> {
-            let size = self.0.size();
+            let texture = self.0.as_ref().unwrap();
+            let size = texture.size();
             [(
                 buffers[0],
-                &self.0,
+                texture,
                 TextureAspect::All,
                 Size {
                     width: size.width * 4,
@@ -74,7 +80,7 @@ pub mod i420 {
 
     use std::borrow::Cow;
 
-    use common::Size;
+    use common::{frame::VideoSubFormat, Size};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -119,8 +125,8 @@ pub mod i420 {
     pub struct I420(Texture, Texture, Texture);
 
     impl I420 {
-        pub(crate) fn new(device: &Device, size: Size) -> Self {
-            let mut textures = Self::create(device, size);
+        pub(crate) fn new(device: &Device, size: Size, sub_format: VideoSubFormat) -> Self {
+            let mut textures = Self::create(device, size, sub_format);
             Self(
                 textures.next().unwrap(),
                 textures.next().unwrap(),
@@ -139,6 +145,7 @@ pub mod i420 {
 
         fn create_texture_descriptor(
             size: Size,
+            _: VideoSubFormat,
         ) -> impl IntoIterator<Item = (Size, TextureFormat)> {
             [
                 (size, TextureFormat::R8Unorm),
@@ -212,7 +219,7 @@ pub mod nv12 {
 
     use std::borrow::Cow;
 
-    use common::Size;
+    use common::{frame::VideoSubFormat, Size};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -257,12 +264,16 @@ pub mod nv12 {
     /// NV12 is possibly the most commonly-used 8-bit 4:2:0 format. It is the
     /// default for Android camera preview.[19] The entire image in Y is written
     /// out, followed by interleaved lines that go U0, V0, U1, V1, etc.
-    pub struct Nv12(Texture, Texture);
+    pub struct Nv12(Option<(Texture, Texture)>);
 
     impl Nv12 {
-        pub(crate) fn new(device: &Device, size: Size) -> Self {
-            let mut textures = Self::create(device, size);
-            Self(textures.next().unwrap(), textures.next().unwrap())
+        pub(crate) fn new(device: &Device, size: Size, sub_format: VideoSubFormat) -> Self {
+            let mut textures = Self::create(device, size, sub_format);
+            Self(if sub_format == VideoSubFormat::D3D11 {
+                None
+            } else {
+                Some((textures.next().unwrap(), textures.next().unwrap()))
+            })
         }
     }
 
@@ -276,17 +287,22 @@ pub mod nv12 {
 
         fn create_texture_descriptor(
             size: Size,
+            sub_format: VideoSubFormat,
         ) -> impl IntoIterator<Item = (Size, TextureFormat)> {
-            [
-                (size, TextureFormat::R8Unorm),
-                (
-                    Size {
-                        width: size.width / 2,
-                        height: size.height / 2,
-                    },
-                    TextureFormat::Rg8Unorm,
-                ),
-            ]
+            if sub_format == VideoSubFormat::D3D11 {
+                Vec::new()
+            } else {
+                vec![
+                    (size, TextureFormat::R8Unorm),
+                    (
+                        Size {
+                            width: size.width / 2,
+                            height: size.height / 2,
+                        },
+                        TextureFormat::Rg8Unorm,
+                    ),
+                ]
+            }
         }
 
         fn views_descriptors<'a>(
@@ -302,9 +318,10 @@ pub mod nv12 {
                     (texture, TextureFormat::Rg8Unorm, TextureAspect::Plane1),
                 ]
             } else {
+                let textures = self.0.as_ref().unwrap();
                 [
-                    (&self.0, TextureFormat::R8Unorm, TextureAspect::All),
-                    (&self.1, TextureFormat::Rg8Unorm, TextureAspect::All),
+                    (&textures.0, TextureFormat::R8Unorm, TextureAspect::All),
+                    (&textures.0, TextureFormat::Rg8Unorm, TextureAspect::All),
                 ]
             }
         }
@@ -313,8 +330,9 @@ pub mod nv12 {
             &self,
             buffers: &'a [&'a [u8]],
         ) -> impl IntoIterator<Item = (&'a [u8], &Texture, TextureAspect, Size)> {
+            let textures = self.0.as_ref().unwrap();
             let size = {
-                let size = self.0.size();
+                let size = textures.0.size();
                 Size {
                     width: size.width,
                     height: size.height,
@@ -322,8 +340,8 @@ pub mod nv12 {
             };
 
             [
-                (buffers[0], &self.0, TextureAspect::All, size),
-                (buffers[1], &self.1, TextureAspect::All, size),
+                (buffers[0], &textures.0, TextureAspect::All, size),
+                (buffers[1], &textures.0, TextureAspect::All, size),
             ]
         }
     }
@@ -334,7 +352,7 @@ pub mod rgba {
 
     use std::borrow::Cow;
 
-    use common::Size;
+    use common::{frame::VideoSubFormat, Size};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -363,11 +381,11 @@ pub mod rgba {
     /// In some contexts the abbreviation "RGBA" means a specific memory layout
     /// (called RGBA8888 below), with other terms such as "BGRA" used for
     /// alternatives. In other contexts "RGBA" means any layout.
-    pub struct Rgba(Texture);
+    pub struct Rgba(Option<Texture>);
 
     impl Rgba {
-        pub(crate) fn new(device: &Device, size: Size) -> Self {
-            Self(Self::create(device, size).next().unwrap())
+        pub(crate) fn new(device: &Device, size: Size, sub_format: VideoSubFormat) -> Self {
+            Self(Self::create(device, size, sub_format).next())
         }
     }
 
@@ -381,8 +399,13 @@ pub mod rgba {
 
         fn create_texture_descriptor(
             size: Size,
+            sub_format: VideoSubFormat,
         ) -> impl IntoIterator<Item = (Size, TextureFormat)> {
-            [(size, TextureFormat::Rgba8Unorm)]
+            if sub_format == VideoSubFormat::SW {
+                vec![(size, TextureFormat::Rgba8Unorm)]
+            } else {
+                Vec::new()
+            }
         }
 
         fn views_descriptors<'a>(
@@ -390,7 +413,7 @@ pub mod rgba {
             texture: Option<&'a Texture>,
         ) -> impl IntoIterator<Item = (&'a Texture, TextureFormat, TextureAspect)> {
             [(
-                texture.unwrap_or_else(|| &self.0),
+                texture.unwrap_or_else(|| self.0.as_ref().unwrap()),
                 TextureFormat::Rgba8Unorm,
                 TextureAspect::All,
             )]
@@ -400,10 +423,11 @@ pub mod rgba {
             &self,
             buffers: &'a [&'a [u8]],
         ) -> impl IntoIterator<Item = (&'a [u8], &Texture, TextureAspect, Size)> {
-            let size = self.0.size();
+            let texture = self.0.as_ref().unwrap();
+            let size = texture.size();
             [(
                 buffers[0],
-                &self.0,
+                texture,
                 TextureAspect::All,
                 Size {
                     width: size.width * 4,

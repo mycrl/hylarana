@@ -24,9 +24,9 @@ pub enum HylaranaReceiverError {
     AudioDecoderError(#[from] codec::AudioDecoderError),
 }
 
-/// Receiver media codec configuration.
+/// Receiver media configuration.
 #[derive(Debug, Clone)]
-pub struct HylaranaReceiverCodecOptions {
+pub struct HylaranaReceiverMediaOptions {
     pub video: VideoDecoderType,
 }
 
@@ -34,7 +34,7 @@ pub struct HylaranaReceiverCodecOptions {
 #[derive(Debug, Clone)]
 pub struct HylaranaReceiverOptions {
     pub transport: TransportOptions,
-    pub codec: HylaranaReceiverCodecOptions,
+    pub media: HylaranaReceiverMediaOptions,
 }
 
 fn create_video_decoder<T: AVFrameStream + 'static>(
@@ -175,7 +175,7 @@ impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
             status.clone(),
             &sink,
             VideoDecoderSettings {
-                codec: options.codec.video,
+                codec: options.media.video,
                 #[cfg(target_os = "windows")]
                 direct3d: Some(crate::get_direct3d()),
             },

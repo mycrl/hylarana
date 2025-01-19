@@ -52,7 +52,7 @@ const Replace = (file, filters) => {
 void (async () => {
     const Profile = Args.release ? "Release" : "Debug";
 
-    for (const path of ["./target", "./build", "./build/bin", "./build/lib", "./build/include"]) {
+    for (const path of ["./target", "./build", "./build/bin", "./build/lib"]) {
         if (!fs.existsSync(path)) {
             fs.mkdirSync(path);
         }
@@ -96,9 +96,6 @@ void (async () => {
     for (const item of [
         ["./README.md", "./build/README.md"],
         ["./LICENSE", "./build/LICENSE"],
-
-        /* inculde */
-        ["./ffi/include/hylarana.h", "./build/include/hylarana.h"],
     ]) {
         fs.cpSync(...item, { force: true, recursive: true });
     }
@@ -110,8 +107,6 @@ void (async () => {
                 `./target/${Profile.toLowerCase()}/hylarana-server.exe`,
                 "./build/bin/hylarana-server.exe",
             ],
-            [`./target/${Profile.toLowerCase()}/hylarana.dll.lib`, "./build/lib/hylarana.dll.lib"],
-            [`./target/${Profile.toLowerCase()}/hylarana.dll`, "./build/bin/hylarana.dll"],
             [`./target/ffmpeg/bin/avcodec-61.dll`, "./build/bin/avcodec-61.dll"],
             [`./target/ffmpeg/bin/avutil-59.dll`, "./build/bin/avutil-59.dll"],
             [`./target/ffmpeg/bin/swresample-5.dll`, "./build/bin/swresample-5.dll"],
@@ -122,10 +117,6 @@ void (async () => {
         for (const item of [
             [`./target/${Profile.toLowerCase()}/hylarana-example`, "./build/bin/example"],
             [`./target/${Profile.toLowerCase()}/hylarana-server`, "./build/bin/hylarana-server"],
-            [
-                `./target/${Profile.toLowerCase()}/libhylarana.dylib`,
-                "./build/bin/libhylarana.dylib",
-            ],
         ]) {
             fs.cpSync(...item, { force: true, recursive: true });
         }
@@ -133,7 +124,6 @@ void (async () => {
         for (const item of [
             [`./target/${Profile.toLowerCase()}/hylarana-example`, "./build/bin/example"],
             [`./target/${Profile.toLowerCase()}/hylarana-server`, "./build/bin/hylarana-server"],
-            [`./target/${Profile.toLowerCase()}/libhylarana.so`, "./build/bin/libhylarana.so"],
             [`./target/ffmpeg/lib`, "./build/lib"],
         ]) {
             fs.cpSync(...item, { force: true, recursive: true });
