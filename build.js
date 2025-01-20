@@ -133,7 +133,8 @@ void (async () => {
     if (process.platform == "win32") {
         for (const item of [
             ["./target/debug/hylarana.pdb", "./build/bin/hylarana.pdb"],
-            ["./target/debug/hylarana_server.pdb", "./build/bin/hylarana-server.pdb"],
+            ["./target/debug/hylarana_server.pdb", "./build/bin/server.pdb"],
+            ["./target/debug/hylarana_example.pdb", "./build/bin/example.pdb"],
         ]) {
             if (!Args.release) {
                 fs.cpSync(...item, { force: true, recursive: true });

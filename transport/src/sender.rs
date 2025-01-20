@@ -6,13 +6,13 @@ use std::{
     thread,
 };
 
+use common::{TransportOptions, TransportStrategy};
 use parking_lot::RwLock;
 use uuid::Uuid;
 
 use crate::{
     adapter::StreamSenderAdapter, MulticastServer, Package, PacketInfo, StreamInfo, StreamInfoKind,
     TransmissionFragmentEncoder, TransmissionOptions, TransmissionServer, TransmissionSocket,
-    TransportOptions, TransportStrategy,
 };
 
 pub struct Sender {

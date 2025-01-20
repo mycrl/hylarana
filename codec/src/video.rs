@@ -1,11 +1,15 @@
 use crate::codec::{
     create_video_context, create_video_frame, set_option, set_str_option, CodecError, CodecType,
-    CreateVideoContextError, CreateVideoFrameError, VideoDecoderType, VideoEncoderType,
+    CreateVideoContextError, CreateVideoFrameError,
 };
 
 use std::{ffi::c_int, ptr::null_mut};
 
-use common::frame::{VideoFormat, VideoFrame, VideoSubFormat};
+use common::{
+    codec::{VideoDecoderType, VideoEncoderType},
+    frame::{VideoFormat, VideoFrame, VideoSubFormat},
+};
+
 use mirror_ffmpeg_sys::*;
 use thiserror::Error;
 
@@ -232,7 +236,7 @@ impl VideoDecoder {
             AVPixelFormat::AV_PIX_FMT_YUV420P => {
                 for i in 0..3 {
                     self.frame.data[i] = frame.data[i] as *const _;
-                    self.frame.linesize[i] = frame.linesize[i] as usize;
+                    self.frame.linesize[i] = frame.linesize[i] as u32;
                 }
 
                 self.frame.sub_format = VideoSubFormat::SW;

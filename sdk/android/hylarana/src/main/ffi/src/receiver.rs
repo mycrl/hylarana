@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use transport::{
-    create_mix_receiver, StreamKind, StreamReceiverAdapter, TransportOptions, TransportReceiver,
-};
+use common::TransportOptions;
+use transport::{create_mix_receiver, StreamKind, StreamReceiverAdapter, TransportReceiver};
 
 use jni::{
     objects::{GlobalRef, JObject, JString, JValue, JValueGen},
@@ -47,7 +46,7 @@ impl Receiver {
         let id: String = env.get_string(id)?.into();
 
         Ok(Self {
-            receiver: create_mix_receiver(id, TransportOptions::from_object(env, &options)?)?,
+            receiver: create_mix_receiver(&id, TransportOptions::from_object(env, &options)?)?,
             observer: env.new_global_ref(observer)?,
         })
     }

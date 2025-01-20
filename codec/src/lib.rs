@@ -13,10 +13,7 @@ pub use self::{
         create_opus_identification_header, AudioDecoder, AudioDecoderError, AudioEncoder,
         AudioEncoderError, AudioEncoderSettings,
     },
-    codec::{
-        CodecError, CodecType, CreateVideoContextError, CreateVideoFrameError, VideoDecoderType,
-        VideoEncoderType,
-    },
+    codec::{CodecError, CodecType, CreateVideoContextError, CreateVideoFrameError},
     video::{
         VideoDecoder, VideoDecoderError, VideoDecoderSettings, VideoEncoder, VideoEncoderError,
         VideoEncoderSettings,

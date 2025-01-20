@@ -1,5 +1,7 @@
 package com.github.mycrl.hylarana
 
+import android.util.Log
+
 /**
  * Data Stream Receiver Adapter
  *
@@ -41,12 +43,42 @@ data class TransportStrategy(
     var addr: String
 )
 
+class VideoFormat {
+    companion object {
+        const val BGRA: Int = 0
+        const val RGBA: Int = 1
+        const val NV12: Int = 2
+        const val I420: Int = 3
+    }
+}
+
 data class TransportOptions(
     val strategy: TransportStrategy,
     /**
      * see: [Maximum_transmission_unit](https://en.wikipedia.org/wiki/Maximum_transmission_unit)
      */
     val mtu: Int
+)
+
+data class MediaVideoStreamDescription(
+    val format: Int,
+    val width: Int,
+    val height: Int,
+    val fps: Int,
+    val bitRate: Int,
+)
+
+data class MediaAudioStreamDescription(
+    val sampleRate: Int,
+    val channels: Int,
+    val bitRate: Int,
+)
+
+data class MediaStreamDescription(
+    val id: String,
+    val transport: TransportOptions,
+    val video: MediaVideoStreamDescription?,
+    val audio: MediaAudioStreamDescription?,
 )
 
 class HylaranaSenderAdapter(

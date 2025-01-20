@@ -39,6 +39,7 @@ import com.github.mycrl.hylarana.HylaranaSenderObserver
 import com.github.mycrl.hylarana.HylaranaService
 import com.github.mycrl.hylarana.HylaranaStrategy
 import com.github.mycrl.hylarana.HylaranaStrategyType
+import com.github.mycrl.hylarana.MediaStreamDescription
 import com.github.mycrl.hylarana.Properties
 import com.github.mycrl.hylarana.Video
 
@@ -186,18 +187,16 @@ class SimpleHylaranaService : Service() {
             Discovery()
                 .query(
                     object : DiscoveryServiceQueryObserver() {
-                        override fun resolve(addrs: Array<String>, properties: Properties) {
+                        override fun resolve(addrs: Array<String>, description: MediaStreamDescription) {
                             if (receiver == null) {
-                                val sdp = Sdp.fromProperties(properties)
-                                if (sdp.strategy.type == HylaranaStrategyType.DIRECT) {
-                                    sdp.strategy.addr =
-                                        addrs[0] + ":" + sdp.strategy.addr.split(":")[1]
+                                if (description.transport.strategy.type == HylaranaStrategyType.DIRECT) {
+                                    description.transport.strategy.addr =
+                                        addrs[0] + ":" + description.transport.strategy.addr.split(":")[1]
                                 }
 
                                 val audioConfig = Audio.getAudioCodecConfigure()
                                 receiver = HylaranaService.createReceiver(
-                                    sdp.id,
-                                    HylaranaOptions(strategy = sdp.strategy, mtu = 1500),
+                                    description,
                                     object : HylaranaReceiverObserver() {
                                         override val surface = outputSurface!!
                                         override val track =
@@ -302,7 +301,7 @@ class SimpleHylaranaService : Service() {
                 Discovery()
                     .register(
                         3456,
-                        Sdp(id = sender!!.getStreamId(), strategy = it).toProperties()
+                        sender!!.getDescription()
                     )
             }
 
@@ -319,32 +318,5 @@ class SimpleHylaranaService : Service() {
             )
 
         virtualDisplay?.surface = sender?.getSurface()
-    }
-}
-
-data class Sdp(val id: String, val strategy: HylaranaStrategy) {
-    fun toProperties(): Properties {
-        return mapOf(
-            "id" to id,
-            "strategy" to strategy.type.toString(),
-            "address" to strategy.addr,
-        )
-    }
-
-    companion object {
-        fun fromProperties(properties: Properties): Sdp {
-            return Sdp(
-                id = properties["id"] ?: throw Exception("not found id property"),
-                strategy =
-                HylaranaStrategy(
-                    type =
-                    (properties["strategy"]
-                        ?: throw Exception("not found strategy property"))
-                        .toInt(),
-                    addr =
-                    properties["address"] ?: throw Exception("not found address property")
-                )
-            )
-        }
     }
 }

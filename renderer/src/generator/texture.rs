@@ -27,6 +27,8 @@ pub mod bgra {
     }
 
     impl Texture2DSample for Bgra {
+        const VIEWS_COUNT: usize = 1;
+
         fn fragment_shader() -> ShaderModuleDescriptor<'static> {
             ShaderModuleDescriptor {
                 label: None,
@@ -136,6 +138,8 @@ pub mod i420 {
     }
 
     impl Texture2DSample for I420 {
+        const VIEWS_COUNT: usize = 3;
+
         fn fragment_shader() -> ShaderModuleDescriptor<'static> {
             ShaderModuleDescriptor {
                 label: None,
@@ -278,6 +282,8 @@ pub mod nv12 {
     }
 
     impl Texture2DSample for Nv12 {
+        const VIEWS_COUNT: usize = 2;
+
         fn fragment_shader() -> ShaderModuleDescriptor<'static> {
             ShaderModuleDescriptor {
                 label: None,
@@ -321,7 +327,7 @@ pub mod nv12 {
                 let textures = self.0.as_ref().unwrap();
                 [
                     (&textures.0, TextureFormat::R8Unorm, TextureAspect::All),
-                    (&textures.0, TextureFormat::Rg8Unorm, TextureAspect::All),
+                    (&textures.1, TextureFormat::Rg8Unorm, TextureAspect::All),
                 ]
             }
         }
@@ -332,16 +338,16 @@ pub mod nv12 {
         ) -> impl IntoIterator<Item = (&'a [u8], &Texture, TextureAspect, Size)> {
             let textures = self.0.as_ref().unwrap();
             let size = {
-                let size = textures.0.size();
+                let it = textures.0.size();
                 Size {
-                    width: size.width,
-                    height: size.height,
+                    width: it.width,
+                    height: it.height,
                 }
             };
 
             [
                 (buffers[0], &textures.0, TextureAspect::All, size),
-                (buffers[1], &textures.0, TextureAspect::All, size),
+                (buffers[1], &textures.1, TextureAspect::All, size),
             ]
         }
     }
@@ -390,6 +396,8 @@ pub mod rgba {
     }
 
     impl Texture2DSample for Rgba {
+        const VIEWS_COUNT: usize = 1;
+
         fn fragment_shader() -> ShaderModuleDescriptor<'static> {
             ShaderModuleDescriptor {
                 label: None,

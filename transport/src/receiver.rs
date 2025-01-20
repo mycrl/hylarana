@@ -5,10 +5,12 @@ use std::{
     thread,
 };
 
+use common::{TransportOptions, TransportStrategy};
+
 use crate::{
     adapter::StreamReceiverAdapterAbstract, MulticastSocket, StreamInfo, StreamInfoKind,
     StreamMultiReceiverAdapter, StreamReceiverAdapter, TransmissionFragmentDecoder,
-    TransmissionOptions, TransmissionSocket, TransportOptions, TransportStrategy, UnPackage,
+    TransmissionOptions, TransmissionSocket, UnPackage,
 };
 
 enum Socket {
@@ -207,13 +209,13 @@ where
 }
 
 fn create_receiver<T: Default + StreamReceiverAdapterAbstract + 'static>(
-    id: String,
+    id: &str,
     options: TransportOptions,
 ) -> Result<Receiver<T>, Error> {
     match options.strategy {
-        TransportStrategy::Multicast(addr) => create_multicast_receiver(id, addr),
+        TransportStrategy::Multicast(addr) => create_multicast_receiver(id.to_string(), addr),
         TransportStrategy::Direct(addr) | TransportStrategy::Relay(addr) => {
-            create_srt_receiver(id, addr, options.mtu)
+            create_srt_receiver(id.to_string(), addr, options.mtu)
         }
     }
 }
@@ -222,7 +224,7 @@ fn create_receiver<T: Default + StreamReceiverAdapterAbstract + 'static>(
 /// received independently, so that a channel can be easily processed separately
 /// from different threads.
 pub fn create_split_receiver(
-    id: String,
+    id: &str,
     options: TransportOptions,
 ) -> Result<Receiver<StreamMultiReceiverAdapter>, Error> {
     create_receiver::<StreamMultiReceiverAdapter>(id, options)
@@ -232,7 +234,7 @@ pub fn create_split_receiver(
 /// data from all channels is mixed together, and the data received from the
 /// receiver is mixed, and you need to process it yourself by data type.
 pub fn create_mix_receiver(
-    id: String,
+    id: &str,
     options: TransportOptions,
 ) -> Result<Receiver<StreamReceiverAdapter>, Error> {
     create_receiver::<StreamReceiverAdapter>(id, options)

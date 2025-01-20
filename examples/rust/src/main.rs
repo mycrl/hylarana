@@ -1,18 +1,17 @@
 use std::{
-    collections::HashMap,
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use hylarana::{
-    shutdown, startup, AVFrameObserver, AVFrameStreamPlayer, AVFrameStreamPlayerOptions,
-    AudioOptions, Capture, DiscoveryService, Hylarana, HylaranaReceiver,
-    HylaranaReceiverMediaOptions, HylaranaReceiverOptions, HylaranaSender,
-    HylaranaSenderMediaOptions, HylaranaSenderOptions, HylaranaSenderTrackOptions, Size,
-    SourceType, TransportOptions, TransportStrategy, VideoDecoderType, VideoEncoderType,
-    VideoOptions, VideoRenderBackend, VideoRenderOptions,
+    create_receiver, create_sender, shutdown, startup, AVFrameObserver, AVFrameStreamPlayer,
+    AVFrameStreamPlayerOptions, AudioOptions, Capture, DiscoveryService, HylaranaReceiver,
+    HylaranaReceiverOptions, HylaranaSender, HylaranaSenderMediaOptions, HylaranaSenderOptions,
+    HylaranaSenderTrackOptions, MediaStreamDescription, Size, SourceType, TransportOptions,
+    TransportStrategy, VideoDecoderType, VideoEncoderType, VideoOptions, VideoRenderBackend,
+    VideoRenderOptionsBuilder, VideoRenderSurfaceOptions,
 };
 
 use parking_lot::Mutex;
@@ -24,61 +23,6 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
-
-type Properties = HashMap<String, String>;
-
-struct StreamInfo {
-    id: String,
-    strategy: TransportStrategy,
-}
-
-impl Into<Properties> for StreamInfo {
-    fn into(self) -> Properties {
-        let mut map = HashMap::with_capacity(3);
-        map.insert("id".to_string(), self.id);
-        map.insert(
-            "strategy".to_string(),
-            match self.strategy {
-                TransportStrategy::Direct(_) => 0,
-                TransportStrategy::Relay(_) => 1,
-                TransportStrategy::Multicast(_) => 2,
-            }
-            .to_string(),
-        );
-
-        match self.strategy {
-            TransportStrategy::Direct(addr)
-            | TransportStrategy::Relay(addr)
-            | TransportStrategy::Multicast(addr) => {
-                map.insert("address".to_string(), addr.to_string());
-            }
-        }
-
-        map
-    }
-}
-
-impl TryFrom<Properties> for StreamInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Properties) -> Result<Self, Self::Error> {
-        (|| {
-            let address: SocketAddr = value.get("address")?.parse().ok()?;
-            let strategy = match value.get("strategy")?.as_str().parse::<i32>().ok()? {
-                0 => TransportStrategy::Direct(address),
-                1 => TransportStrategy::Relay(address),
-                2 => TransportStrategy::Multicast(address),
-                _ => return None,
-            };
-
-            Some(Self {
-                id: value.get("id")?.clone(),
-                strategy,
-            })
-        })()
-        .ok_or_else(|| anyhow!("invalid properties"))
-    }
-}
 
 trait GetSize {
     fn size(&self) -> Size;
@@ -110,11 +54,13 @@ struct Sender {
 
 impl Sender {
     fn new(configure: &Configure, window: Arc<Window>) -> Result<Self> {
+        let video_options = configure.get_video_options();
+
         // Get the first screen that can be captured.
         let mut video = None;
         if let Some(source) = Capture::get_sources(SourceType::Screen)?.get(0) {
             video = Some(HylaranaSenderTrackOptions {
-                options: configure.get_video_options(),
+                options: video_options.clone(),
                 source: source.clone(),
             });
         }
@@ -133,21 +79,26 @@ impl Sender {
             }
         }
 
-        let strategy = configure.get_strategy().unwrap();
-        let sender = Hylarana::create_sender(
-            HylaranaSenderOptions {
-                transport: TransportOptions {
-                    strategy,
-                    mtu: 1500,
-                },
-                media: HylaranaSenderMediaOptions { video, audio },
+        let options = HylaranaSenderOptions {
+            media: HylaranaSenderMediaOptions { video, audio },
+            transport: TransportOptions {
+                strategy: configure.get_strategy().unwrap(),
+                mtu: 1500,
             },
+        };
+
+        let sender = create_sender(
+            &options,
             AVFrameStreamPlayer::new(
-                AVFrameStreamPlayerOptions::OnlyVideo(VideoRenderOptions {
-                    backend: configure.backend,
-                    size: window.size(),
-                    target: window,
-                }),
+                AVFrameStreamPlayerOptions::OnlyVideo(
+                    VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
+                        size: window.size(),
+                        window,
+                    })
+                    .set_backend(configure.backend)
+                    .from_sender(&options)
+                    .build(),
+                ),
                 ViewObserver,
             )?,
         )?;
@@ -155,14 +106,7 @@ impl Sender {
         // Register the current sender's information with the LAN discovery service so
         // that other receivers can know that the sender has been created and can access
         // the sender's information.
-        let discovery = DiscoveryService::register::<Properties>(
-            3456,
-            &StreamInfo {
-                id: sender.get_id().to_string(),
-                strategy,
-            }
-            .into(),
-        )?;
+        let discovery = DiscoveryService::register(3456, sender.get_description())?;
 
         Ok(Self { discovery, sender })
     }
@@ -175,57 +119,53 @@ struct Receiver {
 }
 
 impl Receiver {
-    fn new(configure: &Configure, window: Arc<Window>) -> Result<Self> {
+    fn new(configure: Configure, window: Arc<Window>) -> Result<Self> {
         let video_decoder = configure.decoder;
 
         let receiver = Arc::new(Mutex::new(None));
         let receiver_ = Arc::downgrade(&receiver);
 
-        let player = Mutex::new(Some(AVFrameStreamPlayer::new(
-            AVFrameStreamPlayerOptions::All(VideoRenderOptions {
-                backend: configure.backend,
-                size: window.size(),
-                target: window.clone(),
-            }),
-            ViewObserver,
-        )?));
-
         // Find published senders through the LAN discovery service.
-        let discovery = DiscoveryService::query(move |addrs, properties: Properties| {
-            if let Some(receiver) = receiver_.upgrade() {
-                // If the sender has already been created, no further sender postings are
-                // processed.
-                if receiver.lock().is_some() {
-                    return;
-                }
+        let discovery =
+            DiscoveryService::query(move |addrs, mut description: MediaStreamDescription| {
+                if let Some(receiver) = receiver_.upgrade() {
+                    let window = window.clone();
 
-                let mut properties = StreamInfo::try_from(properties).unwrap();
-
-                // The sender, if using passthrough, will need to replace the ip in the publish
-                // address by replacing the ip address with the sender's ip.
-                if let TransportStrategy::Direct(addr) = &mut properties.strategy {
-                    addr.set_ip(IpAddr::V4(addrs[0]));
-                }
-
-                if let Some(player) = player.lock().take() {
-                    if let Ok(it) = Hylarana::create_receiver(
-                        properties.id,
-                        HylaranaReceiverOptions {
-                            media: HylaranaReceiverMediaOptions {
-                                video: video_decoder,
-                            },
-                            transport: TransportOptions {
-                                strategy: properties.strategy,
-                                mtu: 1500,
-                            },
-                        },
-                        player,
-                    ) {
-                        receiver.lock().replace(it);
+                    // If the sender has already been created, no further sender postings are
+                    // processed.
+                    if receiver.lock().is_some() {
+                        return;
                     }
+
+                    // The sender, if using passthrough, will need to replace the ip in the publish
+                    // address by replacing the ip address with the sender's ip.
+                    if let TransportStrategy::Direct(addr) = &mut description.transport.strategy {
+                        addr.set_ip(IpAddr::V4(addrs[0]));
+                    }
+
+                    let options = HylaranaReceiverOptions { video_decoder };
+                    receiver.lock().replace(
+                        create_receiver(
+                            &description,
+                            &options,
+                            AVFrameStreamPlayer::new(
+                                AVFrameStreamPlayerOptions::All(
+                                    VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
+                                        size: window.size(),
+                                        window,
+                                    })
+                                    .set_backend(configure.backend)
+                                    .from_receiver(&description, &options)
+                                    .build(),
+                                ),
+                                ViewObserver,
+                            )
+                            .unwrap(),
+                        )
+                        .unwrap(),
+                    );
                 }
-            }
-        })?;
+            })?;
 
         Ok(Self {
             discovery,
@@ -296,7 +236,7 @@ impl ApplicationHandler for App {
                             KeyCode::KeyR => {
                                 if let (None, Some(window)) = (&self.receiver, &self.window) {
                                     self.receiver.replace(
-                                        Receiver::new(&Configure::parse(), window.clone()).unwrap(),
+                                        Receiver::new(Configure::parse(), window.clone()).unwrap(),
                                     );
                                 }
                             }

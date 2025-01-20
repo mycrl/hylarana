@@ -26,6 +26,7 @@ class Video {
         private val sinker: ByteArraySinker
     ) {
         private var isRunning: Boolean = false
+        private var videoFormat: Int = VideoFormat.NV12
 
         private val codec: MediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
         private val bufferInfo = MediaCodec.BufferInfo()
@@ -33,16 +34,16 @@ class Video {
         private var worker: Thread
 
         init {
-            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, configure.width, configure.height)
+            var format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, configure.width, configure.height)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
             format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+            format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
             format.setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, configure.frameRate.toFloat())
             format.setInteger(MediaFormat.KEY_LATENCY, configure.frameRate / 10)
             format.setInteger(MediaFormat.KEY_OPERATING_RATE, configure.frameRate)
             format.setInteger(MediaFormat.KEY_CAPTURE_RATE, configure.frameRate)
             format.setInteger(MediaFormat.KEY_FRAME_RATE, configure.frameRate)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, configure.format)
-            format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
             format.setInteger(MediaFormat.KEY_BIT_RATE, configure.bitRate)
             format.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL, 0.4F)
             format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
@@ -55,6 +56,10 @@ class Video {
                     MediaCodecInfo.CodecProfileLevel.AVCLevel5
                 }
             )
+
+            if (codec.name.indexOf(".qti.") >= 0) {
+                videoFormat = VideoFormat.I420
+            }
 
             if (codec.name.indexOf(".rk.") >= 0) {
                 format.setInteger(MediaFormat.KEY_COMPLEXITY, 0)
@@ -119,6 +124,10 @@ class Video {
             return surface
         }
 
+        fun getFormat(): Int {
+            return videoFormat
+        }
+
         fun start() {
             if (!isRunning) {
                 isRunning = true
@@ -158,10 +167,10 @@ class Video {
         }
     }
 
-    class VideoDecoder(surface: Surface) {
+    class VideoDecoder(surface: Surface, width: Int, height: Int) {
         var isRunning: Boolean = false
 
-        private lateinit var codec: MediaCodec
+        private var codec: MediaCodec
         private val bufferInfo = MediaCodec.BufferInfo()
         private var worker: Thread
 
@@ -189,7 +198,7 @@ class Video {
                 MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
             }
 
-            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 2560, 1660)
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
 

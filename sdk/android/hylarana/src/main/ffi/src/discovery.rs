@@ -1,10 +1,13 @@
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::net::Ipv4Addr;
 
 use anyhow::Result;
-pub use discovery::DiscoveryService;
+use common::MediaStreamDescription;
 use jni::objects::{GlobalRef, JValue};
 
-use super::{get_current_env, object::TransformMap, TransformArray};
+pub use discovery::DiscoveryService;
+
+use super::{get_current_env, TransformArray};
+use crate::object::TransformObject;
 
 pub struct DiscoveryServiceObserver(pub GlobalRef);
 
@@ -15,18 +18,18 @@ impl DiscoveryServiceObserver {
     pub fn resolve(
         &self,
         addrs: &Vec<Ipv4Addr>,
-        properties: &HashMap<String, String>,
+        description: &MediaStreamDescription,
     ) -> Result<()> {
         let mut env = get_current_env();
         let addrs = addrs.to_array(&mut env)?;
-        let properties = properties.to_map(&mut env).unwrap();
+        let description = description.to_object(&mut env).unwrap();
         env.call_method(
             self.0.as_obj(),
             "resolve",
             "([Ljava/lang/String;Ljava/util/Map;)V",
             &[
                 JValue::Object(addrs.as_ref()),
-                JValue::Object(properties.as_ref()),
+                JValue::Object(description.as_ref()),
             ],
         )?;
 

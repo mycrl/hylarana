@@ -24,7 +24,11 @@ unsafe impl Send for Transformer {}
 unsafe impl Sync for Transformer {}
 
 impl Transformer {
-    pub fn new(device: Arc<Device>, size: Size, format: VideoFormat) -> Result<Self, TransformError> {
+    pub fn new(
+        device: Arc<Device>,
+        size: Size,
+        format: VideoFormat,
+    ) -> Result<Self, TransformError> {
         // Get the wgpu underlying metal device.
         let mut raw_device = None;
         unsafe {
@@ -72,11 +76,7 @@ impl Transformer {
         texture: CVPixelBufferRef,
     ) -> Result<&Texture, TransformError> {
         unsafe {
-            encoder.as_hal_mut::<Metal, _, _>(|encoder| {
-                if let Some(raw_encoder) = encoder {
-                    
-                }
-            });
+            encoder.as_hal_mut::<Metal, _, _>(|encoder| if let Some(raw_encoder) = encoder {});
         }
 
         todo!()

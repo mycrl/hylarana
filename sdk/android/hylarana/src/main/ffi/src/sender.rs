@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bytes::BytesMut;
+use common::TransportOptions;
 use transport::{
     create_sender, with_capacity as package_with_capacity, StreamBufferInfo, StreamSenderAdapter,
-    TransportOptions, TransportSender,
+    TransportSender,
 };
 
 use jni::{

@@ -23,11 +23,8 @@ pub use self::{
 
 use std::{
     io::{Error, ErrorKind},
-    net::SocketAddr,
     str::FromStr,
 };
-
-use serde::{Deserialize, Serialize};
 
 /// Initialize the srt communication protocol, mainly initializing some
 /// log-related things.
@@ -38,51 +35,6 @@ pub fn startup() -> bool {
 /// Clean up the srt environment and prepare to exit.
 pub fn shutdown() {
     transmission::cleanup()
-}
-
-/// Transport layer strategies.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum TransportStrategy {
-    /// In straight-through mode, the sender creates an SRT server and the
-    /// receiver connects directly to the sender via the SRT protocol.
-    ///
-    /// For the sender, the network address is the address to which the SRT
-    /// server binds and listens.
-    ///
-    /// ```text
-    /// example: 0.0.0.0:8080
-    /// ```
-    ///
-    /// For the receiving end, the network address is the address of the SRT
-    /// server on the sending end.
-    ///
-    /// ```text
-    /// example: 192.168.1.100:8080
-    /// ```
-    Direct(SocketAddr),
-    /// Forwarding mode, where the sender and receiver pass data through a relay
-    /// server.
-    ///
-    /// The network address is the address of the transit server.
-    Relay(SocketAddr),
-    /// UDP multicast mode, where the sender sends multicast packets into the
-    /// current network and the receiver processes the multicast packets.
-    ///
-    /// The sender and receiver use the same address, which is a combination of
-    /// multicast address + port.
-    ///
-    /// ```text
-    /// example: 239.0.0.1:8080
-    /// ```
-    Multicast(SocketAddr),
-}
-
-/// Transport configuration.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct TransportOptions {
-    pub strategy: TransportStrategy,
-    /// see: [Maximum_transmission_unit](https://en.wikipedia.org/wiki/Maximum_transmission_unit)
-    pub mtu: usize,
 }
 
 #[repr(u8)]

@@ -7,7 +7,7 @@ abstract class DiscoveryServiceQueryObserver {
     /**
      * The query service has yielded results.
      */
-    abstract fun resolve(addrs: Array<String>, properties: Properties)
+    abstract fun resolve(addrs: Array<String>, description: MediaStreamDescription)
 }
 
 class DiscoveryService(private val releaseHandle: () -> Unit) {
@@ -36,8 +36,8 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    fun register(port: Int, properties: Properties): DiscoveryService {
-        val discovery = registerDiscoveryService(port, properties)
+    fun register(port: Int, description: MediaStreamDescription): DiscoveryService {
+        val discovery = registerDiscoveryService(port, description)
         if (discovery == 0L) {
             throw Exception("failed to register discovery service")
         }
@@ -69,7 +69,7 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    private external fun registerDiscoveryService(port: Int, properties: Properties): Long
+    private external fun registerDiscoveryService(port: Int, description: MediaStreamDescription): Long
 
     /**
      * Query the registered service, the service type is fixed, when the query

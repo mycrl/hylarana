@@ -1,41 +1,37 @@
-use std::{
-    collections::HashMap,
-    net::{Ipv4Addr, SocketAddr},
-};
+use std::net::{Ipv4Addr, SocketAddr};
 
 use anyhow::{anyhow, Result};
+use common::{
+    MediaAudioStreamDescription, MediaStreamDescription, MediaVideoStreamDescription, Size,
+    TransportOptions, TransportStrategy,
+};
+
 use jni::{
-    objects::{JMap, JObject, JObjectArray, JString, JValueGen},
+    objects::{JObject, JObjectArray, JString, JValueGen},
     JNIEnv,
 };
-use transport::{StreamBufferInfo, StreamKind, TransportOptions, TransportStrategy};
 
+use transport::{StreamBufferInfo, StreamKind};
+
+#[allow(unused)]
 pub trait TransformObject: Sized {
-    #[allow(unused)]
     fn from_object(env: &mut JNIEnv, object: &JObject) -> Result<Self> {
+        unimplemented!()
+    }
+
+    fn to_object<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
         unimplemented!()
     }
 }
 
+#[allow(unused)]
 pub trait TransformArray: Sized {
-    #[allow(unused)]
     fn to_array<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObjectArray<'a>> {
         unimplemented!()
     }
 }
 
-pub trait TransformMap: Sized {
-    #[allow(unused)]
-    fn from_map(env: &mut JNIEnv, map: &JObject) -> Result<Self> {
-        unimplemented!()
-    }
-
-    #[allow(unused)]
-    fn to_map<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
-        unimplemented!()
-    }
-}
-
+#[allow(unused)]
 pub trait EasyObject<'a>
 where
     Self: AsRef<JObject<'a>>,
@@ -48,12 +44,22 @@ where
         }
     }
 
+    fn set_string(&self, env: &mut JNIEnv, key: &str, value: &str) -> Result<()> {
+        let value = env.new_string(value)?;
+        self.set_object(env, "Ljava/lang/String;", key, value.as_ref())
+    }
+
     fn get_int(&self, env: &mut JNIEnv, key: &str) -> Result<i32> {
         if let JValueGen::Int(value) = env.get_field(&self, key, "I")? {
             Ok(value)
         } else {
             Err(anyhow!("[{}] not a int", key))
         }
+    }
+
+    fn set_int(&self, env: &mut JNIEnv, key: &str, value: i32) -> Result<()> {
+        env.set_field(&self, key, "I", JValueGen::Int(value))?;
+        Ok(())
     }
 
     fn get_long(&self, env: &mut JNIEnv, key: &str) -> Result<i64> {
@@ -64,12 +70,28 @@ where
         }
     }
 
+    fn set_long(&self, env: &mut JNIEnv, key: &str, value: i64) -> Result<()> {
+        env.set_field(&self, key, "J", JValueGen::Long(value))?;
+        Ok(())
+    }
+
     fn get_object<'b>(&self, env: &mut JNIEnv<'b>, ty: &str, key: &str) -> Result<JObject<'b>> {
         if let JValueGen::Object(value) = env.get_field(&self, key, ty)? {
             Ok(value)
         } else {
             Err(anyhow!("[{}] not a object", key))
         }
+    }
+
+    fn set_object<'b>(
+        &self,
+        env: &mut JNIEnv<'b>,
+        ty: &str,
+        key: &str,
+        value: &JObject,
+    ) -> Result<()> {
+        env.set_field(&self, key, ty, JValueGen::Object(value))?;
+        Ok(())
     }
 }
 
@@ -101,6 +123,19 @@ impl TransformObject for TransportStrategy {
             _ => return Err(anyhow!("type of invalidity")),
         })
     }
+
+    fn to_object<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
+        let object = env.alloc_object("Lcom/github/mycrl/hylarana/TransportStrategy;")?;
+        let (addr, kind) = match self {
+            Self::Direct(addr) => (addr, 0),
+            Self::Relay(addr) => (addr, 1),
+            Self::Multicast(addr) => (addr, 2),
+        };
+
+        object.set_string(env, "addr", &addr.to_string())?;
+        object.set_int(env, "type", kind)?;
+        Ok(object)
+    }
 }
 
 // ```kt
@@ -124,6 +159,21 @@ impl TransformObject for TransportOptions {
             strategy: TransportStrategy::from_object(env, &strategy)?,
             mtu: object.get_int(env, "mtu")? as usize,
         })
+    }
+
+    fn to_object<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
+        let object = env.alloc_object("Lcom/github/mycrl/hylarana/TransportOptions;")?;
+        object.set_int(env, "mtu", self.mtu as i32)?;
+
+        let strategy = self.strategy.to_object(env)?;
+        object.set_object(
+            env,
+            "Lcom/github/mycrl/hylarana/TransportStrategy;",
+            "strategy",
+            &strategy,
+        )?;
+
+        Ok(object)
     }
 }
 
@@ -152,44 +202,6 @@ impl TransformObject for StreamBufferInfo {
     }
 }
 
-// ```kt
-// typealias Properties = Map<String, String>;
-// ```
-impl TransformMap for HashMap<String, String> {
-    fn from_map(env: &mut JNIEnv, object: &JObject) -> Result<Self> {
-        let mut map = HashMap::with_capacity(10);
-
-        let jmap = JMap::from_env(env, &object)?;
-        let mut iterator = jmap.iter(env)?;
-        while let Some((key, value)) = iterator.next(env)? {
-            map.insert(
-                env.get_string(&JString::from(key))?.into(),
-                env.get_string(&JString::from(value))?.into(),
-            );
-        }
-
-        Ok(map)
-    }
-
-    fn to_map<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
-        let object = env.new_object("java/util/HashMap", "()V", &[])?;
-        let map = JMap::from_env(env, &object)?;
-
-        for (key, value) in self.iter() {
-            map.put(
-                env,
-                env.new_string(key)?.as_ref(),
-                env.new_string(value)?.as_ref(),
-            )?;
-        }
-
-        Ok(object)
-    }
-}
-
-// ```kt
-// Array<String>
-// ```
 impl TransformArray for Vec<Ipv4Addr> {
     fn to_array<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObjectArray<'a>> {
         let array =
@@ -200,5 +212,141 @@ impl TransformArray for Vec<Ipv4Addr> {
         }
 
         Ok(array)
+    }
+}
+
+// ```kt
+// data class MediaVideoStreamDescription(
+//     val format: Int,
+//     val width: Int,
+//     val height: Int,
+//     val fps: Int,
+//     val bitRate: Int,
+// )
+// ```
+impl TransformObject for MediaVideoStreamDescription {
+    fn from_object(env: &mut JNIEnv, object: &JObject) -> Result<Self> {
+        Ok(Self {
+            fps: object.get_int(env, "fps")? as u8,
+            bit_rate: object.get_int(env, "bitRate")? as u64,
+            format: unsafe { std::mem::transmute(object.get_int(env, "format")?) },
+            size: Size {
+                width: object.get_int(env, "width")? as u32,
+                height: object.get_int(env, "height")? as u32,
+            },
+        })
+    }
+
+    fn to_object<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
+        let object = env.alloc_object("Lcom/github/mycrl/hylarana/MediaVideoStreamDescription;")?;
+        object.set_int(env, "fps", self.fps as i32)?;
+        object.set_int(env, "format", self.format as i32)?;
+        object.set_int(env, "width", self.size.width as i32)?;
+        object.set_int(env, "height", self.size.height as i32)?;
+        object.set_int(env, "bitRate", self.bit_rate as i32)?;
+
+        Ok(object)
+    }
+}
+
+// ```kt
+// data class MediaAudioStreamDescription(
+//     val sampleRate: Int,
+//     val channels: Int,
+//     val bitRate: Int,
+// )
+// ```
+impl TransformObject for MediaAudioStreamDescription {
+    fn from_object(env: &mut JNIEnv, object: &JObject) -> Result<Self> {
+        Ok(Self {
+            sample_rate: object.get_int(env, "sampleRate")? as u64,
+            bit_rate: object.get_int(env, "bitRate")? as u64,
+            channels: object.get_int(env, "channels")? as u8,
+        })
+    }
+
+    fn to_object<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
+        let object = env.alloc_object("Lcom/github/mycrl/hylarana/MediaAudioStreamDescription;")?;
+        object.set_int(env, "sampleRate", self.sample_rate as i32)?;
+        object.set_int(env, "channels", self.channels as i32)?;
+        object.set_int(env, "bitRate", self.bit_rate as i32)?;
+
+        Ok(object)
+    }
+}
+
+// ```kt
+// data class MediaStreamDescription(
+//     val id: String,
+//     val transport: TransportOptions,
+//     val video: MediaVideoStreamDescription?,
+//     val audio: MediaAudioStreamDescription?,
+// )
+// ```
+impl TransformObject for MediaStreamDescription {
+    fn from_object(env: &mut JNIEnv, object: &JObject) -> Result<Self> {
+        let transport = object.get_object(
+            env,
+            "Lcom/github/mycrl/hylarana/TransportOptions;",
+            "transport",
+        )?;
+
+        Ok(Self {
+            id: object.get_string(env, "id")?,
+            transport: TransportOptions::from_object(env, &transport)?,
+            video: object
+                .get_object(
+                    env,
+                    "Lcom/github/mycrl/hylarana/MediaVideoStreamDescription;",
+                    "video",
+                )
+                .ok()
+                .map(|it| MediaVideoStreamDescription::from_object(env, &it).ok())
+                .flatten(),
+            audio: object
+                .get_object(
+                    env,
+                    "Lcom/github/mycrl/hylarana/MediaAudioStreamDescription;",
+                    "audio",
+                )
+                .ok()
+                .map(|it| MediaAudioStreamDescription::from_object(env, &it).ok())
+                .flatten(),
+        })
+    }
+
+    fn to_object<'a>(&self, env: &mut JNIEnv<'a>) -> Result<JObject<'a>> {
+        let object = env.alloc_object("Lcom/github/mycrl/hylarana/MediaStreamDescription;")?;
+        object.set_string(env, "id", &self.id)?;
+
+        let transport = self.transport.to_object(env)?;
+        object.set_object(
+            env,
+            "Lcom/github/mycrl/hylarana/TransportOptions;",
+            "transport",
+            &transport,
+        )?;
+
+        if let Some(it) = self.video {
+            let video = it.to_object(env)?;
+            object.set_object(
+                env,
+                "Lcom/github/mycrl/hylarana/MediaVideoStreamDescription;",
+                "video",
+                &video,
+            )?;
+        }
+
+        if let Some(it) = self.audio {
+            let audio = it.to_object(env)?;
+            object.set_object(
+                env,
+                "Lcom/github/mycrl/hylarana/MediaAudioStreamDescription;",
+                "audio",
+                &audio,
+            )?;
+        }
+
+        Ok(object)
     }
 }

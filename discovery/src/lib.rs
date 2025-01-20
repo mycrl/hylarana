@@ -10,7 +10,7 @@ pub enum DiscoveryError {
     #[error(transparent)]
     MdnsError(#[from] mdns_sd::Error),
     #[error(transparent)]
-    JsonError(#[from] serde_json::Error),
+    EncodeError(#[from] serde_json::Error),
 }
 
 /// LAN service discovery.
@@ -38,7 +38,7 @@ impl DiscoveryService {
                 &format!("{}._hylarana._udp.local.", id),
                 "",
                 port,
-                &[("properties", serde_json::to_string(properties)?)][..],
+                &[("p", serde_json::to_string(properties)?)][..],
             )?
             .enable_addr_auto(),
         )?;
@@ -65,8 +65,7 @@ impl DiscoveryService {
         let receiver = mdns.browse("_hylarana._udp.local.")?;
         thread::spawn(move || {
             let process = |info: ServiceInfo| {
-                let properties =
-                    serde_json::from_str(info.get_property("properties")?.val_str()).ok()?;
+                let properties = serde_json::from_str(info.get_property("p")?.val_str()).ok()?;
                 let addrs = info
                     .get_addresses_v4()
                     .into_iter()

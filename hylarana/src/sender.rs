@@ -1,4 +1,9 @@
-use crate::AVFrameStream;
+use crate::{
+    AVFrameStream, MediaAudioStreamDescription, MediaStreamDescription, MediaVideoStreamDescription,
+};
+
+#[cfg(target_os = "windows")]
+use crate::util::get_direct3d;
 
 use std::{
     mem::size_of,
@@ -13,21 +18,21 @@ use capture::{
 
 use common::{
     atomic::EasyAtomic,
-    frame::{AudioFrame, VideoFrame},
-    Size,
+    codec::VideoEncoderType,
+    frame::{AudioFrame, VideoFormat, VideoFrame},
+    Size, TransportOptions,
 };
 
 use codec::{
     create_opus_identification_header, AudioEncoder, AudioEncoderSettings, CodecType, VideoEncoder,
-    VideoEncoderSettings, VideoEncoderType,
-};
-
-use transport::{
-    copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
-    TransportOptions, TransportSender,
+    VideoEncoderSettings,
 };
 
 use thiserror::Error;
+use transport::{
+    copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
+    TransportSender,
+};
 
 #[derive(Debug, Error)]
 pub enum HylaranaSenderError {
@@ -298,6 +303,8 @@ impl<T: AVFrameStream + 'static> FrameArrived for AudioSender<T> {
 
 /// Screen casting sender.
 pub struct HylaranaSender<T: AVFrameStream + 'static> {
+    description: MediaStreamDescription,
+    #[allow(unused)]
     transport: TransportSender,
     status: Arc<AtomicBool>,
     capture: Capture,
@@ -309,7 +316,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
     // but both video capture and audio capture can be empty, which means you can
     // create a sender that captures nothing.
     pub(crate) fn new(
-        options: HylaranaSenderOptions,
+        options: &HylaranaSenderOptions,
         sink: T,
     ) -> Result<Self, HylaranaSenderError> {
         log::info!("create sender");
@@ -319,7 +326,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
         let status = Arc::new(AtomicBool::new(false));
         let sink = Arc::new(sink);
 
-        if let Some(HylaranaSenderTrackOptions { source, options }) = options.media.audio {
+        if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.audio {
             capture_options.audio = Some(SourceCaptureOptions {
                 arrived: AudioSender::new(
                     status.clone(),
@@ -332,12 +339,12 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
                 )?,
                 description: AudioCaptureSourceDescription {
                     sample_rate: options.sample_rate as u32,
-                    source,
+                    source: source.clone(),
                 },
             });
         }
 
-        if let Some(HylaranaSenderTrackOptions { source, options }) = options.media.video {
+        if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.video {
             capture_options.video = Some(SourceCaptureOptions {
                 description: VideoCaptureSourceDescription {
                     hardware: CodecType::from(options.codec).is_hardware(),
@@ -346,9 +353,9 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
                         width: options.width,
                         height: options.height,
                     },
-                    source,
+                    source: source.clone(),
                     #[cfg(target_os = "windows")]
-                    direct3d: crate::get_direct3d(),
+                    direct3d: get_direct3d(),
                 },
                 arrived: VideoSender::new(
                     status.clone(),
@@ -361,15 +368,45 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
                         height: options.height,
                         bit_rate: options.bit_rate,
                         #[cfg(target_os = "windows")]
-                        direct3d: Some(crate::get_direct3d()),
+                        direct3d: Some(get_direct3d()),
                     },
                     &sink,
                 )?,
             });
         }
 
+        let description = MediaStreamDescription {
+            id: transport.get_id().to_string(),
+            transport: options.transport,
+            video: options
+                .media
+                .video
+                .clone()
+                .map(|it| MediaVideoStreamDescription {
+                    format: VideoFormat::NV12,
+                    fps: it.options.frame_rate,
+                    bit_rate: it.options.bit_rate,
+                    size: Size {
+                        width: it.options.width,
+                        height: it.options.height,
+                    },
+                }),
+            audio: options
+                .media
+                .audio
+                .clone()
+                .map(|it| MediaAudioStreamDescription {
+                    sample_rate: it.options.sample_rate,
+                    bit_rate: it.options.bit_rate,
+                    channels: 1,
+                }),
+        };
+
+        log::info!("sender description={:?}", description);
+
         Ok(Self {
             capture: Capture::start(capture_options)?,
+            description,
             transport,
             status,
             sink,
@@ -378,8 +415,8 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
 
     /// Get the ID of the sender, each sender has an individual ID identifier,
     /// you need to specify the ID of the sender when creating the receiver.
-    pub fn get_id(&self) -> &str {
-        self.transport.get_id()
+    pub fn get_description(&self) -> &MediaStreamDescription {
+        &self.description
     }
 }
 
