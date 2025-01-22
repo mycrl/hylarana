@@ -40,14 +40,13 @@ import com.github.mycrl.hylarana.HylaranaService
 import com.github.mycrl.hylarana.HylaranaStrategy
 import com.github.mycrl.hylarana.HylaranaStrategyType
 import com.github.mycrl.hylarana.MediaStreamDescription
-import com.github.mycrl.hylarana.Properties
 import com.github.mycrl.hylarana.Video
 
-class Notify(service: SimpleHylaranaService) {
+class Notify(service: HylaranaBackgroundService) {
     companion object {
         private const val NotifyId = 100
-        private const val NotifyChannelId = "SimpleHylarana"
-        private const val NotifyChannelName = "SimpleHylarana"
+        private const val NotifyChannelId = "HylaranaService"
+        private const val NotifyChannelName = "HylaranaService"
     }
 
     init {
@@ -81,13 +80,13 @@ class Notify(service: SimpleHylaranaService) {
     }
 }
 
-abstract class SimpleHylaranaServiceObserver() {
+abstract class HylaranaBackgroundServiceObserver() {
     abstract fun onConnected()
 
     abstract fun onReceiverClosed()
 }
 
-class SimpleHylaranaServiceBinder(private val service: SimpleHylaranaService) : Binder() {
+class HylaranaBackgroundServiceBinder(private val service: HylaranaBackgroundService) : Binder() {
     fun createSender(intent: Intent, displayMetrics: DisplayMetrics) {
         service.createSender(intent, displayMetrics)
     }
@@ -118,13 +117,13 @@ class SimpleHylaranaServiceBinder(private val service: SimpleHylaranaService) : 
         service.stopReceiver()
     }
 
-    fun setObserver(observer: SimpleHylaranaServiceObserver) {
+    fun setObserver(observer: HylaranaBackgroundServiceObserver) {
         service.setObserver(observer)
     }
 }
 
-class SimpleHylaranaService : Service() {
-    private var observer: SimpleHylaranaServiceObserver? = null
+class HylaranaBackgroundService : Service() {
+    private var observer: HylaranaBackgroundServiceObserver? = null
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var outputSurface: Surface? = null
@@ -134,7 +133,7 @@ class SimpleHylaranaService : Service() {
     private var strategy: HylaranaStrategy? = null
 
     override fun onBind(intent: Intent?): IBinder {
-        return SimpleHylaranaServiceBinder(this)
+        return HylaranaBackgroundServiceBinder(this)
     }
 
     override fun onDestroy() {
@@ -172,7 +171,7 @@ class SimpleHylaranaService : Service() {
         receiver = null
     }
 
-    fun setObserver(observer: SimpleHylaranaServiceObserver) {
+    fun setObserver(observer: HylaranaBackgroundServiceObserver) {
         this.observer = observer
     }
 

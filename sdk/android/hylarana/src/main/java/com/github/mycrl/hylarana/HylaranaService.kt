@@ -18,9 +18,9 @@ class StreamType {
 
 class HylaranaStrategyType {
     companion object {
-        const val DIRECT = 0
-        const val RELAY = 1
-        const val MULTICAST = 2
+        const val DIRECT = "d"
+        const val RELAY = "r"
+        const val MULTICAST = "m"
     }
 }
 
@@ -114,8 +114,8 @@ class HylaranaService {
                         private var isReleased: Boolean = false
                         private val videoDecoder = Video.VideoDecoder(
                             observer.surface,
-                            description.video?.width ?: 2560,
-                            description.video?.height ?: 1440
+                            description.video?.size?.width ?: 2560,
+                            description.video?.size?.height ?: 1440
                         )
                         private val audioDecoder = if (observer.track != null) {
                             Audio.AudioDecoder(observer.track!!)
@@ -259,10 +259,9 @@ class HylaranaSender(
             configure.options,
             MediaVideoStreamDescription(
                 format = videoEncoder.getFormat(),
-                width = configure.video.width,
-                height = configure.video.height,
                 fps = configure.video.frameRate,
-                bitRate = configure.video.bitRate
+                bitRate = configure.video.bitRate,
+                size = Size(width = configure.video.width, height = configure.video.height),
             ),
             MediaAudioStreamDescription(
                 sampleRate = audio.sampleRate,

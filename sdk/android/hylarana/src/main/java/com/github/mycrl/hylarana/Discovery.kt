@@ -1,6 +1,8 @@
 package com.github.mycrl.hylarana
 
-typealias Properties = Map<String, String>;
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 abstract class DiscoveryServiceQueryObserver {
 
@@ -8,6 +10,14 @@ abstract class DiscoveryServiceQueryObserver {
      * The query service has yielded results.
      */
     abstract fun resolve(addrs: Array<String>, description: MediaStreamDescription)
+}
+
+abstract class DiscoveryServiceQueryRawObserver {
+
+    /**
+     * The query service has yielded results.
+     */
+    abstract fun resolve(addrs: String, description: String)
 }
 
 class DiscoveryService(private val releaseHandle: () -> Unit) {
@@ -37,7 +47,7 @@ class Discovery {
      * customized data to the published service.
      */
     fun register(port: Int, description: MediaStreamDescription): DiscoveryService {
-        val discovery = registerDiscoveryService(port, description)
+        val discovery = registerDiscoveryService(port, Json.encodeToString(description))
         if (discovery == 0L) {
             throw Exception("failed to register discovery service")
         }
@@ -53,7 +63,11 @@ class Discovery {
      * addresses of the service publisher as well as the attribute information.
      */
     fun query(observer: DiscoveryServiceQueryObserver): DiscoveryService {
-        val discovery = queryDiscoveryService(observer)
+        val discovery = queryDiscoveryService(object : DiscoveryServiceQueryRawObserver() {
+            override fun resolve(addrs: String, description: String) {
+                observer.resolve(Json.decodeFromString(addrs), Json.decodeFromString(description))
+            }
+        })
         if (discovery == 0L) {
             throw Exception("failed to query discovery service")
         }
@@ -69,14 +83,14 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    private external fun registerDiscoveryService(port: Int, description: MediaStreamDescription): Long
+    private external fun registerDiscoveryService(port: Int, description: String): Long
 
     /**
      * Query the registered service, the service type is fixed, when the query
      * is published the callback function will call back all the network
      * addresses of the service publisher as well as the attribute information.
      */
-    private external fun queryDiscoveryService(observer: DiscoveryServiceQueryObserver): Long
+    private external fun queryDiscoveryService(observer: DiscoveryServiceQueryRawObserver): Long
 
     /**
      * release the discovery service

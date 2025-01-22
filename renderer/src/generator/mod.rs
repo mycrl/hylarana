@@ -244,8 +244,7 @@ pub struct Generator {
     layout: BindGroupLayout,
     pipeline: RenderPipeline,
     sample: Texture2DSourceSample,
-    #[cfg(not(target_os = "linux"))]
-    transformer: Transformer,
+    transformer: Option<Transformer>,
 }
 
 impl Generator {
@@ -260,11 +259,21 @@ impl Generator {
             direct3d,
         }: GeneratorOptions,
     ) -> Result<Self, GeneratorError> {
-        #[cfg(target_os = "windows")]
-        let transformer = Transformer::new(direct3d, &device, size, format)?;
+        let transformer = {
+            if sub_format != VideoSubFormat::SW {
+                #[cfg(target_os = "windows")]
+                {
+                    Some(Transformer::new(direct3d, &device, size, format)?)
+                }
 
-        #[cfg(target_os = "macos")]
-        let transformer = Transformer::new(device.clone(), size, format)?;
+                #[cfg(target_os = "macos")]
+                {
+                    Some(Transformer::new(device.clone(), size, format)?)
+                }
+            } else {
+                None
+            }
+        };
 
         let sampler = device.create_sampler(&SamplerDescriptor {
             address_mode_u: AddressMode::ClampToEdge,
@@ -383,21 +392,25 @@ impl Generator {
 
         let texture = match &texture {
             Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
-                match texture {
-                    #[cfg(not(target_os = "linux"))]
-                    Texture2DResource::Texture(texture) => match texture {
-                        #[cfg(target_os = "windows")]
-                        Texture2DRaw::ID3D11Texture2D(it, index) => {
-                            Some(self.transformer.transform(it, *index)?)
-                        }
-                        #[cfg(target_os = "macos")]
-                        Texture2DRaw::CVPixelBufferRef(it) => {
-                            Some(self.transformer.transform(encoder, *it)?)
-                        }
-                    },
-                    Texture2DResource::Buffer(_) => None,
-                    #[allow(unreachable_patterns)]
-                    _ => None,
+                if let Some(transformer) = &mut self.transformer {
+                    match texture {
+                        #[cfg(not(target_os = "linux"))]
+                        Texture2DResource::Texture(texture) => match texture {
+                            #[cfg(target_os = "windows")]
+                            Texture2DRaw::ID3D11Texture2D(it, index) => {
+                                Some(transformer.transform(it, *index)?)
+                            }
+                            #[cfg(target_os = "macos")]
+                            Texture2DRaw::CVPixelBufferRef(it) => {
+                                Some(transformer.transform(encoder, *it)?)
+                            }
+                        },
+                        Texture2DResource::Buffer(_) => None,
+                        #[allow(unreachable_patterns)]
+                        _ => None,
+                    }
+                } else {
+                    None
                 }
             }
             Texture::I420(_) => None,
@@ -415,7 +428,9 @@ impl Generator {
                 Texture2DSourceSample::Nv12(it) => {
                     it.bind_group(&self.device, &self.sampler, &self.layout, texture)
                 }
-                Texture2DSourceSample::I420(it) => unreachable!(),
+                Texture2DSourceSample::I420(it) => {
+                    it.bind_group(&self.device, &self.sampler, &self.layout, texture)
+                }
             },
         ))
     }

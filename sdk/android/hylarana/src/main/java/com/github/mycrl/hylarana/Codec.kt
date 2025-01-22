@@ -1,6 +1,5 @@
 package com.github.mycrl.hylarana
 
-import android.R.attr.mimeType
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
@@ -13,8 +12,6 @@ import android.os.Process
 import android.util.Log
 import android.view.Surface
 import java.nio.ByteBuffer
-import java.util.Locale
-
 
 abstract class ByteArraySinker {
     abstract fun sink(info: StreamBufferInfo, buf: ByteArray)
@@ -34,7 +31,7 @@ class Video {
         private var worker: Thread
 
         init {
-            var format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, configure.width, configure.height)
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, configure.width, configure.height)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
             format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
             format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)

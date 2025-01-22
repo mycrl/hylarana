@@ -53,7 +53,7 @@
 
 use std::{ffi::c_void, ptr::null};
 
-use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// A sample from the audio stream.
 #[repr(C)]
@@ -80,8 +80,8 @@ impl Default for AudioFrame {
 }
 
 /// Video frame format.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 pub enum VideoFormat {
     BGRA,
     RGBA,
@@ -90,8 +90,8 @@ pub enum VideoFormat {
 }
 
 /// Subtype of the video frame.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize_repr, Serialize_repr)]
 pub enum VideoSubFormat {
     /// This video frame is from Core video, a type exclusive to the Macos
     /// platform.

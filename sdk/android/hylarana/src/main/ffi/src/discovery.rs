@@ -6,8 +6,7 @@ use jni::objects::{GlobalRef, JValue};
 
 pub use discovery::DiscoveryService;
 
-use super::{get_current_env, TransformArray};
-use crate::object::TransformObject;
+use super::get_current_env;
 
 pub struct DiscoveryServiceObserver(pub GlobalRef);
 
@@ -21,15 +20,13 @@ impl DiscoveryServiceObserver {
         description: &MediaStreamDescription,
     ) -> Result<()> {
         let mut env = get_current_env();
-        let addrs = addrs.to_array(&mut env)?;
-        let description = description.to_object(&mut env).unwrap();
         env.call_method(
             self.0.as_obj(),
             "resolve",
-            "([Ljava/lang/String;Ljava/util/Map;)V",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
             &[
-                JValue::Object(addrs.as_ref()),
-                JValue::Object(description.as_ref()),
+                JValue::Object(&env.new_string(serde_json::to_string(addrs)?)?.into()),
+                JValue::Object(&env.new_string(serde_json::to_string(description)?)?.into()),
             ],
         )?;
 

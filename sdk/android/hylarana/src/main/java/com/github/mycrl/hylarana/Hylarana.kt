@@ -1,6 +1,9 @@
 package com.github.mycrl.hylarana
 
-import android.util.Log
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Data Stream Receiver Adapter
@@ -32,14 +35,17 @@ data class StreamBufferInfo(val type: Int) {
 /**
  * transport strategy
  */
+@Serializable
 data class TransportStrategy(
     /**
      * STRATEGY_DIRECT | STRATEGY_RELAY | STRATEGY_MULTICAST
      */
-    val type: Int,
+    @SerialName("t")
+    val type: String,
     /**
      * socket address
      */
+    @SerialName("v")
     var addr: String
 )
 
@@ -52,32 +58,55 @@ class VideoFormat {
     }
 }
 
+@Serializable
 data class TransportOptions(
+    @SerialName("s")
     val strategy: TransportStrategy,
     /**
      * see: [Maximum_transmission_unit](https://en.wikipedia.org/wiki/Maximum_transmission_unit)
      */
+    @SerialName("m")
     val mtu: Int
 )
 
-data class MediaVideoStreamDescription(
-    val format: Int,
+@Serializable
+data class Size(
+    @SerialName("w")
     val width: Int,
+    @SerialName("h")
     val height: Int,
+)
+
+@Serializable
+data class MediaVideoStreamDescription(
+    @SerialName("f")
+    val format: Int,
+    @SerialName("s")
+    val size: Size,
     val fps: Int,
+    @SerialName("br")
     val bitRate: Int,
 )
 
+@Serializable
 data class MediaAudioStreamDescription(
+    @SerialName("sr")
     val sampleRate: Int,
+    @SerialName("cs")
     val channels: Int,
+    @SerialName("br")
     val bitRate: Int,
 )
 
+@Serializable
 data class MediaStreamDescription(
+    @SerialName("i")
     val id: String,
+    @SerialName("t")
     val transport: TransportOptions,
+    @SerialName("v")
     val video: MediaVideoStreamDescription?,
+    @SerialName("a")
     val audio: MediaAudioStreamDescription?,
 )
 
@@ -127,7 +156,7 @@ internal class Hylarana {
     fun createSender(
         options: TransportOptions
     ): HylaranaSenderAdapter {
-        var sender = createTransportSender(options)
+        var sender = createTransportSender(Json.encodeToString(options))
         if (sender == 0L) {
             throw Exception("failed to create transport sender")
         }
@@ -164,7 +193,7 @@ internal class Hylarana {
     fun createReceiver(
         id: String, options: TransportOptions, observer: HylaranaReceiverAdapterObserver
     ): HylaranaReceiverAdapter {
-        var receiver = createTransportReceiver(id, options, observer)
+        var receiver = createTransportReceiver(id, Json.encodeToString(options), observer)
         if (receiver == 0L) {
             throw Exception("failed to create transport receiver")
         }
@@ -186,7 +215,7 @@ internal class Hylarana {
      * was successful or not.
      */
     private external fun createTransportSender(
-        options: TransportOptions,
+        options: String,
     ): Long
 
     /**
@@ -216,7 +245,7 @@ internal class Hylarana {
      */
     private external fun createTransportReceiver(
         id: String,
-        options: TransportOptions,
+        options: String,
         observer: HylaranaReceiverAdapterObserver,
     ): Long
 

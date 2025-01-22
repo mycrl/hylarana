@@ -311,16 +311,16 @@ open class Permissions : Layout() {
 
 @RequiresApi(Build.VERSION_CODES.R)
 class MainActivity : Permissions() {
-    private var simpleHylaranaService: Intent? = null
-    private var simpleHylaranaServiceBinder: SimpleHylaranaServiceBinder? = null
+    private var hylaranaService: Intent? = null
+    private var hylaranaServiceBinder: HylaranaBackgroundServiceBinder? = null
     private val connection: ServiceConnection =
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 Log.i("simple", "service connected.")
 
-                simpleHylaranaServiceBinder = service as SimpleHylaranaServiceBinder
-                simpleHylaranaServiceBinder?.setObserver(
-                    object : SimpleHylaranaServiceObserver() {
+                hylaranaServiceBinder = service as HylaranaBackgroundServiceBinder
+                hylaranaServiceBinder?.setObserver(
+                    object : HylaranaBackgroundServiceObserver() {
                         override fun onConnected() {
                             layoutSetState(State.Connected)
                         }
@@ -332,7 +332,7 @@ class MainActivity : Permissions() {
                 )
 
                 layoutGetSurface()?.let { surface ->
-                    simpleHylaranaServiceBinder?.setRenderSurface(surface)
+                    hylaranaServiceBinder?.setRenderSurface(surface)
                 }
             }
 
@@ -344,14 +344,14 @@ class MainActivity : Permissions() {
     init {
         registerPermissionsHandler { intent ->
             if (intent != null) {
-                simpleHylaranaServiceBinder?.createSender(intent, resources.displayMetrics)
+                hylaranaServiceBinder?.createSender(intent, resources.displayMetrics)
             }
         }
 
         layoutSetObserver(
             object : Observer() {
                 override fun OnConnect(strategy: HylaranaStrategy) {
-                    simpleHylaranaServiceBinder?.connect(strategy)
+                    hylaranaServiceBinder?.connect(strategy)
                 }
 
                 override fun OnPublish() {
@@ -359,15 +359,15 @@ class MainActivity : Permissions() {
                 }
 
                 override fun OnSubscribe() {
-                    simpleHylaranaServiceBinder?.createReceiver()
+                    hylaranaServiceBinder?.createReceiver()
                 }
 
                 override fun OnStop() {
                     val state = layoutGetState()
                     if (state == State.Publishing) {
-                        simpleHylaranaServiceBinder?.stopSender()
+                        hylaranaServiceBinder?.stopSender()
                     } else {
-                        simpleHylaranaServiceBinder?.stopReceiver()
+                        hylaranaServiceBinder?.stopReceiver()
                     }
 
                     layoutSetState(State.Connected)
@@ -378,16 +378,16 @@ class MainActivity : Permissions() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        simpleHylaranaService = startSimpleHylaranaService()
+        hylaranaService = startSimpleHylaranaService()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopService(simpleHylaranaService)
+        stopService(hylaranaService)
     }
 
     private fun startSimpleHylaranaService(): Intent {
-        val intent = Intent(this, SimpleHylaranaService::class.java)
+        val intent = Intent(this, HylaranaBackgroundService::class.java)
         bindService(intent, connection, BIND_AUTO_CREATE)
 
         Log.i("simple", "start simple hylarana service.")

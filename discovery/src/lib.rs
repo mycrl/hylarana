@@ -10,7 +10,7 @@ pub enum DiscoveryError {
     #[error(transparent)]
     MdnsError(#[from] mdns_sd::Error),
     #[error(transparent)]
-    EncodeError(#[from] serde_json::Error),
+    JsonError(#[from] serde_json::Error),
 }
 
 /// LAN service discovery.
@@ -38,7 +38,7 @@ impl DiscoveryService {
                 &format!("{}._hylarana._udp.local.", id),
                 "",
                 port,
-                &[("p", serde_json::to_string(properties)?)][..],
+                &[("p", &serde_json::to_string(properties)?)][..],
             )?
             .enable_addr_auto(),
         )?;
@@ -65,32 +65,41 @@ impl DiscoveryService {
         let receiver = mdns.browse("_hylarana._udp.local.")?;
         thread::spawn(move || {
             let process = |info: ServiceInfo| {
-                let properties = serde_json::from_str(info.get_property("p")?.val_str()).ok()?;
-                let addrs = info
-                    .get_addresses_v4()
-                    .into_iter()
-                    .map(|it| *it)
-                    .collect::<Vec<_>>();
+                if let Some(properties) = info.get_property("p") {
+                    let properties = serde_json::from_str(properties.val_str())?;
+                    let addrs = info
+                        .get_addresses_v4()
+                        .into_iter()
+                        .map(|it| *it)
+                        .collect::<Vec<_>>();
 
-                log::info!(
-                    "discovery service query a sender, host={}, address={:?}, properties={:?}",
-                    info.get_hostname(),
-                    addrs,
-                    properties,
-                );
+                    log::info!(
+                        "discovery service query a sender, host={}, address={:?}, properties={:?}",
+                        info.get_hostname(),
+                        addrs,
+                        properties,
+                    );
 
-                func(addrs, properties);
-                Some(())
+                    func(addrs, properties);
+                }
+
+                Ok::<(), DiscoveryError>(())
             };
 
             loop {
                 match receiver.recv() {
                     Ok(ServiceEvent::ServiceResolved(info)) => {
                         if info.get_fullname() == "sender._hylarana._udp.local." {
-                            process(info);
+                            if let Err(e) = process(info) {
+                                log::warn!("discovery service resolved error={:?}", e);
+                            }
                         }
                     }
-                    Err(_) => break,
+                    Err(e) => {
+                        log::error!("discovery service query error={:?}", e);
+
+                        break;
+                    }
                     Ok(event) => {
                         log::info!("discovery service query event={:?}", event);
                     }

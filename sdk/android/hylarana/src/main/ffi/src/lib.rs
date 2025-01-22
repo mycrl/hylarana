@@ -1,5 +1,4 @@
 mod discovery;
-mod object;
 mod receiver;
 mod sender;
 
@@ -21,7 +20,6 @@ use jni::{
 
 use self::{
     discovery::{DiscoveryService, DiscoveryServiceObserver},
-    object::{TransformArray, TransformObject},
     receiver::Receiver,
     sender::Sender,
 };
@@ -178,7 +176,7 @@ where
 extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportSender(
     mut env: JNIEnv,
     _this: JClass,
-    options: JObject,
+    options: JString,
 ) -> *const Sender {
     ok_or_check(&mut env, |env| {
         Ok(Box::into_raw(Box::new(Sender::new(env, &options)?)))
@@ -267,7 +265,7 @@ extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportReceiv
     mut env: JNIEnv,
     _this: JClass,
     id: JString,
-    options: JObject,
+    options: JString,
     observer: JObject,
 ) -> *const Arc<Receiver> {
     ok_or_check(&mut env, |env| {
@@ -329,10 +327,11 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_registerDiscoverySer
     mut env: JNIEnv,
     _this: JClass,
     port: jint,
-    description: JObject,
+    description: JString,
 ) -> *const DiscoveryService {
     ok_or_check(&mut env, |env| {
-        let description = MediaStreamDescription::from_object(env, &description)?;
+        let description: String = env.get_string(&description)?.into();
+        let description: MediaStreamDescription = serde_json::from_str(&description)?;
 
         Ok(Box::into_raw(Box::new(DiscoveryService::register(
             port as u16,

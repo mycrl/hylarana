@@ -25,6 +25,7 @@ pub struct Size {
 
 /// Transport layer strategies.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(tag = "t", content = "v")]
 pub enum TransportStrategy {
     /// In straight-through mode, the sender creates an SRT server and the
     /// receiver connects directly to the sender via the SRT protocol.

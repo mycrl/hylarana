@@ -1,19 +1,14 @@
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.21'
-    id "org.mozilla.rust-android-gradle.rust-android" version "0.9.6"
-    id 'maven-publish'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.0' apply true
+    id "org.mozilla.rust-android-gradle.rust-android" version "0.9.6" apply true
+    id 'maven-publish' apply true
 }
-
-apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
-apply plugin: 'maven-publish'
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'com.ensarsarajcic.kotlinx:serialization-msgpack:0.5.5'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2'
 }
 
 android {
