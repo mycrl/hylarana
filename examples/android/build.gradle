@@ -1,11 +1,14 @@
 plugins {
+    //noinspection AndroidGradlePluginVersion
     id 'com.android.application' version '8.2.1' apply false
+    //noinspection GradleDependency
     id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
+    //noinspection AndroidGradlePluginVersion
     id 'com.android.library' version '8.2.1' apply false
 }
 
 tasks.register('clean', Delete) {
-    delete rootProject.buildDir
+    delete layout.buildDirectory
 }
 
 wrapper {

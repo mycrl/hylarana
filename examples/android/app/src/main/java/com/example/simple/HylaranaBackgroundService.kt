@@ -1,7 +1,5 @@
 package com.example.simple
 
-// noinspection SuspiciousImport
-import android.R
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Notification
@@ -60,7 +58,7 @@ class Notify(service: HylaranaBackgroundService) {
         )
 
         val intent = Intent(service, MainActivity::class.java)
-        val icon = BitmapFactory.decodeResource(service.resources, R.mipmap.sym_def_app_icon)
+        val icon = BitmapFactory.decodeResource(service.resources, android.R.mipmap.sym_def_app_icon)
         val content =
             PendingIntent.getActivity(
                 service,
@@ -73,7 +71,7 @@ class Notify(service: HylaranaBackgroundService) {
         builder.setContentIntent(content)
         builder.setLargeIcon(icon)
         builder.setContentTitle("Screen recording")
-        builder.setSmallIcon(R.mipmap.sym_def_app_icon)
+        builder.setSmallIcon(android.R.mipmap.sym_def_app_icon)
         builder.setContentText("Recording screen......")
         builder.setWhen(System.currentTimeMillis())
         service.startForeground(NotifyId, builder.build())
