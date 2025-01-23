@@ -140,16 +140,22 @@ where
 {
     fn did_output_sample_buffer(&self, buffer: CMSampleBuffer, _: SCStreamOutputType) {
         if !self.status.get() {
+            log::warn!("macos screen capture stops because sink returns false");
+            
             return;
         }
 
         if buffer.make_data_ready().is_err() {
+            log::warn!("failed to frame sample buffer make data ready");
+
             return;
         }
 
         let buffer = if let Ok(it) = buffer.get_pixel_buffer() {
             it
         } else {
+            log::warn!("failed to get frame sample piexel buffer");
+
             return;
         };
 
@@ -161,8 +167,6 @@ where
 
         if !arrived.sink(&frame) {
             self.status.update(false);
-
-            log::warn!("macos screen capture stops because sink returns false");
         }
     }
 }
