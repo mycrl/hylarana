@@ -349,7 +349,7 @@ pub mod win32 {
             &mut self,
             format: VideoFormat,
             data: &[&[u8]],
-            stride: u32,
+            linesize: &[u32],
         ) -> Result<(), Error> {
             match format {
                 VideoFormat::BGRA | VideoFormat::RGBA => unsafe {
@@ -358,7 +358,7 @@ pub mod win32 {
                         0,
                         None,
                         data[0].as_ptr() as *const _,
-                        stride,
+                        linesize[0],
                         0,
                     );
                 },
@@ -374,7 +374,7 @@ pub mod win32 {
                                 0,
                                 None,
                                 data[0].as_ptr() as *const _,
-                                stride,
+                                linesize[0],
                                 0,
                             );
                         }
@@ -579,8 +579,8 @@ pub mod win32 {
         }
 
         /// The stride of the texture data
-        pub fn stride(&self) -> usize {
-            self.resource.RowPitch as usize
+        pub fn stride(&self) -> u32 {
+            self.resource.RowPitch
         }
     }
 

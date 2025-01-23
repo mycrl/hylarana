@@ -2,16 +2,14 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use transport::{
-    create_mix_receiver, StreamKind, StreamReceiverAdapter, TransportOptions, TransportReceiver,
-};
+use transport::{create_mix_receiver, StreamKind, StreamReceiverAdapter, TransportReceiver};
 
 use jni::{
     objects::{GlobalRef, JObject, JString, JValue, JValueGen},
     JNIEnv,
 };
 
-use super::{get_current_env, object::TransformObject};
+use super::get_current_env;
 
 pub struct Receiver {
     observer: GlobalRef,
@@ -41,13 +39,14 @@ impl Receiver {
     pub fn new(
         env: &mut JNIEnv,
         id: &JString,
-        options: &JObject,
+        options: &JString,
         observer: &JObject,
     ) -> Result<Self> {
         let id: String = env.get_string(id)?.into();
+        let options: String = env.get_string(options)?.into();
 
         Ok(Self {
-            receiver: create_mix_receiver(id, TransportOptions::from_object(env, &options)?)?,
+            receiver: create_mix_receiver(&id, serde_json::from_str(&options)?)?,
             observer: env.new_global_ref(observer)?,
         })
     }

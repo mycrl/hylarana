@@ -1,6 +1,8 @@
 plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
+    //noinspection AndroidGradlePluginVersion
+    id 'com.android.application' version '8.2.1'
+    //noinspection GradleDependency
+    id 'org.jetbrains.kotlin.android' version '1.9.0'
 }
 
 android {
@@ -10,6 +12,7 @@ android {
     defaultConfig {
         applicationId 'com.example.simple'
         minSdk 29
+        //noinspection OldTargetApi
         targetSdk 34
         versionCode 1
         versionName '1.0'
@@ -49,10 +52,17 @@ android {
 }
 
 dependencies {
+    //noinspection GradleDependency
     implementation 'androidx.core:core-ktx:1.12.0'
+    //noinspection GradleDependency
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    //noinspection GradleDependency
     implementation 'androidx.activity:activity-compose:1.8.2'
-    implementation platform('androidx.compose:compose-bom:2023.10.01')
+    implementation platform('androidx.compose:compose-bom:2025.01.00')
+    //noinspection GradleDependency
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    //noinspection GradleDependency
+    implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'

@@ -1,88 +1,52 @@
-use std::ptr::{null, null_mut};
-
-pub use core_video::{
-    metal_texture::CVMetalTextureRef, metal_texture_cache::CVMetalTextureCacheRef,
-    pixel_buffer::CVPixelBufferRef,
-};
-
-use core_foundation_sys::base::{kCFAllocatorDefault, CFRelease};
-use core_video::{
-    metal_texture::CVMetalTextureGetTexture,
-    metal_texture_cache::{
-        CVMetalTextureCacheCreate, CVMetalTextureCacheCreateTextureFromImage,
-        CVMetalTextureCacheFlush,
-    },
-    pixel_buffer::{
-        kCVPixelBufferLock_ReadOnly, kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
-        kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-        kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
-        CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane,
-        CVPixelBufferGetHeight, CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth,
-        CVPixelBufferLockBaseAddress, CVPixelBufferUnlockBaseAddress,
-    },
-    r#return::kCVReturnSuccess,
+use std::{
+    fmt::Display,
+    ptr::{null_mut, NonNull},
 };
 
 pub use metal::{
-    foreign_types::ForeignTypeRef, Device, MTLPixelFormat, MTLTexture, MTLTextureType, TextureRef,
+    foreign_types::ForeignType, Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture,
+    TextureRef,
 };
+
+pub type CVPixelBufferRef = *mut CVPixelBuffer;
+
+use objc2::{rc::Retained, runtime::ProtocolObject};
+use objc2_core_foundation::kCFAllocatorDefault;
+use objc2_core_video::{
+    kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
+    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
+    kCVReturnSuccess, CVMetalTexture, CVMetalTextureCache, CVMetalTextureCacheCreate,
+    CVMetalTextureCacheCreateTextureFromImage, CVMetalTextureCacheFlush, CVMetalTextureGetTexture,
+    CVPixelBuffer, CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane,
+    CVPixelBufferGetHeight, CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth,
+    CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
+};
+
+use objc2_metal::{MTLDevice as Objc2MTLDevice, MTLPixelFormat as Objc2MTLPixelFormat};
 
 use crate::{frame::VideoFormat, Size};
 
-pub struct PixelBufferRef {
-    size: Size,
-    data: [*const u8; 2],
-    linesize: [usize; 2],
-    buffer: CVPixelBufferRef,
-}
+#[derive(Debug)]
+pub struct Error(i32);
 
-impl PixelBufferRef {
-    pub fn size(&self) -> Size {
-        self.size
-    }
+impl std::error::Error for Error {}
 
-    pub fn data(&self) -> &[*const u8; 2] {
-        &self.data
-    }
-
-    pub fn linesize(&self) -> &[usize; 2] {
-        &self.linesize
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error code={}", self.0)
     }
 }
 
-impl From<CVPixelBufferRef> for PixelBufferRef {
-    fn from(buffer: CVPixelBufferRef) -> Self {
-        unsafe {
-            CVPixelBufferLockBaseAddress(buffer, kCVPixelBufferLock_ReadOnly);
-        }
-
-        let mut this = Self {
-            size: get_pixel_buffer_size(buffer),
-            buffer,
-            data: [null(); 2],
-            linesize: [0; 2],
-        };
-
-        for i in 0..2 {
-            this.data[i] = unsafe { CVPixelBufferGetBaseAddressOfPlane(buffer, i) as *const _ };
-            this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(buffer, i) };
-        }
-
-        this
-    }
-}
-
-impl Drop for PixelBufferRef {
-    fn drop(&mut self) {
-        unsafe {
-            CVPixelBufferUnlockBaseAddress(self.buffer, kCVPixelBufferLock_ReadOnly);
-        }
+impl From<i32> for Error {
+    fn from(value: i32) -> Self {
+        Self(value)
     }
 }
 
 #[allow(non_upper_case_globals)]
 pub fn get_pixel_buffer_format(buffer: CVPixelBufferRef) -> VideoFormat {
-    match unsafe { CVPixelBufferGetPixelFormatType(buffer) } {
+    match unsafe { CVPixelBufferGetPixelFormatType(&*buffer) } {
         kCVPixelFormatType_32RGBA => VideoFormat::RGBA,
         kCVPixelFormatType_32BGRA => VideoFormat::BGRA,
         kCVPixelFormatType_420YpCbCr8Planar => VideoFormat::I420,
@@ -94,77 +58,184 @@ pub fn get_pixel_buffer_format(buffer: CVPixelBufferRef) -> VideoFormat {
 
 pub fn get_pixel_buffer_size(buffer: CVPixelBufferRef) -> Size {
     Size {
-        width: unsafe { CVPixelBufferGetWidth(buffer) } as u32,
-        height: unsafe { CVPixelBufferGetHeight(buffer) } as u32,
+        width: unsafe { CVPixelBufferGetWidth(&*buffer) } as u32,
+        height: unsafe { CVPixelBufferGetHeight(&*buffer) } as u32,
     }
 }
 
-pub fn create_metal_texture_cache(device: Device) -> Option<CVMetalTextureCacheRef> {
-    let mut texture_cache = null_mut();
-    if unsafe {
-        CVMetalTextureCacheCreate(
-            kCFAllocatorDefault,
-            null(),
-            device,
-            null(),
-            &mut texture_cache,
-        )
-    } != kCVReturnSuccess
-    {
-        None
-    } else {
-        Some(texture_cache)
-    }
-}
-
-pub fn create_cv_metal_texture(
+pub struct PixelMomeryBuffer<'a> {
+    pub size: Size,
+    pub format: VideoFormat,
+    pub data: [&'a [u8]; 3],
+    pub linesize: [usize; 3],
     buffer: CVPixelBufferRef,
-    format: VideoFormat,
-    size: Size,
-    texture_cache: CVMetalTextureCacheRef,
-) -> Option<CVMetalTextureRef> {
-    let mut texture = null_mut();
-    if unsafe {
-        CVMetalTextureCacheCreateTextureFromImage(
-            kCFAllocatorDefault,
-            texture_cache,
+}
+
+impl<'a> PixelMomeryBuffer<'a> {
+    pub fn as_ref(&self) -> CVPixelBufferRef {
+        self.buffer
+    }
+}
+
+impl<'a> From<(CVPixelBufferRef, VideoFormat, Size)> for PixelMomeryBuffer<'a> {
+    fn from((buffer, format, size): (CVPixelBufferRef, VideoFormat, Size)) -> Self {
+        unsafe {
+            CVPixelBufferLockBaseAddress(&*buffer, CVPixelBufferLockFlags::ReadOnly);
+        }
+
+        let mut this = Self {
+            size,
+            format,
             buffer,
-            null(),
-            match format {
-                VideoFormat::BGRA => MTLPixelFormat::BGRA8Unorm,
-                VideoFormat::RGBA => MTLPixelFormat::RGBA8Unorm,
-                _ => unimplemented!("unsupports format = {:?}", format),
-            },
-            size.width as usize,
-            size.height as usize,
-            0,
-            &mut texture,
-        )
-    } != kCVReturnSuccess
-    {
-        None
-    } else {
-        Some(texture)
+            data: [&[]; 3],
+            linesize: [0; 3],
+        };
+
+        for i in 0..3 {
+            this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(&*buffer, i) };
+            this.data[i] = unsafe {
+                std::slice::from_raw_parts(
+                    CVPixelBufferGetBaseAddressOfPlane(&*buffer, i) as *const _,
+                    this.linesize[i]
+                        * if format == VideoFormat::I420 {
+                            size.height / 2
+                        } else {
+                            size.height
+                        } as usize,
+                )
+            };
+        }
+
+        this
     }
 }
 
-pub fn get_texture_from_cv_texture(texture: CVMetalTextureRef) -> Option<*mut MTLTexture> {
-    let texture = unsafe { CVMetalTextureGetTexture(texture) };
-    if texture.is_null() {
-        None
-    } else {
-        Some(texture)
+impl<'a> From<CVPixelBufferRef> for PixelMomeryBuffer<'a> {
+    fn from(buffer: CVPixelBufferRef) -> Self {
+        Self::from((
+            buffer,
+            get_pixel_buffer_format(buffer),
+            get_pixel_buffer_size(buffer),
+        ))
     }
 }
 
-pub fn texture_ref_release(texture: *mut MTLTexture) {
-    unsafe {
-        CFRelease(texture as _);
+impl<'a> Drop for PixelMomeryBuffer<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            CVPixelBufferUnlockBaseAddress(&*self.buffer, CVPixelBufferLockFlags::ReadOnly);
+        }
     }
 }
 
-pub fn texture_cache_release(texture_cache: CVMetalTextureCacheRef) {
-    unsafe {
-        CVMetalTextureCacheFlush(texture_cache, 0);
+#[derive(Clone, Copy)]
+pub struct PixelBuffer {
+    buffer: CVPixelBufferRef,
+    pub format: VideoFormat,
+    pub size: Size,
+}
+
+impl PixelBuffer {
+    pub fn as_ref(&self) -> &CVPixelBuffer {
+        unsafe { &*self.buffer }
+    }
+
+    pub fn as_raw(&self) -> CVPixelBufferRef {
+        self.buffer
+    }
+}
+
+impl From<CVPixelBufferRef> for PixelBuffer {
+    fn from(buffer: CVPixelBufferRef) -> Self {
+        Self::from((
+            buffer,
+            get_pixel_buffer_format(buffer),
+            get_pixel_buffer_size(buffer),
+        ))
+    }
+}
+
+impl From<(CVPixelBufferRef, VideoFormat, Size)> for PixelBuffer {
+    fn from((buffer, format, size): (CVPixelBufferRef, VideoFormat, Size)) -> Self {
+        Self {
+            buffer,
+            format,
+            size,
+        }
+    }
+}
+
+pub struct MetalTextureCache(Retained<CVMetalTextureCache>);
+
+impl MetalTextureCache {
+    pub fn new(device: Device) -> Result<Self, Error> {
+        let device: Retained<ProtocolObject<dyn Objc2MTLDevice>> =
+            unsafe { Retained::from_raw(device.into_ptr().cast()).unwrap() };
+
+        let mut cache = null_mut();
+        let code = unsafe {
+            CVMetalTextureCacheCreate(
+                kCFAllocatorDefault,
+                None,
+                device.as_ref(),
+                None,
+                NonNull::new(&mut cache).unwrap(),
+            )
+        };
+
+        if code != kCVReturnSuccess || cache.is_null() {
+            return Err(Error(code));
+        }
+
+        Ok(Self(unsafe { Retained::from_raw(cache).unwrap() }))
+    }
+
+    pub fn map(&self, buffer: PixelBuffer) -> Result<MetalTexture, Error> {
+        let Size { width, height } = buffer.size;
+
+        let mut texture = null_mut();
+        let code = unsafe {
+            CVMetalTextureCacheCreateTextureFromImage(
+                kCFAllocatorDefault,
+                &self.0,
+                buffer.as_ref(),
+                None,
+                match buffer.format {
+                    VideoFormat::BGRA => Objc2MTLPixelFormat::BGRA8Unorm,
+                    VideoFormat::RGBA => Objc2MTLPixelFormat::RGBA8Unorm,
+                    _ => unimplemented!("unsupports format = {:?}", buffer.format),
+                },
+                width as usize,
+                height as usize,
+                0,
+                NonNull::new(&mut texture).unwrap(),
+            )
+        };
+
+        if code != kCVReturnSuccess || texture.is_null() {
+            return Err(Error(code));
+        }
+
+        Ok(MetalTexture(unsafe {
+            Retained::from_raw(texture).unwrap()
+        }))
+    }
+
+    pub fn flush(&self) {
+        unsafe {
+            CVMetalTextureCacheFlush(&self.0, 0);
+        }
+    }
+}
+
+pub struct MetalTexture(Retained<CVMetalTexture>);
+
+impl MetalTexture {
+    pub fn get_texture(&mut self) -> Result<Texture, Error> {
+        if let Some(texture) = unsafe { CVMetalTextureGetTexture(&self.0) } {
+            Ok(unsafe { Texture::from_ptr(Retained::into_raw(texture).cast()).to_owned() })
+        } else {
+            Err(Error(-1))
+        }
     }
 }

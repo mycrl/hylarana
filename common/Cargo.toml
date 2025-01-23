@@ -10,6 +10,8 @@ repository = "https://github.com/mycrl/hylarana"
 [dependencies]
 thiserror = "1.0.56"
 log = "0.4.20"
+serde_repr = "0.1"
+serde = { version = "1", features = ["derive"] }
 fern = { version = "0.6.2", features = ["date-based", "colored", "syslog-6"] }
 chrono = { version = "0.4", features = ["clock", "alloc"] }
 
@@ -34,6 +36,8 @@ features = [
 ]
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-video = { version = "0.4.3", features = ["metal"] }
-core-foundation-sys = "0.8"
+objc2-core-video = "0.3.0"
+objc2-core-foundation = "0.3.0"
+objc2-metal = "0.3.0"
+objc2 = "0.6.0"
 metal = "0.29"

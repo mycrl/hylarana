@@ -1,11 +1,9 @@
 mod discovery;
-mod object;
 mod receiver;
 mod sender;
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
     ffi::c_void,
     ptr::null_mut,
     sync::{Arc, Mutex},
@@ -13,7 +11,7 @@ use std::{
 };
 
 use anyhow::Result;
-use common::logger;
+use common::{logger, MediaStreamDescription};
 use jni::{
     objects::{JByteArray, JClass, JObject, JString},
     sys::{jint, JNI_VERSION_1_6},
@@ -22,7 +20,6 @@ use jni::{
 
 use self::{
     discovery::{DiscoveryService, DiscoveryServiceObserver},
-    object::{TransformArray, TransformMap},
     receiver::Receiver,
     sender::Sender,
 };
@@ -179,7 +176,7 @@ where
 extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportSender(
     mut env: JNIEnv,
     _this: JClass,
-    options: JObject,
+    options: JString,
 ) -> *const Sender {
     ok_or_check(&mut env, |env| {
         Ok(Box::into_raw(Box::new(Sender::new(env, &options)?)))
@@ -268,7 +265,7 @@ extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportReceiv
     mut env: JNIEnv,
     _this: JClass,
     id: JString,
-    options: JObject,
+    options: JString,
     observer: JObject,
 ) -> *const Arc<Receiver> {
     ok_or_check(&mut env, |env| {
@@ -330,14 +327,15 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_registerDiscoverySer
     mut env: JNIEnv,
     _this: JClass,
     port: jint,
-    properties: JObject,
+    description: JString,
 ) -> *const DiscoveryService {
     ok_or_check(&mut env, |env| {
-        let properties = HashMap::<String, String>::from_map(env, &properties)?;
+        let description: String = env.get_string(&description)?.into();
+        let description: MediaStreamDescription = serde_json::from_str(&description)?;
 
         Ok(Box::into_raw(Box::new(DiscoveryService::register(
             port as u16,
-            &properties,
+            &description,
         )?)))
     })
     .unwrap_or_else(|| null_mut())
@@ -357,8 +355,8 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_queryDiscoveryServic
         let observer = DiscoveryServiceObserver(env.new_global_ref(observer)?);
 
         Ok(Box::into_raw(Box::new(DiscoveryService::query(
-            move |addrs, properties: HashMap<String, String>| {
-                if let Err(e) = observer.resolve(&addrs, &properties) {
+            move |addrs, description: MediaStreamDescription| {
+                if let Err(e) = observer.resolve(&addrs, &description) {
                     log::warn!("{:?}", e);
                 }
             },

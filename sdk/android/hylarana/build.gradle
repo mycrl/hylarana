@@ -1,19 +1,17 @@
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.21'
-    id 'com.github.willir.rust.cargo-ndk-android' version '0.3.4'
-    id 'maven-publish'
+    //noinspection GradleDependency
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.0' apply true
+    id 'org.mozilla.rust-android-gradle.rust-android' version '0.9.6' apply true
+    id 'maven-publish' apply true
 }
 
-apply plugin: 'com.github.willir.rust.cargo-ndk-android'
-apply plugin: 'maven-publish'
-
 dependencies {
+    //noinspection GradleDependency
     implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'com.ensarsarajcic.kotlinx:serialization-msgpack:0.5.5'
+    //noinspection GradleDependency
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2'
 }
 
 android {
@@ -70,21 +68,26 @@ android {
     }
 }
 
-cargoNdk {
-    buildTypes {
-        release {
-            buildType = "release"
-        }
-        debug {
-            buildType = "debug"
-        }
-    }
-
+cargo {
+    profile = 'release'
     apiLevel = 29
-    targets = ["arm64"]
-    module = "../../ffi"
-    targetDirectory = "../target"
-    librariesNames = ["libhylarana.so"]
+    prebuiltToolchains = true
+    pythonCommand = 'python3'
+    module = './src/main/ffi'
+    libname = 'hylarana'
+    targets = ['arm64']
+    targetDirectory = '../../../target'
+    targetIncludes = ['libhylarana.so']
+    exec { spec, toolchain ->
+        def absolutePath = project.file("../../../target").absolutePath
+        spec.environment("CARGO_TARGET_DIR", "$absolutePath")
+    }
+}
+
+tasks.configureEach { task ->
+    if ((task.name == 'javaPreCompileDebug' || task.name == 'javaPreCompileRelease')) {
+        task.dependsOn 'cargoBuild'
+    }
 }
 
 publishing {
@@ -103,7 +106,7 @@ publishing {
         release(MavenPublication) {
             groupId = 'com.github.mycrl'
             artifactId = 'hylarana'
-            version = '0.2.0-beta'
+            version = '0.3.0'
 
             afterEvaluate {
                 from components.release

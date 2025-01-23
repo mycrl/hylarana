@@ -1,7 +1,5 @@
 package com.example.simple
 
-// noinspection SuspiciousImport
-import android.R
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Notification
@@ -39,14 +37,14 @@ import com.github.mycrl.hylarana.HylaranaSenderObserver
 import com.github.mycrl.hylarana.HylaranaService
 import com.github.mycrl.hylarana.HylaranaStrategy
 import com.github.mycrl.hylarana.HylaranaStrategyType
-import com.github.mycrl.hylarana.Properties
+import com.github.mycrl.hylarana.MediaStreamDescription
 import com.github.mycrl.hylarana.Video
 
-class Notify(service: SimpleHylaranaService) {
+class Notify(service: HylaranaBackgroundService) {
     companion object {
         private const val NotifyId = 100
-        private const val NotifyChannelId = "SimpleHylarana"
-        private const val NotifyChannelName = "SimpleHylarana"
+        private const val NotifyChannelId = "HylaranaService"
+        private const val NotifyChannelName = "HylaranaService"
     }
 
     init {
@@ -60,7 +58,7 @@ class Notify(service: SimpleHylaranaService) {
         )
 
         val intent = Intent(service, MainActivity::class.java)
-        val icon = BitmapFactory.decodeResource(service.resources, R.mipmap.sym_def_app_icon)
+        val icon = BitmapFactory.decodeResource(service.resources, android.R.mipmap.sym_def_app_icon)
         val content =
             PendingIntent.getActivity(
                 service,
@@ -73,20 +71,20 @@ class Notify(service: SimpleHylaranaService) {
         builder.setContentIntent(content)
         builder.setLargeIcon(icon)
         builder.setContentTitle("Screen recording")
-        builder.setSmallIcon(R.mipmap.sym_def_app_icon)
+        builder.setSmallIcon(android.R.mipmap.sym_def_app_icon)
         builder.setContentText("Recording screen......")
         builder.setWhen(System.currentTimeMillis())
         service.startForeground(NotifyId, builder.build())
     }
 }
 
-abstract class SimpleHylaranaServiceObserver() {
+abstract class HylaranaBackgroundServiceObserver() {
     abstract fun onConnected()
 
     abstract fun onReceiverClosed()
 }
 
-class SimpleHylaranaServiceBinder(private val service: SimpleHylaranaService) : Binder() {
+class HylaranaBackgroundServiceBinder(private val service: HylaranaBackgroundService) : Binder() {
     fun createSender(intent: Intent, displayMetrics: DisplayMetrics) {
         service.createSender(intent, displayMetrics)
     }
@@ -117,13 +115,13 @@ class SimpleHylaranaServiceBinder(private val service: SimpleHylaranaService) : 
         service.stopReceiver()
     }
 
-    fun setObserver(observer: SimpleHylaranaServiceObserver) {
+    fun setObserver(observer: HylaranaBackgroundServiceObserver) {
         service.setObserver(observer)
     }
 }
 
-class SimpleHylaranaService : Service() {
-    private var observer: SimpleHylaranaServiceObserver? = null
+class HylaranaBackgroundService : Service() {
+    private var observer: HylaranaBackgroundServiceObserver? = null
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var outputSurface: Surface? = null
@@ -133,7 +131,7 @@ class SimpleHylaranaService : Service() {
     private var strategy: HylaranaStrategy? = null
 
     override fun onBind(intent: Intent?): IBinder {
-        return SimpleHylaranaServiceBinder(this)
+        return HylaranaBackgroundServiceBinder(this)
     }
 
     override fun onDestroy() {
@@ -171,7 +169,7 @@ class SimpleHylaranaService : Service() {
         receiver = null
     }
 
-    fun setObserver(observer: SimpleHylaranaServiceObserver) {
+    fun setObserver(observer: HylaranaBackgroundServiceObserver) {
         this.observer = observer
     }
 
@@ -186,18 +184,16 @@ class SimpleHylaranaService : Service() {
             Discovery()
                 .query(
                     object : DiscoveryServiceQueryObserver() {
-                        override fun resolve(addrs: Array<String>, properties: Properties) {
+                        override fun resolve(addrs: Array<String>, description: MediaStreamDescription) {
                             if (receiver == null) {
-                                val sdp = Sdp.fromProperties(properties)
-                                if (sdp.strategy.type == HylaranaStrategyType.DIRECT) {
-                                    sdp.strategy.addr =
-                                        addrs[0] + ":" + sdp.strategy.addr.split(":")[1]
+                                if (description.transport.strategy.type == HylaranaStrategyType.DIRECT) {
+                                    description.transport.strategy.addr =
+                                        addrs[0] + ":" + description.transport.strategy.addr.split(":")[1]
                                 }
 
                                 val audioConfig = Audio.getAudioCodecConfigure()
                                 receiver = HylaranaService.createReceiver(
-                                    sdp.id,
-                                    HylaranaOptions(strategy = sdp.strategy, mtu = 1500),
+                                    description,
                                     object : HylaranaReceiverObserver() {
                                         override val surface = outputSurface!!
                                         override val track =
@@ -302,7 +298,7 @@ class SimpleHylaranaService : Service() {
                 Discovery()
                     .register(
                         3456,
-                        Sdp(id = sender!!.getStreamId(), strategy = it).toProperties()
+                        sender!!.getDescription()
                     )
             }
 
@@ -319,32 +315,5 @@ class SimpleHylaranaService : Service() {
             )
 
         virtualDisplay?.surface = sender?.getSurface()
-    }
-}
-
-data class Sdp(val id: String, val strategy: HylaranaStrategy) {
-    fun toProperties(): Properties {
-        return mapOf(
-            "id" to id,
-            "strategy" to strategy.type.toString(),
-            "address" to strategy.addr,
-        )
-    }
-
-    companion object {
-        fun fromProperties(properties: Properties): Sdp {
-            return Sdp(
-                id = properties["id"] ?: throw Exception("not found id property"),
-                strategy =
-                HylaranaStrategy(
-                    type =
-                    (properties["strategy"]
-                        ?: throw Exception("not found strategy property"))
-                        .toInt(),
-                    addr =
-                    properties["address"] ?: throw Exception("not found address property")
-                )
-            )
-        }
     }
 }

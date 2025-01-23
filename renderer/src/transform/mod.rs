@@ -10,7 +10,10 @@ use thiserror::Error;
 pub enum TransformError {
     #[cfg(target_os = "windows")]
     #[error(transparent)]
-    DxError(#[from] common::win32::windows::core::Error),
+    WindowsError(#[from] common::win32::windows::core::Error),
+    #[cfg(target_os = "macos")]
+    #[error(transparent)]
+    MacosError(#[from] common::macos::Error),
     #[error("not found wgpu dx12 device")]
     NotFoundDxBackend,
     #[error("dx11 shared handle is invalid")]

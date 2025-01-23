@@ -46,13 +46,13 @@ import com.github.mycrl.hylarana.HylaranaStrategy
 import com.github.mycrl.hylarana.HylaranaStrategyType
 
 abstract class Observer {
-    abstract fun OnConnect(strategy: HylaranaStrategy)
+    abstract fun onConnect(strategy: HylaranaStrategy)
 
-    abstract fun OnPublish()
+    abstract fun onPublish()
 
-    abstract fun OnSubscribe()
+    abstract fun onSubscribe()
 
-    abstract fun OnStop()
+    abstract fun onStop()
 }
 
 open class Layout : ComponentActivity() {
@@ -60,17 +60,14 @@ open class Layout : ComponentActivity() {
     private var surfaceView: SurfaceView? = null
     private var clickStartHandler: (() -> Unit)? = null
     private var address by mutableStateOf("0.0.0.0:8080")
-    private var state by mutableIntStateOf(State.New)
+    private var state by mutableIntStateOf(State.NEW)
 
     class State {
         companion object {
-            const val New = 0
-
-            const val Connected = 1
-
-            const val Publishing = 2
-
-            const val Subscribeing = 3
+            const val NEW = 0
+            const val CONNECTED = 1
+            const val PUBLISHING = 2
+            const val SUBSCRIBING = 3
         }
     }
 
@@ -98,7 +95,7 @@ open class Layout : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun layoutStop() {
-        state = State.Connected
+        state = State.CONNECTED
 
         runOnUiThread {
             window.insetsController?.show(
@@ -146,41 +143,43 @@ open class Layout : ComponentActivity() {
                 Column(
                     modifier =
                     Modifier.align(
-                        if (state == State.Subscribeing) {
+                        if (state == State.SUBSCRIBING) {
                             Alignment.BottomStart
                         } else {
                             Alignment.Center
                         }
                     ),
                     verticalArrangement =
-                    if (state == State.Subscribeing) {
+                    if (state == State.SUBSCRIBING) {
                         Arrangement.Bottom
                     } else {
                         Arrangement.Center
                     },
                     horizontalAlignment =
-                    if (state == State.Subscribeing) {
+                    if (state == State.SUBSCRIBING) {
                         Alignment.Start
                     } else {
                         Alignment.CenterHorizontally
                     },
                 ) {
-                    if (state == State.New) {
+                    if (state == State.NEW) {
                         TextField(
                             value = address,
                             label = { Text(text = "Address") },
                             onValueChange = { address = it },
-                            modifier = Modifier.padding(6.dp).width(320.dp),
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .width(320.dp),
                             shape = RoundedCornerShape(6.dp),
                         )
                     }
 
-                    Row() {
+                    Row {
                         when (state) {
-                            State.New -> {
+                            State.NEW -> {
                                 Button(
                                     onClick = {
-                                        observer?.OnConnect(
+                                        observer?.onConnect(
                                             HylaranaStrategy(
                                                 type = HylaranaStrategyType.DIRECT,
                                                 addr = address
@@ -195,7 +194,7 @@ open class Layout : ComponentActivity() {
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Button(
                                     onClick = {
-                                        observer?.OnConnect(
+                                        observer?.onConnect(
                                             HylaranaStrategy(
                                                 type = HylaranaStrategyType.RELAY,
                                                 addr = address
@@ -210,7 +209,7 @@ open class Layout : ComponentActivity() {
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Button(
                                     onClick = {
-                                        observer?.OnConnect(
+                                        observer?.onConnect(
                                             HylaranaStrategy(
                                                 type = HylaranaStrategyType.MULTICAST,
                                                 addr = address
@@ -223,11 +222,12 @@ open class Layout : ComponentActivity() {
                                     Text(text = "Multicast")
                                 }
                             }
-                            State.Connected -> {
+
+                            State.CONNECTED -> {
                                 Button(
-                                    onClick = { ->
-                                        state = State.Publishing
-                                        observer?.OnPublish()
+                                    onClick = {
+                                        state = State.PUBLISHING
+                                        observer?.onPublish()
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.width(140.dp),
@@ -236,9 +236,9 @@ open class Layout : ComponentActivity() {
                                 }
                                 Spacer(modifier = Modifier.width(20.dp))
                                 Button(
-                                    onClick = { ->
-                                        state = State.Subscribeing
-                                        observer?.OnSubscribe()
+                                    onClick = {
+                                        state = State.SUBSCRIBING
+                                        observer?.onSubscribe()
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.width(140.dp),
@@ -246,9 +246,10 @@ open class Layout : ComponentActivity() {
                                     Text(text = "Subscribe")
                                 }
                             }
+
                             else -> {
                                 Button(
-                                    onClick = { observer?.OnStop() },
+                                    onClick = { observer?.onStop() },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.width(140.dp),
                                 ) {
@@ -311,18 +312,18 @@ open class Permissions : Layout() {
 
 @RequiresApi(Build.VERSION_CODES.R)
 class MainActivity : Permissions() {
-    private var simpleHylaranaService: Intent? = null
-    private var simpleHylaranaServiceBinder: SimpleHylaranaServiceBinder? = null
+    private var hylaranaService: Intent? = null
+    private var hylaranaServiceBinder: HylaranaBackgroundServiceBinder? = null
     private val connection: ServiceConnection =
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 Log.i("simple", "service connected.")
 
-                simpleHylaranaServiceBinder = service as SimpleHylaranaServiceBinder
-                simpleHylaranaServiceBinder?.setObserver(
-                    object : SimpleHylaranaServiceObserver() {
+                hylaranaServiceBinder = service as HylaranaBackgroundServiceBinder
+                hylaranaServiceBinder?.setObserver(
+                    object : HylaranaBackgroundServiceObserver() {
                         override fun onConnected() {
-                            layoutSetState(State.Connected)
+                            layoutSetState(State.CONNECTED)
                         }
 
                         override fun onReceiverClosed() {
@@ -332,7 +333,7 @@ class MainActivity : Permissions() {
                 )
 
                 layoutGetSurface()?.let { surface ->
-                    simpleHylaranaServiceBinder?.setRenderSurface(surface)
+                    hylaranaServiceBinder?.setRenderSurface(surface)
                 }
             }
 
@@ -344,33 +345,33 @@ class MainActivity : Permissions() {
     init {
         registerPermissionsHandler { intent ->
             if (intent != null) {
-                simpleHylaranaServiceBinder?.createSender(intent, resources.displayMetrics)
+                hylaranaServiceBinder?.createSender(intent, resources.displayMetrics)
             }
         }
 
         layoutSetObserver(
             object : Observer() {
-                override fun OnConnect(strategy: HylaranaStrategy) {
-                    simpleHylaranaServiceBinder?.connect(strategy)
+                override fun onConnect(strategy: HylaranaStrategy) {
+                    hylaranaServiceBinder?.connect(strategy)
                 }
 
-                override fun OnPublish() {
+                override fun onPublish() {
                     requestPermissions()
                 }
 
-                override fun OnSubscribe() {
-                    simpleHylaranaServiceBinder?.createReceiver()
+                override fun onSubscribe() {
+                    hylaranaServiceBinder?.createReceiver()
                 }
 
-                override fun OnStop() {
+                override fun onStop() {
                     val state = layoutGetState()
-                    if (state == State.Publishing) {
-                        simpleHylaranaServiceBinder?.stopSender()
+                    if (state == State.PUBLISHING) {
+                        hylaranaServiceBinder?.stopSender()
                     } else {
-                        simpleHylaranaServiceBinder?.stopReceiver()
+                        hylaranaServiceBinder?.stopReceiver()
                     }
 
-                    layoutSetState(State.Connected)
+                    layoutSetState(State.CONNECTED)
                 }
             }
         )
@@ -378,16 +379,16 @@ class MainActivity : Permissions() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        simpleHylaranaService = startSimpleHylaranaService()
+        hylaranaService = startSimpleHylaranaService()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopService(simpleHylaranaService)
+        stopService(hylaranaService)
     }
 
     private fun startSimpleHylaranaService(): Intent {
-        val intent = Intent(this, SimpleHylaranaService::class.java)
+        val intent = Intent(this, HylaranaBackgroundService::class.java)
         bindService(intent, connection, BIND_AUTO_CREATE)
 
         Log.i("simple", "start simple hylarana service.")

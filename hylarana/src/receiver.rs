@@ -1,18 +1,21 @@
-use crate::AVFrameStream;
+use crate::{AVFrameStream, MediaStreamDescription};
 
 use std::{
     sync::{atomic::AtomicBool, Arc},
     thread,
 };
 
-use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings, VideoDecoderType};
-use common::atomic::EasyAtomic;
-use transport::{StreamKind, StreamMultiReceiverAdapter, TransportOptions, TransportReceiver};
+use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings};
+use common::{atomic::EasyAtomic, codec::VideoDecoderType};
+use transport::{StreamKind, StreamMultiReceiverAdapter, TransportReceiver};
 
 use thiserror::Error;
 
 #[cfg(target_os = "windows")]
 use common::win32::MediaThreadClass;
+
+#[cfg(target_os = "windows")]
+use crate::util::get_direct3d;
 
 #[derive(Debug, Error)]
 pub enum HylaranaReceiverError {
@@ -24,17 +27,10 @@ pub enum HylaranaReceiverError {
     AudioDecoderError(#[from] codec::AudioDecoderError),
 }
 
-/// Receiver media codec configuration.
-#[derive(Debug, Clone)]
-pub struct HylaranaReceiverCodecOptions {
-    pub video: VideoDecoderType,
-}
-
 /// Receiver configuration.
 #[derive(Debug, Clone)]
 pub struct HylaranaReceiverOptions {
-    pub transport: TransportOptions,
-    pub codec: HylaranaReceiverCodecOptions,
+    pub video_decoder: VideoDecoderType,
 }
 
 fn create_video_decoder<T: AVFrameStream + 'static>(
@@ -148,6 +144,7 @@ fn create_audio_decoder<T: AVFrameStream + 'static>(
 
 /// Screen casting receiver.
 pub struct HylaranaReceiver<T: AVFrameStream + 'static> {
+    description: MediaStreamDescription,
     #[allow(unused)]
     transport: TransportReceiver<StreamMultiReceiverAdapter>,
     status: Arc<AtomicBool>,
@@ -159,13 +156,13 @@ impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
     /// You only need to decode the data in the queue and call it back to the
     /// sink.
     pub(crate) fn new(
-        id: String,
-        options: HylaranaReceiverOptions,
+        description: &MediaStreamDescription,
+        options: &HylaranaReceiverOptions,
         sink: T,
     ) -> Result<Self, HylaranaReceiverError> {
         log::info!("create receiver");
 
-        let transport = transport::create_split_receiver(id, options.transport)?;
+        let transport = transport::create_split_receiver(&description.id, description.transport)?;
         let status = Arc::new(AtomicBool::new(false));
         let sink = Arc::new(sink);
 
@@ -175,17 +172,22 @@ impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
             status.clone(),
             &sink,
             VideoDecoderSettings {
-                codec: options.codec.video,
+                codec: options.video_decoder,
                 #[cfg(target_os = "windows")]
-                direct3d: Some(crate::get_direct3d()),
+                direct3d: Some(get_direct3d()),
             },
         )?;
 
         Ok(Self {
+            description: description.clone(),
             transport,
             status,
             sink,
         })
+    }
+
+    pub fn get_description(&self) -> &MediaStreamDescription {
+        &self.description
     }
 }
 

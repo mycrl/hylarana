@@ -18,9 +18,9 @@ class StreamType {
 
 class HylaranaStrategyType {
     companion object {
-        const val DIRECT = 0
-        const val RELAY = 1
-        const val MULTICAST = 2
+        const val DIRECT = "d"
+        const val RELAY = "r"
+        const val MULTICAST = "m"
     }
 }
 
@@ -103,17 +103,20 @@ class HylaranaService {
          * `port` The port number from the created sender.
          */
         fun createReceiver(
-            id: String,
-            options: HylaranaOptions,
+            description: MediaStreamDescription,
             observer: HylaranaReceiverObserver
         ): HylaranaReceiver {
             return HylaranaReceiver(
                 hylarana.createReceiver(
-                    id,
-                    options,
+                    description.id,
+                    description.transport,
                     object : HylaranaReceiverAdapterObserver() {
                         private var isReleased: Boolean = false
-                        private val videoDecoder = Video.VideoDecoder(observer.surface)
+                        private val videoDecoder = Video.VideoDecoder(
+                            observer.surface,
+                            description.video?.size?.width ?: 2560,
+                            description.video?.size?.height ?: 1440
+                        )
                         private val audioDecoder = if (observer.track != null) {
                             Audio.AudioDecoder(observer.track!!)
                         } else {
@@ -200,7 +203,7 @@ class HylaranaReceiver(
 class HylaranaSender(
     private val observer: HylaranaSenderObserver,
     private val sender: HylaranaSenderAdapter,
-    configure: HylaranaSenderConfigure,
+    private val configure: HylaranaSenderConfigure,
     record: AudioRecord?,
 ) {
     private val videoEncoder: Video.VideoEncoder =
@@ -249,8 +252,23 @@ class HylaranaSender(
     /**
      * get sender stream id.
      */
-    fun getStreamId(): String {
-        return sender.getId()
+    fun getDescription(): MediaStreamDescription {
+        val audio = Audio.getAudioCodecConfigure()
+        return MediaStreamDescription(
+            sender.getId(),
+            configure.options,
+            MediaVideoStreamDescription(
+                format = videoEncoder.getFormat(),
+                fps = configure.video.frameRate,
+                bitRate = configure.video.bitRate,
+                size = Size(width = configure.video.width, height = configure.video.height),
+            ),
+            MediaAudioStreamDescription(
+                sampleRate = audio.sampleRate,
+                channels = audio.channels,
+                bitRate = audio.bitRate
+            ),
+        )
     }
 
     /**

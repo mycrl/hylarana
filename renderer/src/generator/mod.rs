@@ -11,31 +11,29 @@ use crate::transform::direct3d::Transformer;
 #[cfg(target_os = "macos")]
 use crate::transform::metal::Transformer;
 
-#[cfg(any(target_os = "linux"))]
-type Transformer = ();
-
-use common::Size;
+use common::{
+    frame::{VideoFormat, VideoSubFormat},
+    Size,
+};
 use smallvec::SmallVec;
 use thiserror::Error;
 
 #[cfg(target_os = "macos")]
-use common::macos::{get_pixel_buffer_size, CVPixelBufferRef};
+use common::macos::CVPixelBufferRef;
 
 #[cfg(target_os = "windows")]
-use common::win32::{
-    windows::Win32::Graphics::Direct3D11::ID3D11Texture2D, Direct3DDevice, EasyTexture,
-};
+use common::win32::{windows::Win32::Graphics::Direct3D11::ID3D11Texture2D, Direct3DDevice};
 
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
-    ColorTargetState, ColorWrites, Device, Extent3d, FilterMode, FragmentState, ImageCopyTexture,
-    ImageDataLayout, IndexFormat, MultisampleState, Origin3d, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue, RenderPipeline,
-    RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor,
-    ShaderSource, ShaderStages, Texture as WGPUTexture, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
-    TextureViewDescriptor, TextureViewDimension, VertexState,
+    ColorTargetState, ColorWrites, CommandEncoder, Device, Extent3d, FilterMode, FragmentState,
+    ImageCopyTexture, ImageDataLayout, IndexFormat, MultisampleState, Origin3d,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue,
+    RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor,
+    ShaderModuleDescriptor, ShaderSource, ShaderStages, Texture as WGPUTexture, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
+    TextureView, TextureViewDescriptor, TextureViewDimension, VertexState,
 };
 
 #[derive(Debug, Error)]
@@ -52,42 +50,16 @@ pub enum Texture2DRaw {
     CVPixelBufferRef(CVPixelBufferRef),
 }
 
-impl Texture2DRaw {
-    pub(crate) fn size(&self) -> Size {
-        match self {
-            #[cfg(target_os = "windows")]
-            Self::ID3D11Texture2D(texture, _) => {
-                let desc = texture.desc();
-                Size {
-                    width: desc.Width,
-                    height: desc.Height,
-                }
-            }
-            #[cfg(target_os = "macos")]
-            Self::CVPixelBufferRef(texture) => get_pixel_buffer_size(*texture),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Texture2DBuffer<'a> {
-    pub size: Size,
     pub buffers: &'a [&'a [u8]],
+    pub linesize: &'a [u32],
 }
 
 #[derive(Debug)]
 pub enum Texture2DResource<'a> {
     Texture(Texture2DRaw),
     Buffer(Texture2DBuffer<'a>),
-}
-
-impl<'a> Texture2DResource<'a> {
-    pub(crate) fn size(&self) -> Size {
-        match self {
-            Texture2DResource::Texture(texture) => texture.size(),
-            Texture2DResource::Buffer(texture) => texture.size,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -98,20 +70,14 @@ pub enum Texture<'a> {
     I420(Texture2DBuffer<'a>),
 }
 
-impl<'a> Texture<'a> {
-    pub(crate) fn size(&self) -> Size {
-        match self {
-            Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
-                texture.size()
-            }
-            Texture::I420(texture) => texture.size,
-        }
-    }
-}
-
 trait Texture2DSample {
+    const VIEWS_COUNT: usize;
+
     fn fragment_shader() -> ShaderModuleDescriptor<'static>;
-    fn create_texture_descriptor(size: Size) -> impl IntoIterator<Item = (Size, TextureFormat)>;
+    fn create_texture_descriptor(
+        size: Size,
+        sub_format: VideoSubFormat,
+    ) -> impl IntoIterator<Item = (Size, TextureFormat)>;
 
     fn views_descriptors<'a>(
         &'a self,
@@ -123,8 +89,12 @@ trait Texture2DSample {
         buffers: &'a [&'a [u8]],
     ) -> impl IntoIterator<Item = (&'a [u8], &WGPUTexture, TextureAspect, Size)>;
 
-    fn create(device: &Device, size: Size) -> impl Iterator<Item = WGPUTexture> {
-        Self::create_texture_descriptor(size)
+    fn create(
+        device: &Device,
+        size: Size,
+        sub_format: VideoSubFormat,
+    ) -> impl Iterator<Item = WGPUTexture> {
+        Self::create_texture_descriptor(size, sub_format)
             .into_iter()
             .map(|(size, format)| {
                 device.create_texture(&TextureDescriptor {
@@ -155,7 +125,7 @@ trait Texture2DSample {
     /// PipelineLayoutOptions, which can be used to create a PipelineLayout.
     fn bind_group_layout(&self, device: &Device) -> BindGroupLayout {
         let mut entries: SmallVec<[BindGroupLayoutEntry; 5]> = SmallVec::with_capacity(5);
-        for (i, _) in self.views_descriptors(None).into_iter().enumerate() {
+        for i in 0..Self::VIEWS_COUNT {
             entries.push(BindGroupLayoutEntry {
                 count: None,
                 binding: i as u32,
@@ -191,19 +161,10 @@ trait Texture2DSample {
     fn bind_group(
         &self,
         device: &Device,
+        sampler: &Sampler,
         layout: &BindGroupLayout,
         texture: Option<&WGPUTexture>,
     ) -> BindGroup {
-        let sampler = device.create_sampler(&SamplerDescriptor {
-            address_mode_u: AddressMode::ClampToEdge,
-            address_mode_v: AddressMode::ClampToEdge,
-            address_mode_w: AddressMode::ClampToEdge,
-            mipmap_filter: FilterMode::Nearest,
-            mag_filter: FilterMode::Nearest,
-            min_filter: FilterMode::Nearest,
-            ..Default::default()
-        });
-
         let mut views: SmallVec<[TextureView; 5]> = SmallVec::with_capacity(5);
         for (texture, format, aspect) in self.views_descriptors(texture) {
             views.push(texture.create_view(&TextureViewDescriptor {
@@ -224,7 +185,7 @@ trait Texture2DSample {
 
         entries.push(BindGroupEntry {
             binding: entries.len() as u32,
-            resource: BindingResource::Sampler(&sampler),
+            resource: BindingResource::Sampler(sampler),
         });
 
         device.create_bind_group(&BindGroupDescriptor {
@@ -271,35 +232,124 @@ pub struct GeneratorOptions {
     pub direct3d: Direct3DDevice,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
+    pub format: VideoFormat,
+    pub sub_format: VideoSubFormat,
+    pub size: Size,
 }
 
 pub struct Generator {
     device: Arc<Device>,
     queue: Arc<Queue>,
-    pipeline: Option<RenderPipeline>,
-    sample: Option<Texture2DSourceSample>,
-    bind_group_layout: Option<BindGroupLayout>,
-    transformer: Transformer,
+    sampler: Sampler,
+    layout: BindGroupLayout,
+    pipeline: RenderPipeline,
+    sample: Texture2DSourceSample,
+    transformer: Option<Transformer>,
 }
 
 impl Generator {
-    pub fn new(options: GeneratorOptions) -> Result<Self, GeneratorError> {
-        #[cfg(target_os = "windows")]
-        let transformer = Transformer::new(options.device.clone(), options.direct3d);
+    pub fn new(
+        GeneratorOptions {
+            device,
+            queue,
+            format,
+            sub_format,
+            size,
+            #[cfg(target_os = "windows")]
+            direct3d,
+        }: GeneratorOptions,
+    ) -> Result<Self, GeneratorError> {
+        let transformer = {
+            if sub_format != VideoSubFormat::SW {
+                #[cfg(target_os = "windows")]
+                {
+                    Some(Transformer::new(direct3d, &device, size, format)?)
+                }
 
-        #[cfg(target_os = "macos")]
-        let transformer = Transformer::new(options.device.clone())?;
+                #[cfg(target_os = "macos")]
+                {
+                    Some(Transformer::new(device.clone(), size, format)?)
+                }
+            } else {
+                None
+            }
+        };
 
-        #[cfg(any(target_os = "linux"))]
-        let transformer = ();
+        let sampler = device.create_sampler(&SamplerDescriptor {
+            address_mode_u: AddressMode::ClampToEdge,
+            address_mode_v: AddressMode::ClampToEdge,
+            address_mode_w: AddressMode::ClampToEdge,
+            mipmap_filter: FilterMode::Nearest,
+            mag_filter: FilterMode::Nearest,
+            min_filter: FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let sample = match format {
+            VideoFormat::NV12 => Texture2DSourceSample::Nv12(Nv12::new(&device, size, sub_format)),
+            VideoFormat::BGRA => Texture2DSourceSample::Bgra(Bgra::new(&device, size, sub_format)),
+            VideoFormat::RGBA => Texture2DSourceSample::Rgba(Rgba::new(&device, size, sub_format)),
+            VideoFormat::I420 => Texture2DSourceSample::I420(I420::new(&device, size, sub_format)),
+        };
+
+        let layout = match &sample {
+            Texture2DSourceSample::Bgra(it) => it.bind_group_layout(&device),
+            Texture2DSourceSample::Rgba(it) => it.bind_group_layout(&device),
+            Texture2DSourceSample::Nv12(it) => it.bind_group_layout(&device),
+            Texture2DSourceSample::I420(it) => it.bind_group_layout(&device),
+        };
+
+        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[&layout],
+                push_constant_ranges: &[],
+            })),
+            vertex: VertexState {
+                entry_point: Some("main"),
+                module: &device.create_shader_module(ShaderModuleDescriptor {
+                    label: None,
+                    source: ShaderSource::Wgsl(Cow::Borrowed(Vertex::VERTEX_SHADER)),
+                }),
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[Vertex::desc()],
+            },
+            fragment: Some(FragmentState {
+                entry_point: Some("main"),
+                module: &device.create_shader_module(match &sample {
+                    Texture2DSourceSample::Rgba(_) => Rgba::fragment_shader(),
+                    Texture2DSourceSample::Bgra(_) => Bgra::fragment_shader(),
+                    Texture2DSourceSample::Nv12(_) => Nv12::fragment_shader(),
+                    Texture2DSourceSample::I420(_) => I420::fragment_shader(),
+                }),
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    blend: Some(BlendState::REPLACE),
+                    write_mask: ColorWrites::ALL,
+                    format: TextureFormat::Bgra8Unorm,
+                })],
+            }),
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleStrip,
+                strip_index_format: Some(IndexFormat::Uint16),
+                ..Default::default()
+            },
+            multisample: MultisampleState::default(),
+            depth_stencil: None,
+            multiview: None,
+            cache: None,
+        });
 
         Ok(Self {
-            device: options.device,
-            queue: options.queue,
-            bind_group_layout: None,
-            pipeline: None,
-            sample: None,
+            #[cfg(not(target_os = "linux"))]
             transformer,
+            device: device,
+            queue: queue,
+            sample,
+            sampler,
+            layout,
+            pipeline,
         })
     }
 
@@ -308,149 +358,80 @@ impl Generator {
     /// the internal texture first, and then create the view for the internal
     /// texture, so it is a more time-consuming operation to use the software
     /// texture.
+    #[allow(unused_variables)]
     pub fn get_view(
         &mut self,
+        encoder: &mut CommandEncoder,
         texture: Texture,
-    ) -> Result<Option<(&RenderPipeline, BindGroup)>, GeneratorError> {
-        // Not yet initialized, initialize the environment first.
-        if self.sample.is_none() {
-            let size = texture.size();
-            let sample = match texture {
-                Texture::Bgra(_) => Texture2DSourceSample::Bgra(Bgra::new(&self.device, size)),
-                Texture::Rgba(_) => Texture2DSourceSample::Rgba(Rgba::new(&self.device, size)),
-                Texture::Nv12(_) => Texture2DSourceSample::Nv12(Nv12::new(&self.device, size)),
-                Texture::I420(_) => Texture2DSourceSample::I420(I420::new(&self.device, size)),
-            };
-
-            let bind_group_layout = match &sample {
-                Texture2DSourceSample::Bgra(texture) => texture.bind_group_layout(&self.device),
-                Texture2DSourceSample::Rgba(texture) => texture.bind_group_layout(&self.device),
-                Texture2DSourceSample::Nv12(texture) => texture.bind_group_layout(&self.device),
-                Texture2DSourceSample::I420(texture) => texture.bind_group_layout(&self.device),
-            };
-
-            let pipeline =
-                self.device
-                    .create_render_pipeline(&RenderPipelineDescriptor {
-                        label: None,
-                        layout: Some(&self.device.create_pipeline_layout(
-                            &PipelineLayoutDescriptor {
-                                label: None,
-                                bind_group_layouts: &[&bind_group_layout],
-                                push_constant_ranges: &[],
-                            },
-                        )),
-                        vertex: VertexState {
-                            entry_point: Some("main"),
-                            module: &self.device.create_shader_module(ShaderModuleDescriptor {
-                                label: None,
-                                source: ShaderSource::Wgsl(Cow::Borrowed(Vertex::VERTEX_SHADER)),
-                            }),
-                            compilation_options: PipelineCompilationOptions::default(),
-                            buffers: &[Vertex::desc()],
-                        },
-                        fragment: Some(FragmentState {
-                            entry_point: Some("main"),
-                            module: &self.device.create_shader_module(match &sample {
-                                Texture2DSourceSample::Rgba(_) => Rgba::fragment_shader(),
-                                Texture2DSourceSample::Bgra(_) => Bgra::fragment_shader(),
-                                Texture2DSourceSample::Nv12(_) => Nv12::fragment_shader(),
-                                Texture2DSourceSample::I420(_) => I420::fragment_shader(),
-                            }),
-                            compilation_options: PipelineCompilationOptions::default(),
-                            targets: &[Some(ColorTargetState {
-                                blend: Some(BlendState::REPLACE),
-                                write_mask: ColorWrites::ALL,
-                                format: TextureFormat::Bgra8Unorm,
-                            })],
-                        }),
-                        primitive: PrimitiveState {
-                            topology: PrimitiveTopology::TriangleStrip,
-                            strip_index_format: Some(IndexFormat::Uint16),
-                            ..Default::default()
-                        },
-                        multisample: MultisampleState::default(),
-                        depth_stencil: None,
-                        multiview: None,
-                        cache: None,
-                    });
-
-            self.sample = Some(sample);
-            self.pipeline = Some(pipeline);
-            self.bind_group_layout = Some(bind_group_layout);
-        }
-
+    ) -> Result<(&RenderPipeline, BindGroup), GeneratorError> {
         // Only software textures need to be updated to the sample via update.
         #[allow(unreachable_patterns)]
-        if let Some(sample) = &self.sample {
-            match &texture {
-                Texture::Bgra(Texture2DResource::Buffer(buffer)) => {
-                    if let Texture2DSourceSample::Bgra(rgba) = sample {
-                        rgba.update(&self.queue, buffer);
-                    }
+        match &texture {
+            Texture::Bgra(Texture2DResource::Buffer(buffer)) => {
+                if let Texture2DSourceSample::Bgra(it) = &self.sample {
+                    it.update(&self.queue, buffer);
                 }
-                Texture::Rgba(Texture2DResource::Buffer(buffer)) => {
-                    if let Texture2DSourceSample::Rgba(rgba) = sample {
-                        rgba.update(&self.queue, buffer);
-                    }
-                }
-                Texture::Nv12(Texture2DResource::Buffer(buffer)) => {
-                    if let Texture2DSourceSample::Nv12(nv12) = sample {
-                        nv12.update(&self.queue, buffer);
-                    }
-                }
-                Texture::I420(texture) => {
-                    if let Texture2DSourceSample::I420(i420) = sample {
-                        i420.update(&self.queue, texture);
-                    }
-                }
-                _ => (),
             }
+            Texture::Rgba(Texture2DResource::Buffer(buffer)) => {
+                if let Texture2DSourceSample::Rgba(it) = &self.sample {
+                    it.update(&self.queue, buffer);
+                }
+            }
+            Texture::Nv12(Texture2DResource::Buffer(buffer)) => {
+                if let Texture2DSourceSample::Nv12(it) = &self.sample {
+                    it.update(&self.queue, buffer);
+                }
+            }
+            Texture::I420(texture) => {
+                if let Texture2DSourceSample::I420(it) = &self.sample {
+                    it.update(&self.queue, texture);
+                }
+            }
+            _ => (),
         }
 
-        Ok(
-            if let (Some(layout), Some(sample), Some(pipeline)) =
-                (&self.bind_group_layout, &self.sample, &self.pipeline)
-            {
-                let texture = match &texture {
-                    Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
-                        match texture {
-                            Texture2DResource::Texture(texture) => Some(match &texture {
-                                #[cfg(target_os = "windows")]
-                                Texture2DRaw::ID3D11Texture2D(it, index) => {
-                                    self.transformer.transform(it, *index)?
-                                }
-                                #[cfg(target_os = "macos")]
-                                Texture2DRaw::CVPixelBufferRef(it) => {
-                                    self.transformer.transform(it.clone())?
-                                }
-                            }),
-                            Texture2DResource::Buffer(_) => None,
-                        }
+        let texture = match &texture {
+            Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
+                if let Some(transformer) = &mut self.transformer {
+                    match texture {
+                        #[cfg(not(target_os = "linux"))]
+                        Texture2DResource::Texture(texture) => match texture {
+                            #[cfg(target_os = "windows")]
+                            Texture2DRaw::ID3D11Texture2D(it, index) => {
+                                Some(transformer.transform(it, *index)?)
+                            }
+                            #[cfg(target_os = "macos")]
+                            Texture2DRaw::CVPixelBufferRef(it) => {
+                                Some(transformer.transform(encoder, *it)?)
+                            }
+                        },
+                        Texture2DResource::Buffer(_) => None,
+                        #[allow(unreachable_patterns)]
+                        _ => None,
                     }
-                    Texture::I420(_) => None,
-                };
+                } else {
+                    None
+                }
+            }
+            Texture::I420(_) => None,
+        };
 
-                Some((
-                    pipeline,
-                    match sample {
-                        Texture2DSourceSample::Bgra(sample) => {
-                            sample.bind_group(&self.device, layout, texture)
-                        }
-                        Texture2DSourceSample::Rgba(sample) => {
-                            sample.bind_group(&self.device, layout, texture)
-                        }
-                        Texture2DSourceSample::Nv12(sample) => {
-                            sample.bind_group(&self.device, layout, texture)
-                        }
-                        Texture2DSourceSample::I420(sample) => {
-                            sample.bind_group(&self.device, layout, texture)
-                        }
-                    },
-                ))
-            } else {
-                None
+        Ok((
+            &self.pipeline,
+            match &self.sample {
+                Texture2DSourceSample::Bgra(it) => {
+                    it.bind_group(&self.device, &self.sampler, &self.layout, texture)
+                }
+                Texture2DSourceSample::Rgba(it) => {
+                    it.bind_group(&self.device, &self.sampler, &self.layout, texture)
+                }
+                Texture2DSourceSample::Nv12(it) => {
+                    it.bind_group(&self.device, &self.sampler, &self.layout, texture)
+                }
+                Texture2DSourceSample::I420(it) => {
+                    it.bind_group(&self.device, &self.sampler, &self.layout, texture)
+                }
             },
-        )
+        ))
     }
 }

@@ -38,15 +38,16 @@ pub use self::macos::{
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
+#[cfg(target_os = "windows")]
+use common::win32::Direct3DDevice;
+
 use common::{
     frame::{AudioFrame, VideoFrame},
     Size,
 };
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-#[cfg(target_os = "windows")]
-use common::win32::Direct3DDevice;
 
 #[cfg(target_os = "linux")]
 pub fn startup() {
@@ -100,7 +101,7 @@ pub trait CaptureHandler: Sync + Send {
 }
 
 /// Video source type or Audio source type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub enum SourceType {
     /// Camera or video capture card and other devices (and support virtual
     /// camera)
@@ -113,7 +114,7 @@ pub enum SourceType {
 }
 
 /// Video source or Audio source.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Source {
     /// Device ID, usually the symbolic link to the device or the address of the
     /// device file handle.

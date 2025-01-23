@@ -9,7 +9,7 @@ repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
 pollster = "0.3.0"
-thiserror = "1.0.63"
+thiserror = "2.0"
 smallvec = "1.13.2"
 wgpu = "23"
 bytemuck = { version = "1.17.1", features = ["derive"] }

@@ -50,10 +50,10 @@ impl Socket {
     /// the specified multicast group.
     ///
     /// Note that only IPV4 is supported.
-    pub fn new(multicast: Ipv4Addr, bind: SocketAddr) -> Result<Self, Error> {
+    pub fn new(multicast: Ipv4Addr, bind: SocketAddr, delay: usize) -> Result<Self, Error> {
         assert!(bind.is_ipv4());
 
-        RUNTIME.block_on(Self::create(multicast, bind))
+        RUNTIME.block_on(Self::create(multicast, bind, delay))
     }
 
     /// Reads packets sent from the multicast server.
@@ -70,7 +70,7 @@ impl Socket {
         let _ = self.close_signal.send(());
     }
 
-    async fn create(multicast: Ipv4Addr, bind: SocketAddr) -> Result<Self, Error> {
+    async fn create(multicast: Ipv4Addr, bind: SocketAddr, delay: usize) -> Result<Self, Error> {
         let socket = socket2::Socket::from(UdpSocket::bind(bind)?);
         socket.set_recv_buffer_size(4 * 1024 * 1024)?;
         socket.set_nonblocking(true)?;
@@ -86,7 +86,7 @@ impl Socket {
 
         tokio::spawn(async move {
             let mut buf = vec![0u8; 2048];
-            let mut queue = Dequeue::new(50);
+            let mut queue = Dequeue::new(delay);
             let mut decoder = FragmentDecoder::new();
 
             'a: loop {

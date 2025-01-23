@@ -1,0 +1,20 @@
+[package]
+name = "hylarana-shared"
+version = "0.2.0-beta"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+name = "hylarana"
+doc = false
+
+[dependencies]
+anyhow = "1.0.82"
+log = "0.4.20"
+bytes = "1.5"
+jni = "0.21.1"
+num_cpus = "1.16.0"
+serde_json = "1.0"
+common = { path = "../../../../../../common", package = "hylarana-common" }
+transport = { path = "../../../../../../transport", package = "hylarana-transport" }
+discovery = { path = "../../../../../../discovery", package = "hylarana-discovery" }

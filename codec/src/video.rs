@@ -1,11 +1,15 @@
 use crate::codec::{
     create_video_context, create_video_frame, set_option, set_str_option, CodecError, CodecType,
-    CreateVideoContextError, CreateVideoFrameError, VideoDecoderType, VideoEncoderType,
+    CreateVideoContextError, CreateVideoFrameError,
 };
 
 use std::{ffi::c_int, ptr::null_mut};
 
-use common::frame::{VideoFormat, VideoFrame, VideoSubFormat};
+use common::{
+    codec::{VideoDecoderType, VideoEncoderType},
+    frame::{VideoFormat, VideoFrame, VideoSubFormat},
+};
+
 use mirror_ffmpeg_sys::*;
 use thiserror::Error;
 
@@ -16,7 +20,7 @@ use common::Size;
 use common::win32::Direct3DDevice;
 
 #[cfg(target_os = "macos")]
-use common::macos::{get_pixel_buffer_format, CVPixelBufferRef};
+use common::macos::get_pixel_buffer_format;
 
 #[derive(Debug, Clone)]
 pub struct VideoDecoderSettings {
@@ -232,7 +236,7 @@ impl VideoDecoder {
             AVPixelFormat::AV_PIX_FMT_YUV420P => {
                 for i in 0..3 {
                     self.frame.data[i] = frame.data[i] as *const _;
-                    self.frame.linesize[i] = frame.linesize[i] as usize;
+                    self.frame.linesize[i] = frame.linesize[i] as u32;
                 }
 
                 self.frame.sub_format = VideoSubFormat::SW;
@@ -243,7 +247,7 @@ impl VideoDecoder {
                 self.frame.data[0] = frame.data[3] as _;
 
                 self.frame.sub_format = VideoSubFormat::CvPixelBufferRef;
-                self.frame.format = get_pixel_buffer_format(frame.data[3] as CVPixelBufferRef);
+                self.frame.format = get_pixel_buffer_format(frame.data[3] as _);
             }
             _ => unimplemented!("unsupported video frame format = {:?}", format),
         };
@@ -394,7 +398,11 @@ impl VideoEncoder {
         } else {
             context_mut.thread_count = 4;
             context_mut.thread_type = FF_THREAD_SLICE as i32;
-            context_mut.pix_fmt = AVPixelFormat::AV_PIX_FMT_NV12;
+            context_mut.pix_fmt = if options.codec == VideoEncoderType::VideoToolBox {
+                AVPixelFormat::AV_PIX_FMT_VIDEOTOOLBOX
+            } else {
+                AVPixelFormat::AV_PIX_FMT_NV12
+            };
         }
 
         // The bitrate of qsv is always too high, so if it is qsv, using half of the
@@ -432,7 +440,9 @@ impl VideoEncoder {
                 set_option(context_mut, "low_power", 1);
                 set_option(context_mut, "vcm", 1);
             }
-            VideoEncoderType::VideoToolBox => {}
+            VideoEncoderType::VideoToolBox => {
+                set_option(context_mut, "realtime", 1);
+            }
         };
 
         if unsafe { avcodec_open2(this.context, codec, null_mut()) } != 0 {
@@ -479,6 +489,10 @@ impl VideoEncoder {
                     hdl.first = frame.data[0] as *mut _;
                     hdl.second = frame.data[1] as *mut _;
                 }
+            }
+            #[cfg(target_os = "macos")]
+            VideoSubFormat::CvPixelBufferRef => {
+                av_frame.data[3] = frame.data[0] as _;
             }
             VideoSubFormat::SW => {
                 // Anyway, the hardware encoder has no way to check whether the current frame is
