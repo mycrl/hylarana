@@ -36,6 +36,8 @@ features = [
 ]
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-video = { version = "0.4.3", features = ["metal"] }
-core-foundation = "0.10"
+objc2-core-video = "0.3.0"
+objc2-core-foundation = "0.3.0"
+objc2-metal = "0.3.0"
+objc2 = "0.6.0"
 metal = "0.29"

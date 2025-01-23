@@ -84,7 +84,7 @@ impl CaptureHandler for ScreenCapture {
         frame.format = VideoFormat::BGRA;
         frame.width = options.size.width;
         frame.height = options.size.height;
-        frame.linesize = [frame.width as usize * 4, 0, 0];
+        frame.linesize = [frame.width * 4, 0, 0];
 
         let mut stream = SCStream::new(
             &SCContentFilter::new().with_display_excluding_windows(&display, &[]),
@@ -143,18 +143,26 @@ where
             return;
         }
 
-        if !{
-            if let Ok(buffer) = buffer.get_pixel_buffer() {
-                let mut lock = self.ctx.lock();
-                let CaptureContext { arrived, frame } = lock.deref_mut();
+        if buffer.make_data_ready().is_err() {
+            return;
+        }
 
-                frame.data[0] = buffer.as_concrete_TypeRef() as _;
-                arrived.sink(&frame)
-            } else {
-                false
-            }
-        } {
+        let buffer = if let Ok(it) = buffer.get_pixel_buffer() {
+            it
+        } else {
+            return;
+        };
+
+        let mut lock = self.ctx.lock();
+        let CaptureContext { arrived, frame } = lock.deref_mut();
+
+        let buffer_ref = buffer.as_concrete_TypeRef();
+        frame.data[0] = buffer_ref as _;
+
+        if !arrived.sink(&frame) {
             self.status.update(false);
+
+            log::warn!("macos screen capture stops because sink returns false");
         }
     }
 }

@@ -73,12 +73,52 @@ impl Transformer {
     pub fn transform(
         &mut self,
         encoder: &mut CommandEncoder,
-        texture: CVPixelBufferRef,
+        buffer: CVPixelBufferRef,
     ) -> Result<&Texture, TransformError> {
-        unsafe {
-            encoder.as_hal_mut::<Metal, _, _>(|encoder| if let Some(raw_encoder) = encoder {});
-        }
+        let size = self.texture.size();
 
-        todo!()
+        encoder.copy_texture_to_texture(
+            ImageCopyTexture {
+                texture: &unsafe {
+                    self.device.create_texture_from_hal::<Metal>(
+                        <Metal as Api>::Device::texture_from_raw(
+                            self.cache.map(PixelBuffer::from(buffer))?.get_texture()?,
+                            self.texture.format(),
+                            MTLTextureType::D2,
+                            1,
+                            1,
+                            CopyExtent {
+                                width: size.width,
+                                height: size.height,
+                                depth: 1,
+                            },
+                        ),
+                        &TextureDescriptor {
+                            label: None,
+                            size,
+                            mip_level_count: 1,
+                            sample_count: 1,
+                            dimension: TextureDimension::D2,
+                            format: self.texture.format(),
+                            usage: TextureUsages::COPY_SRC,
+                            view_formats: &[],
+                        },
+                    )
+                },
+                mip_level: 0,
+                origin: Origin3d::default(),
+                aspect: TextureAspect::All,
+            },
+            ImageCopyTexture {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: Origin3d::default(),
+                aspect: TextureAspect::All,
+            },
+            self.texture.size(),
+        );
+
+        self.cache.flush();
+        Ok(&self.texture)
     }
 }

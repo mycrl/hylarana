@@ -1,9 +1,12 @@
 use std::{slice::from_raw_parts, str::FromStr};
 
 use crate::{
-    sender::HylaranaSenderOptions, util::get_direct3d, AVFrameObserver, AVFrameSink, AVFrameStream,
+    sender::HylaranaSenderOptions, AVFrameObserver, AVFrameSink, AVFrameStream,
     HylaranaReceiverOptions, MediaStreamDescription,
 };
+
+#[cfg(target_os = "windows")]
+use crate::util::get_direct3d;
 
 #[cfg(target_os = "windows")]
 use common::win32::d3d_texture_borrowed_raw;
@@ -14,7 +17,7 @@ use common::macos::{CVPixelBufferRef, PixelMomeryBuffer};
 #[cfg(target_os = "windows")]
 use renderer::win32::D3D11Renderer;
 
-#[cfg(target_os = "macos")]
+#[cfg(not(target_os = "linux"))]
 use renderer::Texture2DRaw;
 
 use common::{
@@ -438,7 +441,7 @@ impl<'a> VideoRender<'a> {
         match frame.sub_format {
             #[cfg(target_os = "windows")]
             VideoSubFormat::D3D11 => {
-                let texture = Texture2DResource::Texture(renderer::Texture2DRaw::ID3D11Texture2D(
+                let texture = Texture2DResource::Texture(Texture2DRaw::ID3D11Texture2D(
                     d3d_texture_borrowed_raw(&(frame.data[0] as *mut _))
                         .ok_or_else(|| VideoRenderError::InvalidD3D11Texture)?
                         .clone(),
@@ -480,7 +483,11 @@ impl<'a> VideoRender<'a> {
                             },
                         ));
 
-                        let buffer = Texture2DBuffer(&pixel_buffer.data);
+                        let buffer = Texture2DBuffer {
+                            buffers: &pixel_buffer.data,
+                            linesize: &frame.linesize,
+                        };
+
                         render.submit(match frame.format {
                             VideoFormat::NV12 => Texture::Nv12(Texture2DResource::Buffer(buffer)),
                             VideoFormat::I420 => Texture::I420(buffer),
