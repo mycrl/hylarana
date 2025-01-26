@@ -312,7 +312,7 @@ impl rodio::Source for AudioSamples {
     }
 
     fn channels(&self) -> u16 {
-        1
+        2
     }
 
     fn sample_rate(&self) -> u32 {

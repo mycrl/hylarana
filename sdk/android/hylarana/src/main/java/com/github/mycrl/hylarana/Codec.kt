@@ -289,7 +289,7 @@ class Audio {
                 override val sampleBits = AudioFormat.ENCODING_PCM_16BIT
                 override val sampleRate = 48000
                 override val bitRate = 64000
-                override val channels = 1
+                override val channels = 2
             }
         }
     }
@@ -379,7 +379,7 @@ class Audio {
 
         private val minBufferSize = AudioRecord.getMinBufferSize(
             48000,
-            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.CHANNEL_IN_STEREO,
             AudioFormat.ENCODING_PCM_16BIT
         )
 
@@ -387,7 +387,7 @@ class Audio {
             val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 1)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-            format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1)
+            format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 2)
             format.setInteger(MediaFormat.KEY_BIT_RATE, 64000)
             format.setInteger(MediaFormat.KEY_DURATION, 100000)
             format.setInteger(MediaFormat.KEY_COMPLEXITY, 0)

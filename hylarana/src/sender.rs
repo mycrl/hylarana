@@ -205,7 +205,7 @@ impl<T: AVFrameStream + 'static> AudioSender<T> {
         // the adapter layer will automatically cache it.
         adapter.send(
             package_copy_from_slice(&create_opus_identification_header(
-                1,
+                2,
                 settings.sample_rate as u32,
             )),
             StreamBufferInfo::Audio(BufferFlag::Config as i32, 0),

@@ -14,7 +14,7 @@ use common::{
 
 use scrap::{Capturer, Display};
 use thiserror::Error;
-use yuvutils_rs::{
+use yuv::{
     bgra_to_yuv_nv12, YuvBiPlanarImageMut, YuvChromaSubsampling, YuvRange, YuvStandardMatrix,
 };
 

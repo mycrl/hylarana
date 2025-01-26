@@ -71,16 +71,14 @@ impl Sender {
 
         // Get the first audio input device that can be captured.
         let mut audio = None;
-        if !cfg!(target_os = "macos") {
-            if let Some(source) = Capture::get_sources(SourceType::Audio)?.get(0) {
-                audio = Some(HylaranaSenderTrackOptions {
-                    source: source.clone(),
-                    options: AudioOptions {
-                        sample_rate: 48000,
-                        bit_rate: 64000,
-                    },
-                });
-            }
+        if let Some(source) = Capture::get_sources(SourceType::Audio)?.get(0) {
+            audio = Some(HylaranaSenderTrackOptions {
+                source: source.clone(),
+                options: AudioOptions {
+                    sample_rate: 48000,
+                    bit_rate: 64000,
+                },
+            });
         }
 
         let options = HylaranaSenderOptions {

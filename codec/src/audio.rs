@@ -59,9 +59,9 @@ impl AudioDecoder {
 
         let ch_layout = AVChannelLayout {
             order: AVChannelOrder::AV_CHANNEL_ORDER_NATIVE,
-            nb_channels: 1,
+            nb_channels: 2,
             u: AVChannelLayout__bindgen_ty_1 {
-                mask: AV_CH_LAYOUT_MONO,
+                mask: AV_CH_LAYOUT_STEREO,
             },
             opaque: null_mut(),
         };
@@ -250,9 +250,9 @@ impl AudioEncoder {
         let context_mut = unsafe { &mut *this.context };
         let ch_layout = AVChannelLayout {
             order: AVChannelOrder::AV_CHANNEL_ORDER_NATIVE,
-            nb_channels: 1,
+            nb_channels: 2,
             u: AVChannelLayout__bindgen_ty_1 {
-                mask: AV_CH_LAYOUT_MONO,
+                mask: AV_CH_LAYOUT_STEREO,
             },
             opaque: null_mut(),
         };
