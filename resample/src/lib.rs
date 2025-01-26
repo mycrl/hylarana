@@ -14,18 +14,23 @@ pub struct AudioResampler {
 }
 
 impl AudioResampler {
-    pub fn new(input: f64, output: f64, frames: usize) -> Result<Self, ResamplerConstructionError> {
+    pub fn new(
+        input: f64,
+        output: f64,
+        frames: usize,
+        channels: u8,
+    ) -> Result<Self, ResamplerConstructionError> {
         Ok(Self {
-            samples: Vec::with_capacity(frames),
+            samples: Vec::with_capacity(frames * 2),
             input_buffer: Vec::with_capacity(48000),
-            output_buffer: vec![0.0; 48000],
+            output_buffer: vec![0.0; 48000 * 2],
             sampler: if input != output {
                 Some(FastFixedIn::new(
                     output / input,
                     2.0,
                     PolynomialDegree::Linear,
                     frames,
-                    1,
+                    channels as usize,
                 )?)
             } else {
                 None
@@ -33,24 +38,15 @@ impl AudioResampler {
         })
     }
 
-    pub fn resample<'a>(
-        &'a mut self,
-        buffer: &'a [i16],
-        channels: usize,
-    ) -> ResampleResult<&'a [i16]> {
-        if channels == 1 && self.sampler.is_none() {
+    pub fn resample<'a>(&'a mut self, buffer: &'a [i16]) -> ResampleResult<&'a [i16]> {
+        if self.sampler.is_none() {
             Ok(buffer)
         } else {
             self.samples.clear();
             self.input_buffer.clear();
 
-            for item in buffer.iter().step_by(channels) {
-                if self.sampler.is_none() {
-                    self.samples.push(*item);
-                } else {
-                    // need resample
-                    self.input_buffer.push(*item as f32);
-                }
+            for it in buffer {
+                self.input_buffer.push(*it as f32);
             }
 
             if let Some(sampler) = &mut self.sampler {

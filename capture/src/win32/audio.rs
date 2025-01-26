@@ -88,10 +88,12 @@ impl CaptureHandler for AudioCapture {
             })
             .ok_or_else(|| AudioCaptureError::NotFoundAudioSource)?;
 
-        let config: StreamConfig = match kind {
+        let mut config: StreamConfig = match kind {
             DeviceKind::Input => device.default_input_config()?.into(),
             DeviceKind::Output => device.default_output_config()?.into(),
         };
+
+        config.channels = 2;
 
         let mut frame = AudioFrame::default();
         frame.sample_rate = options.sample_rate;
@@ -101,6 +103,8 @@ impl CaptureHandler for AudioCapture {
         let stream = device.build_input_stream(
             &config,
             move |data: &[i16], _| {
+                let frames = data.len() / config.channels as usize;
+                
                 // When any problem occurs in the process, you should not continue processing.
                 // If the cpal bottom layer continues to push audio samples, it should be
                 // ignored here and the process should not continue.
@@ -117,15 +121,16 @@ impl CaptureHandler for AudioCapture {
                     if let Ok(sampler) = AudioResampler::new(
                         config.sample_rate.0 as f64,
                         options.sample_rate as f64,
-                        data.len() / config.channels as usize,
+                        frames,
+                        2,
                     ) {
                         resampler = Some(sampler);
                     }
                 }
 
                 if let Some(sampler) = &mut resampler {
-                    if let Ok(sample) = sampler.resample(data, config.channels.into()) {
-                        frame.frames = sample.len() as u32;
+                    if let Ok(sample) = sampler.resample(data) {
+                        frame.frames = frames as u32;
                         frame.data = sample.as_ptr();
 
                         playing = arrived.sink(&frame);

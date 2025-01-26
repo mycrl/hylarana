@@ -57,12 +57,15 @@ struct Sender {
 }
 
 impl Sender {
-    fn new(configure: &Configure, window: Arc<Window>) -> Result<Self> {
+    fn new(configure: &Configure) -> Result<Self> {
         let video_options = configure.get_video_options();
 
         // Get the first screen that can be captured.
         let mut video = None;
-        if let Some(source) = Capture::get_sources(SourceType::Screen)?.get(0) {
+        if let Some(source) = Capture::get_sources(SourceType::Screen)?
+            .iter()
+            .find(|it| it.is_default)
+        {
             video = Some(HylaranaSenderTrackOptions {
                 options: video_options.clone(),
                 source: source.clone(),
@@ -71,7 +74,10 @@ impl Sender {
 
         // Get the first audio input device that can be captured.
         let mut audio = None;
-        if let Some(source) = Capture::get_sources(SourceType::Audio)?.get(0) {
+        if let Some(source) = Capture::get_sources(SourceType::Audio)?
+            .iter()
+            .find(|it| it.is_default)
+        {
             audio = Some(HylaranaSenderTrackOptions {
                 source: source.clone(),
                 options: AudioOptions {
@@ -91,18 +97,7 @@ impl Sender {
 
         let sender = create_sender(
             &options,
-            AVFrameStreamPlayer::new(
-                AVFrameStreamPlayerOptions::OnlyVideo(
-                    VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
-                        size: window.size(),
-                        window,
-                    })
-                    .set_backend(configure.backend)
-                    .from_sender(&options)
-                    .build(),
-                ),
-                ViewObserver,
-            )?,
+            AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::<Window>::Quiet, ViewObserver)?,
         )?;
 
         // Register the current sender's information with the LAN discovery service so
@@ -217,10 +212,9 @@ impl ApplicationHandler<Events> for App {
                             //
                             // The receiving end is the same.
                             KeyCode::KeyS => {
-                                if let (None, Some(window)) = (&self.sender, &self.window) {
-                                    self.sender.replace(
-                                        Sender::new(&Configure::parse(), window.clone()).unwrap(),
-                                    );
+                                if self.sender.is_none() {
+                                    self.sender
+                                        .replace(Sender::new(&Configure::parse()).unwrap());
                                 }
                             }
                             KeyCode::KeyR => {

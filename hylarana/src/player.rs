@@ -337,7 +337,7 @@ impl Iterator for AudioSamples {
 impl From<&AudioFrame> for AudioSamples {
     fn from(frame: &AudioFrame) -> Self {
         Self {
-            buffer: unsafe { from_raw_parts(frame.data, frame.frames as usize) }.to_vec(),
+            buffer: unsafe { from_raw_parts(frame.data, frame.frames as usize * 2) }.to_vec(),
             sample_rate: frame.sample_rate,
             frames: frame.frames as usize,
             index: 0,

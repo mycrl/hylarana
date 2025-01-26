@@ -302,7 +302,7 @@ class Audio {
         private var worker: Thread
 
         init {
-            val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 1)
+            val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 2)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
 
@@ -384,9 +384,10 @@ class Audio {
         )
 
         init {
-            val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 1)
+            val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 2)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+            format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, minBufferSize);
             format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 2)
             format.setInteger(MediaFormat.KEY_BIT_RATE, 64000)
             format.setInteger(MediaFormat.KEY_DURATION, 100000)

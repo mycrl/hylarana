@@ -310,7 +310,7 @@ impl AudioEncoder {
                 av_frame.data.as_mut_ptr(),
                 av_frame.linesize.as_mut_ptr(),
                 frame.data as *const _,
-                1,
+                av_frame.nb_samples,
                 frame.frames as i32,
                 context_ref.sample_fmt,
                 0,
