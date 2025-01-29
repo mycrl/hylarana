@@ -25,7 +25,7 @@
 </div>
 <div align="center">
   <span>watch the demo on youtube:</span>
-  <a href="https://www.youtube.com/shorts/npD_VgEKZmM">link</a>
+  <a href="https://youtu.be/AkW3eRlKl1U">link</a>
 </div>
 <br/>
 <br/>
