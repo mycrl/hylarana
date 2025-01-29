@@ -51,9 +51,6 @@ pub fn startup() -> Result<(), HylaranaError> {
         );
     }
 
-    #[cfg(target_os = "linux")]
-    capture::startup();
-
     codec::startup();
     log::info!("codec initialized");
 

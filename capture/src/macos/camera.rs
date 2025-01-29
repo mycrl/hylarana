@@ -23,10 +23,10 @@ impl CaptureHandler for CameraCapture {
         _options: Self::CaptureOptions,
         mut _arrived: S,
     ) -> Result<(), Self::Error> {
-        todo!("camera capture is not supported on macos")
+        unimplemented!("camera capture is not supported on macos")
     }
 
     fn stop(&self) -> Result<(), Self::Error> {
-        todo!("camera capture is not supported on macos")
+        unimplemented!("camera capture is not supported on macos")
     }
 }

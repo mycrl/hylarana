@@ -177,6 +177,14 @@ impl Swresample {
     }
 }
 
+impl Drop for Swresample {
+    fn drop(&mut self) {
+        unsafe {
+            swr_free(&mut self.0);
+        }
+    }
+}
+
 #[cfg(target_os = "windows")]
 pub mod win32 {
     use std::mem::ManuallyDrop;

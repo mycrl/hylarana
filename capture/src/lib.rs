@@ -51,13 +51,6 @@ use common::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[cfg(target_os = "linux")]
-pub fn startup() {
-    unsafe {
-        mirror_ffmpeg_sys::avdevice_register_all();
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum CaptureError {
     #[error(transparent)]
