@@ -244,6 +244,7 @@ pub struct Generator {
     layout: BindGroupLayout,
     pipeline: RenderPipeline,
     sample: Texture2DSourceSample,
+    #[cfg(not(target_os = "linux"))]
     transformer: Option<Transformer>,
 }
 
@@ -259,6 +260,7 @@ impl Generator {
             direct3d,
         }: GeneratorOptions,
     ) -> Result<Self, GeneratorError> {
+        #[cfg(not(target_os = "linux"))]
         let transformer = {
             if sub_format != VideoSubFormat::SW {
                 #[cfg(target_os = "windows")]
@@ -390,6 +392,10 @@ impl Generator {
             _ => (),
         }
 
+        #[cfg(target_os = "linux")]
+        let texture = None;
+
+        #[cfg(not(target_os = "linux"))]
         let texture = match &texture {
             Texture::Rgba(texture) | Texture::Bgra(texture) | Texture::Nv12(texture) => {
                 if let Some(transformer) = &mut self.transformer {

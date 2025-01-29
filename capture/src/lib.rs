@@ -1,39 +1,41 @@
-mod audio;
-
 #[cfg(target_os = "windows")]
 mod win32 {
+    pub mod audio;
     pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "linux")]
 mod linux {
+    pub mod audio;
     pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "macos")]
 mod macos {
+    pub mod audio;
     pub mod camera;
     pub mod screen;
 }
 
-pub use self::audio::{AudioCapture, AudioCaptureError};
-
 #[cfg(target_os = "windows")]
 pub use self::win32::{
+    audio::{AudioCapture, AudioCaptureError},
     camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
 #[cfg(target_os = "linux")]
 pub use self::linux::{
+    audio::{AudioCapture, AudioCaptureError},
     camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
 #[cfg(target_os = "macos")]
 pub use self::macos::{
+    audio::{AudioCapture, AudioCaptureError},
     camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
@@ -48,13 +50,6 @@ use common::{
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-#[cfg(target_os = "linux")]
-pub fn startup() {
-    unsafe {
-        mirror_ffmpeg_sys::avdevice_register_all();
-    }
-}
 
 #[derive(Debug, Error)]
 pub enum CaptureError {

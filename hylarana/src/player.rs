@@ -312,7 +312,7 @@ impl rodio::Source for AudioSamples {
     }
 
     fn channels(&self) -> u16 {
-        1
+        2
     }
 
     fn sample_rate(&self) -> u32 {
@@ -337,10 +337,11 @@ impl Iterator for AudioSamples {
 impl From<&AudioFrame> for AudioSamples {
     fn from(frame: &AudioFrame) -> Self {
         Self {
-            buffer: unsafe { from_raw_parts(frame.data, frame.frames as usize) }.to_vec(),
-            sample_rate: frame.sample_rate,
-            frames: frame.frames as usize,
             index: 0,
+            frames: frame.frames as usize,
+            sample_rate: frame.sample_rate,
+            buffer: unsafe { from_raw_parts(frame.data as *const i16, frame.frames as usize * 2) }
+                .to_vec(),
         }
     }
 }

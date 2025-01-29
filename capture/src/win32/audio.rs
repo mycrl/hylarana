@@ -1,10 +1,13 @@
-use crate::{AudioCaptureSourceDescription, CaptureHandler, Source, SourceType};
+use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameArrived, Source, SourceType};
 
 use common::frame::AudioFrame;
 use cpal::{traits::*, Host, Stream, StreamConfig};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use resample::AudioResampler;
+use resample::{
+    AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription,
+    AudioSampleFormat,
+};
 use thiserror::Error;
 
 // Just use a default audio port globally.
@@ -26,6 +29,8 @@ pub enum AudioCaptureError {
     PlayStreamError(#[from] cpal::PlayStreamError),
     #[error(transparent)]
     PauseStreamError(#[from] cpal::PauseStreamError),
+    #[error(transparent)]
+    AudioResamplerError(#[from] AudioResamplerError),
 }
 
 enum DeviceKind {
@@ -71,10 +76,10 @@ impl CaptureHandler for AudioCapture {
         Ok(sources)
     }
 
-    fn start<S: crate::FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
-        mut arrived: S,
+        arrived: S,
     ) -> Result<(), Self::Error> {
         // Find devices with matching names
         let (device, kind) = HOST
@@ -88,16 +93,41 @@ impl CaptureHandler for AudioCapture {
             })
             .ok_or_else(|| AudioCaptureError::NotFoundAudioSource)?;
 
-        let config: StreamConfig = match kind {
+        let mut config: StreamConfig = match kind {
             DeviceKind::Input => device.default_input_config()?.into(),
             DeviceKind::Output => device.default_output_config()?.into(),
         };
 
+        config.channels = 2;
+
         let mut frame = AudioFrame::default();
         frame.sample_rate = options.sample_rate;
 
+        let mut resampler = AudioResampler::new(
+            // config.sample_rate.0 as f64,
+            AudioSampleDescription {
+                sample_bits: AudioSampleFormat::I16,
+                sample_rate: config.sample_rate.0,
+                channels: 2,
+            },
+            // options.sample_rate as f64,
+            AudioSampleDescription {
+                sample_bits: AudioSampleFormat::I16,
+                sample_rate: options.sample_rate,
+                channels: 2,
+            },
+            Output {
+                arrived,
+                frame: {
+                    let mut frame = AudioFrame::default();
+                    frame.sample_rate = options.sample_rate;
+
+                    frame
+                },
+            },
+        )?;
+
         let mut playing = true;
-        let mut resampler = None;
         let stream = device.build_input_stream(
             &config,
             move |data: &[i16], _| {
@@ -108,28 +138,8 @@ impl CaptureHandler for AudioCapture {
                     return;
                 }
 
-                // Creating a resampler requires knowing the fixed number of input samples, but
-                // in cpal the number of samples can only be known after the first frame is
-                // obtained. There may be a question here, whether the number of
-                // samples for each sample is fixed. It is currently observed that it is fixed,
-                // so the default number of samples is fixed here.
-                if resampler.is_none() {
-                    if let Ok(sampler) = AudioResampler::new(
-                        config.sample_rate.0 as f64,
-                        options.sample_rate as f64,
-                        data.len() / config.channels as usize,
-                    ) {
-                        resampler = Some(sampler);
-                    }
-                }
-
-                if let Some(sampler) = &mut resampler {
-                    if let Ok(sample) = sampler.resample(data, config.channels.into()) {
-                        frame.frames = sample.len() as u32;
-                        frame.data = sample.as_ptr();
-
-                        playing = arrived.sink(&frame);
-                    }
+                if resampler.resample(data).is_err() {
+                    playing = false;
                 }
             },
             |e| {
@@ -158,5 +168,22 @@ impl CaptureHandler for AudioCapture {
         }
 
         Ok(())
+    }
+}
+
+struct Output<S> {
+    arrived: S,
+    frame: AudioFrame,
+}
+
+impl<S> AudioResamplerOutput<i16> for Output<S>
+where
+    S: FrameArrived<Frame = AudioFrame> + 'static,
+{
+    fn output(&mut self, buffer: &[i16], frames: u32) -> bool {
+        self.frame.data = buffer.as_ptr();
+        self.frame.frames = frames;
+
+        self.arrived.sink(&self.frame)
     }
 }

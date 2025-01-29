@@ -186,6 +186,7 @@ impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
         })
     }
 
+    /// Get the media description information of the current receiver. 
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
     }

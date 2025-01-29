@@ -1,6 +1,6 @@
 [package]
 name = "hylarana-codec"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
@@ -10,9 +10,10 @@ repository = "https://github.com/mycrl/hylarana"
 [dependencies]
 log = "0.4"
 thiserror = "2.0"
-common = { path = "../common", version = "0.2.0", package = "hylarana-common" }
+common = { path = "../common", version = "0.3.0", package = "hylarana-common" }
 
-[target.'cfg(target_os = "windows")'.dependencies.mirror-ffmpeg-sys]
+[target.'cfg(target_os = "windows")'.dependencies.ffmpeg]
+package = "hylarana-ffmpeg-sys"
 default-features = false
 version = "0.1"
 features = [
@@ -22,7 +23,8 @@ features = [
     "qsv"
 ]
 
-[target.'cfg(not(target_os = "windows"))'.dependencies.mirror-ffmpeg-sys]
+[target.'cfg(not(target_os = "windows"))'.dependencies.ffmpeg]
+package = "hylarana-ffmpeg-sys"
 default-features = false
 version = "0.1"
 features = [

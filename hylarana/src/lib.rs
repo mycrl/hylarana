@@ -1,5 +1,3 @@
-#![doc = include_str!("../README.md")]
-
 mod player;
 mod receiver;
 mod sender;
@@ -50,9 +48,6 @@ pub fn startup() -> Result<(), HylaranaError> {
             because you didn't run it with administrator privileges."
         );
     }
-
-    #[cfg(target_os = "linux")]
-    capture::startup();
 
     codec::startup();
     log::info!("codec initialized");

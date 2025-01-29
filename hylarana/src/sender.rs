@@ -205,16 +205,16 @@ impl<T: AVFrameStream + 'static> AudioSender<T> {
         // the adapter layer will automatically cache it.
         adapter.send(
             package_copy_from_slice(&create_opus_identification_header(
-                1,
+                2,
                 settings.sample_rate as u32,
             )),
             StreamBufferInfo::Audio(BufferFlag::Config as i32, 0),
         );
 
         Ok(AudioSender {
-            chunk_count: settings.sample_rate as usize / 1000 * 100,
+            chunk_count: settings.sample_rate as usize / 1000 * 100 * 2,
             encoder: AudioEncoder::new(settings)?,
-            buffer: BytesMut::with_capacity(48000),
+            buffer: BytesMut::with_capacity(48000 * 2),
             sink: Arc::downgrade(sink),
             adapter,
             status,
@@ -225,15 +225,15 @@ impl<T: AVFrameStream + 'static> AudioSender<T> {
         self.buffer.extend_from_slice(unsafe {
             std::slice::from_raw_parts(
                 frame.data as *const _,
-                frame.frames as usize * size_of::<i16>(),
+                frame.frames as usize * 2 * size_of::<i16>(),
             )
         });
 
-        if self.buffer.len() >= self.chunk_count * 2 {
+        if self.buffer.len() >= self.chunk_count * size_of::<i16>() {
             let payload = self.buffer.split_to(self.chunk_count * size_of::<i16>());
             let frame = AudioFrame {
                 data: payload.as_ptr() as *const _,
-                frames: self.chunk_count as u32,
+                frames: self.chunk_count as u32 / 2,
                 sample_rate: 0,
             };
 
@@ -398,7 +398,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
                 .map(|it| MediaAudioStreamDescription {
                     sample_rate: it.options.sample_rate,
                     bit_rate: it.options.bit_rate,
-                    channels: 1,
+                    channels: 2,
                 }),
         };
 
@@ -413,8 +413,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
         })
     }
 
-    /// Get the ID of the sender, each sender has an individual ID identifier,
-    /// you need to specify the ID of the sender when creating the receiver.
+    /// Get the media description information of the current sender. The media description is the information needed to create the receiver.
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
     }

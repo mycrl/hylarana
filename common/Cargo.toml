@@ -1,6 +1,6 @@
 [package]
 name = "hylarana-common"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
@@ -36,8 +36,10 @@ features = [
 ]
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-core-video = "0.3.0"
-objc2-core-foundation = "0.3.0"
-objc2-metal = "0.3.0"
+core-media = { version = "0.3.0", package = "objc2-core-media" }
+core-video = { version = "0.3.0", package = "objc2-core-video" }
+core-foundation = { version = "0.3.0", package = "objc2-core-foundation" }
+core-metal = { version = "0.3.0",  package = "objc2-metal" }
+core-audo-types = { version = "0.3.0", package = "objc2-core-audio-types"}
 objc2 = "0.6.0"
 metal = "0.29"

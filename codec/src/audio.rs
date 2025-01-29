@@ -3,7 +3,7 @@ use crate::codec::{set_option, set_str_option};
 use std::{ffi::c_int, ptr::null_mut};
 
 use common::{frame::AudioFrame, strings::PSTR};
-use mirror_ffmpeg_sys::*;
+use ffmpeg::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -59,9 +59,9 @@ impl AudioDecoder {
 
         let ch_layout = AVChannelLayout {
             order: AVChannelOrder::AV_CHANNEL_ORDER_NATIVE,
-            nb_channels: 1,
+            nb_channels: 2,
             u: AVChannelLayout__bindgen_ty_1 {
-                mask: AV_CH_LAYOUT_MONO,
+                mask: AV_CH_LAYOUT_STEREO,
             },
             opaque: null_mut(),
         };
@@ -250,9 +250,9 @@ impl AudioEncoder {
         let context_mut = unsafe { &mut *this.context };
         let ch_layout = AVChannelLayout {
             order: AVChannelOrder::AV_CHANNEL_ORDER_NATIVE,
-            nb_channels: 1,
+            nb_channels: 2,
             u: AVChannelLayout__bindgen_ty_1 {
-                mask: AV_CH_LAYOUT_MONO,
+                mask: AV_CH_LAYOUT_STEREO,
             },
             opaque: null_mut(),
         };
@@ -310,7 +310,7 @@ impl AudioEncoder {
                 av_frame.data.as_mut_ptr(),
                 av_frame.linesize.as_mut_ptr(),
                 frame.data as *const _,
-                1,
+                av_frame.nb_samples,
                 frame.frames as i32,
                 context_ref.sample_fmt,
                 0,

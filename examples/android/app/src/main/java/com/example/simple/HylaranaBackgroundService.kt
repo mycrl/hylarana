@@ -211,7 +211,7 @@ class HylaranaBackgroundService : Service() {
                                                         .setEncoding(audioConfig.sampleBits)
                                                         .setSampleRate(audioConfig.sampleRate)
                                                         .setChannelMask(
-                                                            AudioFormat.CHANNEL_OUT_MONO
+                                                            AudioFormat.CHANNEL_OUT_STEREO
                                                         )
                                                         .build()
                                                 )
@@ -271,7 +271,7 @@ class HylaranaBackgroundService : Service() {
                                 .setAudioFormat(
                                     AudioFormat.Builder()
                                         .setSampleRate(audioConfig.sampleRate)
-                                        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                                        .setChannelMask(AudioFormat.CHANNEL_IN_STEREO)
                                         .setEncoding(audioConfig.sampleBits)
                                         .build()
                                 )

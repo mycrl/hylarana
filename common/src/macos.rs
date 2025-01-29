@@ -3,16 +3,10 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-pub use metal::{
-    foreign_types::ForeignType, Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture,
-    TextureRef,
-};
-
-pub type CVPixelBufferRef = *mut CVPixelBuffer;
-
-use objc2::{rc::Retained, runtime::ProtocolObject};
-use objc2_core_foundation::kCFAllocatorDefault;
-use objc2_core_video::{
+use core_foundation::kCFAllocatorDefault;
+use core_media::{CMAudioFormatDescription, CMAudioFormatDescriptionGetStreamBasicDescription};
+use core_metal::{MTLDevice as Objc2MTLDevice, MTLPixelFormat as Objc2MTLPixelFormat};
+use core_video::{
     kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
     kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
     kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
@@ -23,9 +17,17 @@ use objc2_core_video::{
     CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
 };
 
-use objc2_metal::{MTLDevice as Objc2MTLDevice, MTLPixelFormat as Objc2MTLPixelFormat};
+use objc2::{rc::Retained, runtime::ProtocolObject};
 
 use crate::{frame::VideoFormat, Size};
+
+pub use core_audo_types::AudioStreamBasicDescription;
+pub use metal::{
+    foreign_types::ForeignType, Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture,
+    TextureRef,
+};
+
+pub type CVPixelBufferRef = *mut CVPixelBuffer;
 
 #[derive(Debug)]
 pub struct Error(i32);
@@ -60,6 +62,18 @@ pub fn get_pixel_buffer_size(buffer: CVPixelBufferRef) -> Size {
     Size {
         width: unsafe { CVPixelBufferGetWidth(&*buffer) } as u32,
         height: unsafe { CVPixelBufferGetHeight(&*buffer) } as u32,
+    }
+}
+
+pub fn get_format_description_info<'a>(
+    descr: *const CMAudioFormatDescription,
+) -> Option<&'a AudioStreamBasicDescription> {
+    let ptr = unsafe { CMAudioFormatDescriptionGetStreamBasicDescription(&*descr) };
+
+    if ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { &*ptr })
     }
 }
 

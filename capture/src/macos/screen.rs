@@ -10,7 +10,7 @@ use common::{
 };
 
 use core_foundation::{base::TCFType, error::CFError};
-use core_media_rs::cm_time::CMTime;
+use core_media::cm_time::CMTime;
 use parking_lot::Mutex;
 use screencapturekit::{
     output::CMSampleBuffer,
@@ -141,32 +141,22 @@ where
     fn did_output_sample_buffer(&self, buffer: CMSampleBuffer, _: SCStreamOutputType) {
         if !self.status.get() {
             log::warn!("macos screen capture stops because sink returns false");
-            
-            return;
-        }
-
-        if buffer.make_data_ready().is_err() {
-            log::warn!("failed to frame sample buffer make data ready");
 
             return;
         }
 
-        let buffer = if let Ok(it) = buffer.get_pixel_buffer() {
-            it
-        } else {
-            log::warn!("failed to get frame sample piexel buffer");
+        if buffer.make_data_ready().is_ok() {
+            if let Ok(buffer) = buffer.get_pixel_buffer() {
+                let mut lock = self.ctx.lock();
+                let CaptureContext { arrived, frame } = lock.deref_mut();
 
-            return;
-        };
+                let buffer_ref = buffer.as_concrete_TypeRef();
+                frame.data[0] = buffer_ref as _;
 
-        let mut lock = self.ctx.lock();
-        let CaptureContext { arrived, frame } = lock.deref_mut();
-
-        let buffer_ref = buffer.as_concrete_TypeRef();
-        frame.data[0] = buffer_ref as _;
-
-        if !arrived.sink(&frame) {
-            self.status.update(false);
+                if !arrived.sink(&frame) {
+                    self.status.update(false);
+                }
+            }
         }
     }
 }

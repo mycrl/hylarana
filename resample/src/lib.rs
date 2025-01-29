@@ -1,71 +1,186 @@
-use rubato::{FastFixedIn, PolynomialDegree, Resampler};
+use std::{
+    marker::PhantomData,
+    ptr::null_mut,
+    sync::{
+        atomic::AtomicBool,
+        mpsc::{channel, Sender},
+        Arc,
+    },
+    thread,
+};
 
-pub use rubato::{ResampleError, ResampleResult, ResamplerConstructionError};
+use common::atomic::EasyAtomic;
+use ffmpeg::*;
+use thiserror::Error;
+
+#[derive(Debug, Clone, Copy)]
+pub enum AudioSampleFormat {
+    I16,
+    I32,
+    F32,
+}
+
+impl Into<AVSampleFormat> for AudioSampleFormat {
+    fn into(self) -> AVSampleFormat {
+        match self {
+            Self::I16 => AVSampleFormat::AV_SAMPLE_FMT_S16,
+            Self::I32 => AVSampleFormat::AV_SAMPLE_FMT_S32,
+            Self::F32 => AVSampleFormat::AV_SAMPLE_FMT_FLT,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AudioSampleDescription {
+    pub sample_bits: AudioSampleFormat,
+    pub sample_rate: u32,
+    pub channels: u8,
+}
+
+impl AudioSampleDescription {
+    fn channel_layout(&self) -> AVChannelLayout {
+        AVChannelLayout {
+            order: AVChannelOrder::AV_CHANNEL_ORDER_NATIVE,
+            nb_channels: self.channels as i32,
+            u: AVChannelLayout__bindgen_ty_1 {
+                mask: match self.channels {
+                    1 => AV_CH_LAYOUT_MONO,
+                    2 => AV_CH_LAYOUT_STEREO,
+                    _ => unimplemented!("unsupports audio channels={}", self.channels),
+                },
+            },
+            opaque: null_mut(),
+        }
+    }
+}
+
+pub trait AudioResamplerOutput<T>: Send {
+    fn output(&mut self, buffer: &[T], frames: u32) -> bool;
+}
+
+#[derive(Debug, Error)]
+pub enum AudioResamplerError {
+    #[error("failed to send buffer to queue")]
+    SendBufferError,
+    #[error("failed to create swresample")]
+    CreateSwresampleError,
+    #[error("queue is closed")]
+    QueueClosed,
+}
 
 /// Audio resampler, quickly resample input to a single channel count and
 /// different sampling rates.
 ///
 /// Note that due to the fast sampling, the quality may be reduced.
-pub struct AudioResampler {
-    sampler: Option<FastFixedIn<f32>>,
-    input_buffer: Vec<f32>,
-    output_buffer: Vec<f32>,
-    samples: Vec<i16>,
+pub struct AudioResampler<I, O> {
+    _p: PhantomData<O>,
+    tx: Sender<Vec<I>>,
+    status: Arc<AtomicBool>,
 }
 
-impl AudioResampler {
-    pub fn new(input: f64, output: f64, frames: usize) -> Result<Self, ResamplerConstructionError> {
+impl<I, O> AudioResampler<I, O>
+where
+    I: Copy + Send + 'static,
+    O: Copy + Default,
+{
+    pub fn new<T: AudioResamplerOutput<O> + 'static>(
+        input: AudioSampleDescription,
+        output: AudioSampleDescription,
+        mut sink: T,
+    ) -> Result<Self, AudioResamplerError> {
+        let (tx, rx) = channel::<Vec<I>>();
+
+        let status = Arc::new(AtomicBool::new(true));
+        let mut swresample = Swresample::new(&input, &output)
+            .ok_or_else(|| AudioResamplerError::CreateSwresampleError)?;
+
+        let status_ = status.clone();
+        thread::spawn(move || {
+            let mut output: Vec<O> =
+                vec![O::default(); output.sample_rate as usize * output.channels as usize];
+
+            while let Ok(buffer) = rx.recv() {
+                let frames = buffer.len() / input.channels as usize;
+                if swresample.convert(&buffer, &mut output, frames as i32) {
+                    if !sink.output(&output, frames as u32) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            status_.update(false);
+        });
+
         Ok(Self {
-            samples: Vec::with_capacity(frames),
-            input_buffer: Vec::with_capacity(48000),
-            output_buffer: vec![0.0; 48000],
-            sampler: if input != output {
-                Some(FastFixedIn::new(
-                    output / input,
-                    2.0,
-                    PolynomialDegree::Linear,
-                    frames,
-                    1,
-                )?)
-            } else {
-                None
-            },
+            _p: PhantomData::default(),
+            status,
+            tx,
         })
     }
 
-    pub fn resample<'a>(
-        &'a mut self,
-        buffer: &'a [i16],
-        channels: usize,
-    ) -> ResampleResult<&'a [i16]> {
-        if channels == 1 && self.sampler.is_none() {
-            Ok(buffer)
-        } else {
-            self.samples.clear();
-            self.input_buffer.clear();
+    pub fn resample<'a>(&'a mut self, buffer: &'a [I]) -> Result<(), AudioResamplerError> {
+        if !self.status.get() {
+            return Err(AudioResamplerError::QueueClosed);
+        }
 
-            for item in buffer.iter().step_by(channels) {
-                if self.sampler.is_none() {
-                    self.samples.push(*item);
-                } else {
-                    // need resample
-                    self.input_buffer.push(*item as f32);
-                }
-            }
+        self.tx
+            .send(buffer.to_vec())
+            .map_err(|_| AudioResamplerError::SendBufferError)?;
+        Ok(())
+    }
+}
 
-            if let Some(sampler) = &mut self.sampler {
-                let (_, size) = sampler.process_into_buffer(
-                    &[&self.input_buffer[..]],
-                    &mut [&mut self.output_buffer],
-                    None,
-                )?;
+struct Swresample(*mut SwrContext);
 
-                for item in &self.output_buffer[..size] {
-                    self.samples.push(*item as i16);
-                }
-            }
+unsafe impl Send for Swresample {}
+unsafe impl Sync for Swresample {}
 
-            Ok(&self.samples[..])
+impl Swresample {
+    fn new(input: &AudioSampleDescription, output: &AudioSampleDescription) -> Option<Self> {
+        let mut ctx = null_mut();
+        if unsafe {
+            swr_alloc_set_opts2(
+                &mut ctx,
+                &output.channel_layout(),
+                output.sample_bits.into(),
+                output.sample_rate as i32,
+                &input.channel_layout(),
+                input.sample_bits.into(),
+                output.sample_rate as i32,
+                0,
+                null_mut(),
+            )
+        } != 0
+        {
+            return None;
+        }
+
+        if unsafe { swr_init(ctx) } != 0 {
+            return None;
+        }
+
+        Some(Self(ctx))
+    }
+
+    fn convert<I, O>(&mut self, input: &[I], output: &mut [O], frames: i32) -> bool {
+        unsafe {
+            swr_convert(
+                self.0,
+                [output.as_mut_ptr() as _].as_ptr(),
+                frames,
+                [input.as_ptr() as _].as_ptr(),
+                frames,
+            ) >= 0
+        }
+    }
+}
+
+impl Drop for Swresample {
+    fn drop(&mut self) {
+        unsafe {
+            swr_free(&mut self.0);
         }
     }
 }
