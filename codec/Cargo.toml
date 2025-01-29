@@ -12,7 +12,8 @@ log = "0.4"
 thiserror = "2.0"
 common = { path = "../common", version = "0.2.0", package = "hylarana-common" }
 
-[target.'cfg(target_os = "windows")'.dependencies.mirror-ffmpeg-sys]
+[target.'cfg(target_os = "windows")'.dependencies.ffmpeg]
+package = "hylarana-ffmpeg-sys"
 default-features = false
 version = "0.1"
 features = [
@@ -22,7 +23,8 @@ features = [
     "qsv"
 ]
 
-[target.'cfg(not(target_os = "windows"))'.dependencies.mirror-ffmpeg-sys]
+[target.'cfg(not(target_os = "windows"))'.dependencies.ffmpeg]
+package = "hylarana-ffmpeg-sys"
 default-features = false
 version = "0.1"
 features = [

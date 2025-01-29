@@ -2,7 +2,7 @@ use common::{
     codec::{VideoDecoderType, VideoEncoderType},
     strings::PSTR,
 };
-use mirror_ffmpeg_sys::*;
+use ffmpeg::*;
 use thiserror::Error;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]

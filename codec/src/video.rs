@@ -10,7 +10,7 @@ use common::{
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
 };
 
-use mirror_ffmpeg_sys::*;
+use ffmpeg::*;
 use thiserror::Error;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]

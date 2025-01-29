@@ -3,7 +3,7 @@ use crate::codec::{set_option, set_str_option};
 use std::{ffi::c_int, ptr::null_mut};
 
 use common::{frame::AudioFrame, strings::PSTR};
-use mirror_ffmpeg_sys::*;
+use ffmpeg::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
