@@ -1,4 +1,4 @@
-use crate::{AudioCaptureSourceDescription, CaptureHandler, Source, SourceType};
+use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameArrived, Source, SourceType};
 
 use common::frame::AudioFrame;
 use cpal::{traits::*, Host, Stream, StreamConfig};
@@ -76,7 +76,7 @@ impl CaptureHandler for AudioCapture {
         Ok(sources)
     }
 
-    fn start<S: crate::FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
         arrived: S,
@@ -102,12 +102,6 @@ impl CaptureHandler for AudioCapture {
 
         let mut frame = AudioFrame::default();
         frame.sample_rate = options.sample_rate;
-
-        #[cfg(not(target_os = "macos"))]
-        type ISample = i16;
-
-        #[cfg(target_os = "macos")]
-        type ISample = f32;
 
         let mut resampler = AudioResampler::new(
             // config.sample_rate.0 as f64,
@@ -136,7 +130,7 @@ impl CaptureHandler for AudioCapture {
         let mut playing = true;
         let stream = device.build_input_stream(
             &config,
-            move |data: &[ISample], _| {
+            move |data: &[i16], _| {
                 // When any problem occurs in the process, you should not continue processing.
                 // If the cpal bottom layer continues to push audio samples, it should be
                 // ignored here and the process should not continue.
@@ -184,7 +178,7 @@ struct Output<S> {
 
 impl<S> AudioResamplerOutput<i16> for Output<S>
 where
-    S: crate::FrameArrived<Frame = AudioFrame> + 'static,
+    S: FrameArrived<Frame = AudioFrame> + 'static,
 {
     fn output(&mut self, buffer: &[i16], frames: u32) -> bool {
         self.frame.data = buffer.as_ptr();

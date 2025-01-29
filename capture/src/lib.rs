@@ -1,42 +1,44 @@
-mod audio;
-
 #[cfg(target_os = "windows")]
 mod win32 {
+    pub mod audio;
     pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "linux")]
 mod linux {
+    pub mod audio;
     pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "macos")]
 mod macos {
+    pub mod audio;
     pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "windows")]
 pub use self::win32::{
+    audio::{AudioCapture, AudioCaptureError},
     camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
 #[cfg(target_os = "linux")]
 pub use self::linux::{
+    audio::{AudioCapture, AudioCaptureError},
     camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
 #[cfg(target_os = "macos")]
 pub use self::macos::{
+    audio::{AudioCapture, AudioCaptureError},
     camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
-
-use self::audio::{AudioCapture, AudioCaptureError};
 
 #[cfg(target_os = "windows")]
 use common::win32::Direct3DDevice;
