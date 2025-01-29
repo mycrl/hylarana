@@ -1,6 +1,6 @@
 [package]
 name = "hylarana"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
@@ -12,10 +12,10 @@ thiserror = "2.0"
 bytes = "1.5"
 log = "0.4.20"
 parking_lot = "0.12"
-common = { path = "../common", version = "0.2.0", package = "hylarana-common" }
-transport = { path = "../transport", version = "0.2.0", package = "hylarana-transport" }
-renderer = { path = "../renderer", version = "0.2.0", package = "hylarana-renderer" }
-discovery = { path = "../discovery", version = "0.2.0", package = "hylarana-discovery" }
-capture = { path = "../capture", version = "0.2.0", package = "hylarana-capture" }
-codec = { path = "../codec", version = "0.2.0", package = "hylarana-codec" }
+common = { path = "../common", version = "0.3.0", package = "hylarana-common" }
+transport = { path = "../transport", version = "0.3.0", package = "hylarana-transport" }
+renderer = { path = "../renderer", version = "0.3.0", package = "hylarana-renderer" }
+discovery = { path = "../discovery", version = "0.3.0", package = "hylarana-discovery" }
+capture = { path = "../capture", version = "0.3.0", package = "hylarana-capture" }
+codec = { path = "../codec", version = "0.3.0", package = "hylarana-codec" }
 rodio = { version = "0.19.0", default-features = false }

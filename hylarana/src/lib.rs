@@ -1,5 +1,3 @@
-#![doc = include_str!("../README.md")]
-
 mod player;
 mod receiver;
 mod sender;

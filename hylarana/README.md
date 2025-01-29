@@ -10,7 +10,7 @@ Hylarana is a cross-platform screen casting SDK for writing screen casting appli
 hylarana does not need to specifically address cross-platform differences and feature flags:
 
 ```toml
-hylarana = "0.2"
+hylarana = "0.3"
 ```
 
 ### Creating a Sender

@@ -413,8 +413,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
         })
     }
 
-    /// Get the ID of the sender, each sender has an individual ID identifier,
-    /// you need to specify the ID of the sender when creating the receiver.
+    /// Get the media description information of the current sender. The media description is the information needed to create the receiver.
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
     }
