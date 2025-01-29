@@ -170,7 +170,7 @@ impl Swresample {
                 self.0,
                 [output.as_mut_ptr() as _].as_ptr(),
                 frames,
-                input.as_ptr() as _,
+                [input.as_ptr() as _].as_ptr(),
                 frames,
             ) >= 0
         }
