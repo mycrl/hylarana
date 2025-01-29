@@ -21,7 +21,7 @@
   <span>examples:</span>
   <a href="./examples/rust">rust</a>
   <span>/</span>
-  <a href="./examples/Android">Android</a>
+  <a href="./examples/Android">kotlin</a>
 </div>
 <div align="center">
   <span>watch the demo on youtube:</span>
