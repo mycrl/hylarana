@@ -413,7 +413,8 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
         })
     }
 
-    /// Get the media description information of the current sender. The media description is the information needed to create the receiver.
+    /// Get the media description information of the current sender. The media
+    /// description is the information needed to create the receiver.
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
     }

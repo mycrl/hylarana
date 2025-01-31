@@ -1,5 +1,4 @@
-const { exec } = require("node:child_process");
-const { join } = require("node:path");
+const child_process = require("node:child_process");
 const fs = require("node:fs");
 
 const Args = process.argv
@@ -18,7 +17,7 @@ const Command = (cmd, options = {}) =>
         (
             resolve,
             reject,
-            ps = exec(
+            ps = child_process.exec(
                 process.platform == "win32"
                     ? "$ProgressPreference = 'SilentlyContinue';" + cmd
                     : cmd,
@@ -39,59 +38,38 @@ const Command = (cmd, options = {}) =>
         }
     );
 
-const Replace = (file, filters) => {
-    let src = fs.readFileSync(file).toString();
-    for (const item of filters) {
-        src = src.replaceAll(...item);
+const SearchBuild = (package, subdir) => {
+    const Profile = Args.release ? "release" : "debug";
+
+    for (const dir of fs.readdirSync(`./target/${Profile}/build`)) {
+        const output = `./target/${Profile}/build/${dir}/out/${subdir}`;
+
+        if (dir.startsWith(package) && fs.existsSync(output)) {
+            return output;
+        }
     }
 
-    fs.writeFileSync(file, src);
+    return null;
 };
 
 /* async block */
 void (async () => {
     const Profile = Args.release ? "Release" : "Debug";
 
-    for (const path of ["./target", "./build", "./build/bin", "./build/lib"]) {
+    for (const path of ["./target", "./build", "./build/bin"]) {
         if (!fs.existsSync(path)) {
             fs.mkdirSync(path);
         }
     }
 
-    await Command(`cargo build ${Args.release ? "--release" : ""} -p hylarana-shared`);
     await Command(`cargo build ${Args.release ? "--release" : ""} -p hylarana-example`);
     await Command(`cargo build ${Args.release ? "--release" : ""} -p hylarana-server`);
 
-    /* download ffmpeg librarys for windows */
-    if (process.platform == "win32" || process.platform == "linux") {
-        const name = `ffmpeg-n7.1-latest-${
-            process.platform == "win32" ? "win64" : "linux64"
-        }-gpl-shared-7.1`;
-        const baseUri = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest";
-
-        if (!fs.existsSync("./target/ffmpeg")) {
-            if (process.platform == "win32") {
-                await Command(`Invoke-WebRequest -Uri ${baseUri}/${name}.zip -OutFile ffmpeg.zip`, {
-                    cwd: "./target",
-                });
-            } else {
-                await Command(`wget ${baseUri}/${name}.tar.xz -O ffmpeg.tar.xz -q`, {
-                    cwd: "./target",
-                });
-            }
-
-            if (process.platform == "win32") {
-                await Command("Expand-Archive -Path ffmpeg.zip -DestinationPath ./", {
-                    cwd: "./target",
-                });
-            } else {
-                await Command("tar -xf ffmpeg.tar.xz", { cwd: "./target" });
-            }
-
-            fs.renameSync(`./target/${name}`, "./target/ffmpeg");
-            fs.rmSync(`./target/ffmpeg.${process.platform == "win32" ? "zip" : "tar.xz"}`);
-        }
-    }
+    const CefOutputDir = SearchBuild("webview-sys", "cef");
+    const FFmpegOutputDir = SearchBuild(
+        "hylarana-ffmpeg-sys",
+        "ffmpeg-n7.1-latest-win64-gpl-shared-7.1"
+    );
 
     for (const item of [
         ["./README.md", "./build/README.md"],
@@ -107,9 +85,11 @@ void (async () => {
                 `./target/${Profile.toLowerCase()}/hylarana-server.exe`,
                 "./build/bin/hylarana-server.exe",
             ],
-            [`./target/ffmpeg/bin/avcodec-61.dll`, "./build/bin/avcodec-61.dll"],
-            [`./target/ffmpeg/bin/avutil-59.dll`, "./build/bin/avutil-59.dll"],
-            [`./target/ffmpeg/bin/swresample-5.dll`, "./build/bin/swresample-5.dll"],
+            [`${FFmpegOutputDir}/bin/avcodec-61.dll`, "./build/bin/avcodec-61.dll"],
+            [`${FFmpegOutputDir}/bin/avutil-59.dll`, "./build/bin/avutil-59.dll"],
+            [`${FFmpegOutputDir}/bin/swresample-5.dll`, "./build/bin/swresample-5.dll"],
+            [`${CefOutputDir}/Release`, "./build/bin"],
+            [`${CefOutputDir}/Resources`, "./build/bin"],
         ]) {
             fs.cpSync(...item, { force: true, recursive: true });
         }
@@ -124,7 +104,7 @@ void (async () => {
         for (const item of [
             [`./target/${Profile.toLowerCase()}/hylarana-example`, "./build/bin/example"],
             [`./target/${Profile.toLowerCase()}/hylarana-server`, "./build/bin/hylarana-server"],
-            [`./target/ffmpeg/lib`, "./build/lib"],
+            [`${FFmpegOutputDir}/lib`, "./build/bin"],
         ]) {
             fs.cpSync(...item, { force: true, recursive: true });
         }
@@ -132,7 +112,6 @@ void (async () => {
 
     if (process.platform == "win32") {
         for (const item of [
-            ["./target/debug/hylarana.pdb", "./build/bin/hylarana.pdb"],
             ["./target/debug/hylarana_server.pdb", "./build/bin/server.pdb"],
             ["./target/debug/hylarana_example.pdb", "./build/bin/example.pdb"],
         ]) {

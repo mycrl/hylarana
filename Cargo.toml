@@ -19,5 +19,6 @@ members = [
     "transport",
     "examples/rust", 
     "discovery",
-    "sdk/android/hylarana/src/main/ffi",
+    "sdk/android/hylarana/src/main/ffi", 
+    "app",
 ]
