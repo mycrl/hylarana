@@ -1,20 +1,26 @@
 use std::sync::Arc;
 
-use super::{ActiveEventLoop, Events, WindowHandler, WindowId};
+use super::{ActiveEventLoop, Events, EventsManager, WindowHandler, WindowId};
 use crate::RUNTIME;
 
 use anyhow::Result;
+use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
 use webview::{Observer, Page, PageOptions, PageState, Webview};
 
 pub struct MainWindow {
+    events_manager: EventsManager,
     webview: Arc<Webview>,
     page: Option<Arc<Page>>,
 }
 
 impl MainWindow {
-    pub fn new(webview: Arc<Webview>) -> Self {
+    const WIDTH: u32 = 1000;
+    const HEIGHT: u32 = 600;
+
+    pub fn new(events_manager: EventsManager, webview: Arc<Webview>) -> Self {
         Self {
             page: None,
+            events_manager,
             webview,
         }
     }
@@ -29,18 +35,30 @@ impl WindowHandler for MainWindow {
         match event {
             Events::EnableWindow => {
                 if self.page.is_none() {
-                    self.page.replace(RUNTIME.block_on(self.webview.create_page(
-                        "https://google.com",
-                        &PageOptions {
-                            frame_rate: 30,
-                            width: 400,
-                            height: 300,
-                            device_scale_factor: 1.0,
-                            is_offscreen: false,
-                            window_handle: None,
-                        },
-                        PageObserver,
-                    ))?);
+                    {
+                        let page = RUNTIME.block_on(self.webview.create_page(
+                            "webview://index.html",
+                            &PageOptions {
+                                frame_rate: 30,
+                                width: Self::WIDTH,
+                                height: Self::HEIGHT,
+                                device_scale_factor: 1.0,
+                                is_offscreen: false,
+                                window_handle: None,
+                            },
+                            PageObserver {
+                                events_manager: self.events_manager.clone(),
+                            },
+                        ))?;
+
+                        // The standalone windows created by cef have many limitations that cannot
+                        // be adjusted directly through configuration. Here the windows created by
+                        // cef are adjusted directly through the system's window management API.
+                        update_page_window_style(&page)?;
+
+                        page.set_devtools_state(true);
+                        self.page.replace(page);
+                    }
                 }
             }
             Events::DisableWindow => {
@@ -53,10 +71,60 @@ impl WindowHandler for MainWindow {
     }
 }
 
-struct PageObserver;
+struct PageObserver {
+    events_manager: EventsManager,
+}
 
 impl Observer for PageObserver {
     fn on_state_change(&self, state: PageState) {
-        println!("===================== {:?}", state)
+        if state == PageState::Close {
+            self.events_manager
+                .send(WindowId::Main, Events::DisableWindow);
+        }
     }
+}
+
+fn update_page_window_style(page: &Page) -> Result<()> {
+    if let RawWindowHandle::Win32(Win32WindowHandle { hwnd, .. }) = page.window_handle() {
+        #[cfg(target_os = "windows")]
+        {
+            use windows::Win32::{
+                Foundation::{HWND, RECT},
+                UI::WindowsAndMessaging::{
+                    AdjustWindowRectEx, GetWindowLongA, SetWindowLongA, SetWindowPos, GWL_STYLE,
+                    SWP_NOMOVE, SWP_NOZORDER, WINDOW_EX_STYLE, WS_MAXIMIZEBOX, WS_OVERLAPPEDWINDOW,
+                },
+            };
+
+            let mut rect = RECT::default();
+            rect.right = MainWindow::WIDTH as i32;
+            rect.bottom = MainWindow::HEIGHT as i32;
+
+            unsafe {
+                AdjustWindowRectEx(&mut rect, WS_OVERLAPPEDWINDOW, false, WINDOW_EX_STYLE(0))?;
+            }
+
+            let hwnd = HWND(hwnd.get() as _);
+            let mut style = unsafe { GetWindowLongA(hwnd, GWL_STYLE) };
+            style &= !WS_MAXIMIZEBOX.0 as i32;
+
+            unsafe {
+                SetWindowLongA(hwnd, GWL_STYLE, style);
+            }
+
+            unsafe {
+                SetWindowPos(
+                    hwnd,
+                    None,
+                    0,
+                    0,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top,
+                    SWP_NOMOVE | SWP_NOZORDER,
+                )?;
+            }
+        }
+    }
+
+    Ok(())
 }

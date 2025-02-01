@@ -33,11 +33,18 @@ struct App {
 
 impl App {
     async fn new(event_loop: Arc<EventLoopProxy<(WindowId, Events)>>) -> Result<Self> {
-        let webview = Webview::new(&WebviewOptions::default()).await?;
+        let events_manager = EventsManager::new(event_loop);
+
+        let webview = Webview::new(&WebviewOptions {
+            scheme_path: Some("C:/Users/panda/Desktop/hylarana/app/ui/dist"),
+            browser_subprocess_path: None,
+            cache_path: None,
+        })
+        .await?;
 
         Ok(Self {
-            windows_manager: WindowsManager::new(webview.clone()),
-            events_manager: EventsManager::new(event_loop),
+            windows_manager: WindowsManager::new(events_manager.clone(), webview.clone()),
+            events_manager,
             tray: None,
             webview,
         })
@@ -52,7 +59,7 @@ impl ApplicationHandler<(WindowId, Events)> for App {
         let events_manager = self.events_manager.clone();
         RUNTIME.spawn(async move {
             webview.wait_exit().await;
-            events_manager.broadcast(Events::CloseRequested).unwrap();
+            events_manager.broadcast(Events::CloseRequested);
         });
 
         self.tray.replace(
@@ -87,8 +94,7 @@ impl ApplicationHandler<(WindowId, Events)> for App {
                 TrayIconEvent::DoubleClick { button, .. } => {
                     if button == MouseButton::Left {
                         self.events_manager
-                            .send(WindowId::Main, Events::EnableWindow)
-                            .unwrap();
+                            .send(WindowId::Main, Events::EnableWindow);
                     }
                 }
                 _ => (),
@@ -104,9 +110,7 @@ impl ApplicationHandler<(WindowId, Events)> for App {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                self.events_manager
-                    .broadcast(Events::CloseRequested)
-                    .unwrap();
+                self.events_manager.broadcast(Events::CloseRequested);
             }
             _ => (),
         }

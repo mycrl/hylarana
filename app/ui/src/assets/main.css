@@ -1,0 +1,23 @@
+@font-face {
+    font-family: "inter";
+    src: url("./fonts/inter.ttf");
+}
+
+* {
+    padding: 0;
+    margin: 0;
+    font-size: 12px;
+    font-family: inter;
+}
+
+.click:hover {
+    cursor: pointer;
+}
+
+.transition {
+    transition: 0.3s;
+}
+
+html {
+    background-color: #555;
+}

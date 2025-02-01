@@ -7,7 +7,7 @@ use anyhow::Result;
 use webview::Webview;
 use winit::{event::WindowEvent, event_loop::ActiveEventLoop};
 
-use crate::events::Events;
+use crate::events::{Events, EventsManager};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum WindowId {
@@ -35,8 +35,11 @@ pub trait WindowHandler: Send {
 pub struct WindowsManager(Vec<Box<dyn WindowHandler + 'static>>);
 
 impl WindowsManager {
-    pub fn new(webview: Arc<Webview>) -> Self {
-        Self(vec![Box::new(main::MainWindow::new(webview.clone()))])
+    pub fn new(events_manager: EventsManager, webview: Arc<Webview>) -> Self {
+        Self(vec![Box::new(main::MainWindow::new(
+            events_manager,
+            webview,
+        ))])
     }
 }
 

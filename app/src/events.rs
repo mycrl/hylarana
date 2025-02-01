@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use winit::event_loop::EventLoopProxy;
 
 use crate::window::WindowId;
@@ -20,19 +19,17 @@ impl EventsManager {
         Self(event_loop)
     }
 
-    pub fn broadcast(&self, event: Events) -> Result<()> {
+    pub fn broadcast(&self, event: Events) {
         for it in WindowId::all() {
-            self.send(*it, event)?;
+            self.send(*it, event);
         }
-
-        Ok(())
     }
 
-    pub fn send(&self, id: WindowId, event: Events) -> Result<()> {
-        self.0.send_event((id, event))?;
-
-        log::info!("event manager, id={:?} event={:?}", id, event);
-
-        Ok(())
+    pub fn send(&self, id: WindowId, event: Events) {
+        if let Err(e) = self.0.send_event((id, event)) {
+            log::error!("failed to send event in manager, error={:?}", e);
+        } else {
+            log::info!("event manager, id={:?} event={:?}", id, event);
+        }
     }
 }
