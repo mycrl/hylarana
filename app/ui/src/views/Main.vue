@@ -1,21 +1,21 @@
 <template>
     <div id="Main">
         <MainHeader :type="type" @change="changeType" />
-        <Sender v-show="type == 'sender'" />
-        <Receiver v-show="type == 'receiver'" />
-        <Settings v-show="type == 'settings'" />
+        <Sender v-if="type == 'sender'" />
+        <Receiver v-if="type == 'receiver'" />
+        <Settings v-if="type == 'settings'" />
     </div>
 </template>
 
 <script setup>
 import MainHeader from "@/components/main/Header.vue";
 import Settings from "@/components/main/Settings.vue";
-import Sender from "@/components/main/Sender.vue";
+import Sender from "@/components/main/sender/Index.vue";
 import Receiver from "@/components/main/Receiver.vue";
 
 import { ref } from "vue";
 
-const type = ref("receiver");
+const type = ref("sender");
 
 function changeType(kind) {
     type.value = kind;

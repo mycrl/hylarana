@@ -1,20 +1,19 @@
 <template>
     <div id="Header">
-        <div id="icon">
-            <img
-                style="width: 20px"
+        <div id="navigation">
+            <FontAwesomeIcon
+                :icon="faGear"
                 v-show="props.type != 'settings'"
-                class="click transition"
-                src="@/assets/icons/settings.svg"
+                class="icon click transition"
                 @click="() => change('settings')"
             />
-            <img
+            <FontAwesomeIcon
+                :icon="faAngleLeft"
                 v-show="props.type == 'settings'"
-                class="click transition"
-                src="@/assets/icons/arrow_left.svg"
+                class="icon click transition"
                 @click="() => change('sender')"
             />
-            <span>{{ props.type != "settings" ? I18n.Settings : I18n.BackToHome }}</span>
+            <span>{{ props.type != "settings" ? Text.Settings : Text.BackToHome }}</span>
         </div>
         <div id="switch" v-show="props.type != 'settings'">
             <div
@@ -22,14 +21,14 @@
                 :id="props.type == 'sender' ? 'selected' : null"
                 @click="() => change('sender')"
             >
-                <p>{{ I18n.Sender }}</p>
+                <p>{{ Text.Sender }}</p>
             </div>
             <div
                 class="item click transition right"
                 :id="props.type == 'receiver' ? 'selected' : null"
                 @click="() => change('receiver')"
             >
-                <p>{{ I18n.Receiver }}</p>
+                <p>{{ Text.Receiver }}</p>
             </div>
         </div>
     </div>
@@ -37,7 +36,10 @@
 
 <script setup>
 import { ref } from "vue";
-import { I18n } from "@/i18n";
+import Text from "@/text";
+
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { faGear, faAngleLeft } from "@fortawesome/free-solid-svg-icons";
 
 const props = defineProps(["type"]);
 const emit = defineEmits(["change"]);
@@ -67,11 +69,16 @@ function change(kind) {
     margin-left: 300px;
 }
 
-#icon span {
+#navigation .icon {
+    color: #3951af;
+    font-size: 17px;
+}
+
+#navigation span {
     color: #555;
-    position: relative;
-    top: -7px;
     margin-left: 5px;
+    position: relative;
+    top: -2px;
 }
 
 #switch .item {

@@ -3,12 +3,12 @@
         <div id="content">
             <!-- system -->
             <div class="module">
-                <h1>{{ I18n.System.toLocaleUpperCase() }}</h1>
+                <h1>{{ Text.System }}</h1>
 
                 <!-- Language -->
                 <div class="item">
-                    <p>{{ I18n.Language }}:</p>
-                    <select :value="Language" @change="changeLanguage">
+                    <p>{{ Text.Language }}:</p>
+                    <select v-model="Settings.system.language" :disabled="disabled">
                         <option value="chinase">简体中文</option>
                         <option value="english">English</option>
                     </select>
@@ -17,7 +17,7 @@
 
             <!-- Network -->
             <div class="module">
-                <h1>{{ I18n.Network.toLocaleUpperCase() }}</h1>
+                <h1>{{ Text.Network }}</h1>
 
                 <!-- 
                 Interface
@@ -25,9 +25,31 @@
                 Bound NIC interfaces, 0.0.0.0 means all NICs are bound. 
                  -->
                 <div class="item">
-                    <p>{{ I18n.NetworkInterface }}:</p>
-                    <sub>{{ I18n.NetworkInterfaceTips }}</sub>
-                    <input type="text" value="0.0.0.0" />
+                    <p>{{ Text.NetworkInterface }}:</p>
+                    <sub>{{ Text.NetworkInterfaceHelp }}</sub>
+                    <input type="text" v-model="Settings.network.interface" :disabled="disabled" />
+                </div>
+
+                <!-- 
+                Multicast
+
+                The IP address used for multicast, the default is 239.0.0.1.
+                 -->
+                <div class="item">
+                    <p>{{ Text.NetworkMulticast }}:</p>
+                    <sub>{{ Text.NetworkMulticastHelp }}</sub>
+                    <input type="text" v-model="Settings.network.multicast" :disabled="disabled" />
+                </div>
+
+                <!-- 
+                Server
+
+                The address of the forwarding server, such as 192.168.1.100:8080.
+                 -->
+                <div class="item">
+                    <p>{{ Text.NetworkServer }}:</p>
+                    <sub>{{ Text.NetworkServerHelp }}</sub>
+                    <input type="text" v-model="Settings.network.server" :disabled="disabled" />
                 </div>
 
                 <!-- 
@@ -38,15 +60,19 @@
                 communicated in a single network layer transaction.
                 -->
                 <div class="item">
-                    <p>{{ I18n.NetworkMtu }}:</p>
-                    <sub>{{ I18n.NetworkMtuTips }}</sub>
-                    <input type="number" value="1500" />
+                    <p>{{ Text.NetworkMtu }}:</p>
+                    <sub>{{ Text.NetworkMtuHelp }}</sub>
+                    <input
+                        type="number"
+                        v-model.number="Settings.network.mtu"
+                        :disabled="disabled"
+                    />
                 </div>
             </div>
 
             <!-- Codec -->
             <div class="module">
-                <h1>{{ I18n.Codec.toLocaleUpperCase() }}</h1>
+                <h1>{{ Text.Codec }}</h1>
 
                 <!-- 
                 Decoder
@@ -54,13 +80,10 @@
                 Video decoder, H264 is a software decoder with the best compatibility.
                 -->
                 <div class="item">
-                    <p>{{ I18n.CodecDecoder }}:</p>
-                    <sub>{{ I18n.CodecDecoderTips }}</sub>
-                    <select>
-                        <option value="h264">H264</option>
-                        <option value="d3d11va">D3D11VA - Windows</option>
-                        <option value="qsv">Intel QSV - Windows</option>
-                        <option value="videotoolbox">VideoToolbox - Apple</option>
+                    <p>{{ Text.CodecDecoder }}:</p>
+                    <sub>{{ Text.CodecDecoderHelp }}</sub>
+                    <select v-model="Settings.codec.decoder" :disabled="disabled">
+                        <option v-for="(v, k) in VideoDecoders" :value="k">{{ v }}</option>
                     </select>
                 </div>
 
@@ -70,19 +93,17 @@
                 Video encoder, X264 is a software encoder with the best compatibility.
                 -->
                 <div class="item">
-                    <p>{{ I18n.CodecEncoder }}:</p>
-                    <sub>{{ I18n.CodecEncoderTips }}</sub>
-                    <select>
-                        <option value="x264">X264</option>
-                        <option value="qsv">Intel QSV - Windows</option>
-                        <option value="videotoolbox">VideoToolbox - Apple</option>
+                    <p>{{ Text.CodecEncoder }}:</p>
+                    <sub>{{ Text.CodecEncoderHelp }}</sub>
+                    <select v-model="Settings.codec.encoder" :disabled="disabled">
+                        <option v-for="(v, k) in VideoEncoders" :value="k">{{ v }}</option>
                     </select>
                 </div>
             </div>
 
             <!-- Video -->
             <div class="module">
-                <h1>{{ I18n.Video.toLocaleUpperCase() }}</h1>
+                <h1>{{ Text.Video }}</h1>
 
                 <!-- 
                 Size 
@@ -90,11 +111,20 @@
                 The width and height of the video on the sender side.
                 -->
                 <div class="item">
-                    <p>{{ I18n.VideoSize }}:</p>
-                    <sub>{{ I18n.VideoSizeTips }}</sub>
+                    <p>{{ Text.VideoSize }}:</p>
+                    <sub>{{ Text.VideoSizeHelp }}</sub>
                     <div>
-                        <input type="number" value="1280" /> -
-                        <input type="number" value="720" />
+                        <input
+                            type="number"
+                            v-model.number="Settings.video.size.width"
+                            :disabled="disabled"
+                        />
+                        -
+                        <input
+                            type="number"
+                            v-model.number="Settings.video.size.height"
+                            :disabled="disabled"
+                        />
                     </div>
                 </div>
 
@@ -104,9 +134,13 @@
                 The refresh rate of the video is usually 24 / 30 / 60.
                 -->
                 <div class="item">
-                    <p>{{ I18n.VideoFrameRate }}:</p>
-                    <sub>{{ I18n.VideoFrameRateTips }}</sub>
-                    <input type="number" value="24" />
+                    <p>{{ Text.VideoFrameRate }}:</p>
+                    <sub>{{ Text.VideoFrameRateHelp }}</sub>
+                    <input
+                        type="number"
+                        v-model.number="Settings.video.frameRate"
+                        :disabled="disabled"
+                    />
                 </div>
 
                 <!-- 
@@ -115,9 +149,13 @@
                 The bit rate of the video stream, in bit/s.
                 -->
                 <div class="item">
-                    <p>{{ I18n.BitRate }}:</p>
-                    <sub>{{ I18n.VideoBitRateTips }}</sub>
-                    <input type="number" value="10000000" />
+                    <p>{{ Text.BitRate }}:</p>
+                    <sub>{{ Text.VideoBitRateHelp }}</sub>
+                    <input
+                        type="number"
+                        v-model.number="Settings.video.bitRate"
+                        :disabled="disabled"
+                    />
                 </div>
 
                 <!-- 
@@ -127,15 +165,19 @@
                 the video frame rate, which helps reduce the size of the video stream.
                 -->
                 <div class="item">
-                    <p>{{ I18n.VideoKeyFrameInterval }}:</p>
-                    <sub>{{ I18n.VideoKeyFrameIntervalTips }}</sub>
-                    <input type="number" value="24" />
+                    <p>{{ Text.VideoKeyFrameInterval }}:</p>
+                    <sub>{{ Text.VideoKeyFrameIntervalHelp }}</sub>
+                    <input
+                        type="number"
+                        v-model.number="Settings.video.keyFrameInterval"
+                        :disabled="disabled"
+                    />
                 </div>
             </div>
 
             <!-- Audio -->
             <div class="module">
-                <h1>{{ I18n.Audio.toLocaleUpperCase() }}</h1>
+                <h1>{{ Text.Audio }}</h1>
 
                 <!-- 
                 SampleRate 
@@ -143,9 +185,13 @@
                 The audio sampling rate is recommended to be 48Khz.
                 -->
                 <div class="item">
-                    <p>{{ I18n.AudioSampleRate }}:</p>
-                    <sub>{{ I18n.AudioSampleRateTips }}</sub>
-                    <input type="number" value="48000" />
+                    <p>{{ Text.AudioSampleRate }}:</p>
+                    <sub>{{ Text.AudioSampleRateHelp }}</sub>
+                    <input
+                        type="number"
+                        v-model.number="Settings.audio.sampleRate"
+                        :disabled="disabled"
+                    />
                 </div>
 
                 <!-- 
@@ -154,25 +200,36 @@
                 The bit rate of the audio stream, in bit/s.
                 -->
                 <div class="item">
-                    <p>{{ I18n.BitRate }}:</p>
-                    <sub>{{ I18n.AudioBitRateTips }}</sub>
-                    <input type="number" value="64000" />
+                    <p>{{ Text.BitRate }}:</p>
+                    <sub>{{ Text.AudioBitRateHelp }}</sub>
+                    <input
+                        type="number"
+                        v-model.number="Settings.audio.bitRate"
+                        :disabled="disabled"
+                    />
                 </div>
             </div>
         </div>
 
         <!-- apply button -->
-        <button id="apply" class="click">
-            {{ I18n.Apply }}
+        <button v-if="!disabled" id="apply" class="click" @click="submit">
+            {{ Text.Apply }}
         </button>
     </div>
 </template>
 
 <script setup>
-import { I18n, Language, setLanguage } from "@/i18n";
+import { ref } from "vue";
 
-function changeLanguage({ target }) {
-    setLanguage(target.value);
+import Text from "@/text";
+import Settings, { updateSettings, VideoEncoders, VideoDecoders } from "@/settings";
+
+const disabled = ref(false);
+
+function submit() {
+    updateSettings();
+
+    disabled.value = true;
 }
 </script>
 
@@ -202,6 +259,7 @@ function changeLanguage({ target }) {
     margin-bottom: 20px;
     color: #829bff;
     font-weight: 300;
+    text-transform: uppercase;
 }
 
 #content .module .item {
@@ -219,13 +277,6 @@ function changeLanguage({ target }) {
 #content .module .item input,
 #content .module .item select {
     width: 214px;
-    line-height: 30px;
-    height: 30px;
-    border-radius: 5px;
-    background-color: #eee;
-    border: 1px solid #ddd;
-    text-indent: 10px;
-    color: #000;
     margin: 2px 0;
 }
 

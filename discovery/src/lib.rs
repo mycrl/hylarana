@@ -25,6 +25,7 @@ impl DiscoveryService {
     /// customized data to the published service.
     pub fn register<P: Serialize + Debug>(
         port: u16,
+        name: &str,
         properties: &P,
     ) -> Result<Self, DiscoveryError> {
         let mdns = ServiceDaemon::new()?;
@@ -34,7 +35,7 @@ impl DiscoveryService {
         mdns.register(
             ServiceInfo::new(
                 "_hylarana._udp.local.",
-                "sender",
+                name,
                 &format!("{}._hylarana._udp.local.", id),
                 "",
                 port,
@@ -44,7 +45,7 @@ impl DiscoveryService {
         )?;
 
         log::info!(
-            "discovery service register sender, port={}, id={}, properties={:?}",
+            "discovery service register, port={}, id={}, properties={:?}",
             port,
             id,
             properties
@@ -56,7 +57,7 @@ impl DiscoveryService {
     /// Query the registered service, the service type is fixed, when the query
     /// is published the callback function will call back all the network
     /// addresses of the service publisher as well as the attribute information.
-    pub fn query<P: DeserializeOwned + Debug, T: Fn(Vec<Ipv4Addr>, P) + Send + 'static>(
+    pub fn query<P: DeserializeOwned + Debug, T: Fn(&str, Vec<Ipv4Addr>, P) + Send + 'static>(
         func: T,
     ) -> Result<Self, DiscoveryError> {
         let mdns = ServiceDaemon::new()?;
@@ -74,13 +75,15 @@ impl DiscoveryService {
                         .collect::<Vec<_>>();
 
                     log::info!(
-                        "discovery service query a sender, host={}, address={:?}, properties={:?}",
+                        "discovery service query, host={}, address={:?}, properties={:?}",
                         info.get_hostname(),
                         addrs,
                         properties,
                     );
 
-                    func(addrs, properties);
+                    if let Some((name, _)) = info.get_fullname().split_once('.') {
+                        func(name, addrs, properties);
+                    }
                 }
 
                 Ok::<(), DiscoveryError>(())
@@ -89,10 +92,8 @@ impl DiscoveryService {
             loop {
                 match receiver.recv() {
                     Ok(ServiceEvent::ServiceResolved(info)) => {
-                        if info.get_fullname() == "sender._hylarana._udp.local." {
-                            if let Err(e) = process(info) {
-                                log::warn!("discovery service resolved error={:?}", e);
-                            }
+                        if let Err(e) = process(info) {
+                            log::warn!("discovery service resolved error={:?}", e);
                         }
                     }
                     Err(e) => {

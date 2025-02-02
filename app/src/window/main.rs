@@ -4,8 +4,10 @@ use super::{ActiveEventLoop, Events, EventsManager, WindowHandler, WindowId};
 use crate::RUNTIME;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
-use webview::{Observer, Page, PageOptions, PageState, Webview};
+use serde::{Deserialize, Serialize};
+use webview::{Observer, Page, PageOptions, PageState, Webview, BridgeObserver};
 
 pub struct MainWindow {
     events_manager: EventsManager,
@@ -57,6 +59,7 @@ impl WindowHandler for MainWindow {
                         update_page_window_style(&page)?;
 
                         page.set_devtools_state(true);
+                        page.on_bridge(PageHandler);
                         self.page.replace(page);
                     }
                 }
@@ -127,4 +130,30 @@ fn update_page_window_style(page: &Page) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+enum Request {
+}
+
+#[derive(Debug, Serialize)]
+enum Response {
+
+}
+
+struct PageHandler;
+
+#[async_trait]
+impl BridgeObserver for PageHandler {
+    type Req = Request;
+    type Res = Option<Response>;
+    type Err = anyhow::Error;
+
+    async fn on(&self, req: Self::Req) -> Result<Self::Res, Self::Err> {
+        match req {
+
+        }
+
+        todo!()
+    }
 }

@@ -327,14 +327,17 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_registerDiscoverySer
     mut env: JNIEnv,
     _this: JClass,
     port: jint,
+    name: JString,
     description: JString,
 ) -> *const DiscoveryService {
     ok_or_check(&mut env, |env| {
+        let name: String = env.get_string(&name)?.into();
         let description: String = env.get_string(&description)?.into();
         let description: MediaStreamDescription = serde_json::from_str(&description)?;
 
         Ok(Box::into_raw(Box::new(DiscoveryService::register(
             port as u16,
+            &name,
             &description,
         )?)))
     })
@@ -355,8 +358,8 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_queryDiscoveryServic
         let observer = DiscoveryServiceObserver(env.new_global_ref(observer)?);
 
         Ok(Box::into_raw(Box::new(DiscoveryService::query(
-            move |addrs, description: MediaStreamDescription| {
-                if let Err(e) = observer.resolve(&addrs, &description) {
+            move |name, addrs, description: MediaStreamDescription| {
+                if let Err(e) = observer.resolve(name, &addrs, &description) {
                     log::warn!("{:?}", e);
                 }
             },

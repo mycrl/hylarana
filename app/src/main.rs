@@ -1,3 +1,4 @@
+mod discovery;
 mod events;
 mod window;
 
@@ -34,13 +35,13 @@ struct App {
 impl App {
     async fn new(events_manager: EventsManager) -> Result<Self> {
         let webview = Webview::new(&WebviewOptions {
+            browser_subprocess_path: None,
+            cache_path: None,
             scheme_path: Some(
                 &option_env!("SCHEME_PATH")
                     .map(|it| it.to_string())
                     .unwrap_or_else(|| format!("{}/ui/dist/", env!("CARGO_MANIFEST_DIR"))),
             ),
-            browser_subprocess_path: None,
-            cache_path: None,
         })
         .await?;
 

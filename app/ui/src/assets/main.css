@@ -21,3 +21,14 @@
 html {
     background-color: #555;
 }
+
+input,
+select {
+    line-height: 30px;
+    height: 30px;
+    border-radius: 5px;
+    background-color: #eee;
+    border: 1px solid #ddd;
+    text-indent: 10px;
+    color: #000;
+}

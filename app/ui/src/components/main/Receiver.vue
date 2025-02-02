@@ -2,16 +2,16 @@
     <div id="Receiver">
         <div id="switch">
             <div class="body">
-                <span>{{ I18n.AutoAllow }}</span>
+                <span>{{ Text.AutoAllow }}</span>
                 <Switch :value="false" />
             </div>
-            <p>{{ I18n.AutoAllowTips }}</p>
+            <p>{{ Text.AutoAllowHelp }}</p>
         </div>
     </div>
 </template>
 
 <script setup>
-import { I18n } from "@/i18n";
+import Text from "@/text";
 
 import Switch from "@/components/Switch.vue";
 </script>

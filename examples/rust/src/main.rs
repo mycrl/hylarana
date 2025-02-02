@@ -103,7 +103,7 @@ impl Sender {
         // Register the current sender's information with the LAN discovery service so
         // that other receivers can know that the sender has been created and can access
         // the sender's information.
-        let discovery = DiscoveryService::register(3456, sender.get_description())?;
+        let discovery = DiscoveryService::register(3456, "sender", sender.get_description())?;
 
         Ok(Self { discovery, sender })
     }
@@ -222,13 +222,15 @@ impl ApplicationHandler<Events> for App {
                                     let event_loop = self.event_loop.clone();
                                     self.service.replace(
                                         DiscoveryService::query(
-                                            move |addrs, description: MediaStreamDescription| {
-                                                event_loop
+                                            move |name, addrs, description: MediaStreamDescription| {
+                                                if name == "sender" {
+                                                    event_loop
                                                     .send_event(Events::CreateReceiver(
                                                         addrs,
                                                         description,
                                                     ))
                                                     .unwrap();
+                                                }
                                             },
                                         )
                                         .unwrap(),
