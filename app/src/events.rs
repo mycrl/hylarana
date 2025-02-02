@@ -15,8 +15,8 @@ pub enum Events {
 pub struct EventsManager(Arc<EventLoopProxy<(WindowId, Events)>>);
 
 impl EventsManager {
-    pub fn new(event_loop: Arc<EventLoopProxy<(WindowId, Events)>>) -> Self {
-        Self(event_loop)
+    pub fn new(event_loop: EventLoopProxy<(WindowId, Events)>) -> Self {
+        Self(Arc::new(event_loop))
     }
 
     pub fn broadcast(&self, event: Events) {

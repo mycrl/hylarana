@@ -14,7 +14,7 @@ use webview::{execute_subprocess, is_subprocess, Webview, WebviewOptions};
 use winit::{
     application::ApplicationHandler,
     event::{StartCause, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
 };
 
 use self::{
@@ -32,11 +32,13 @@ struct App {
 }
 
 impl App {
-    async fn new(event_loop: Arc<EventLoopProxy<(WindowId, Events)>>) -> Result<Self> {
-        let events_manager = EventsManager::new(event_loop);
-
+    async fn new(events_manager: EventsManager) -> Result<Self> {
         let webview = Webview::new(&WebviewOptions {
-            scheme_path: Some("C:/Users/panda/Desktop/hylarana/app/ui/dist"),
+            scheme_path: Some(
+                &option_env!("SCHEME_PATH")
+                    .map(|it| it.to_string())
+                    .unwrap_or_else(|| format!("{}/ui/dist/", env!("CARGO_MANIFEST_DIR"))),
+            ),
             browser_subprocess_path: None,
             cache_path: None,
         })
@@ -141,8 +143,8 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::<(WindowId, Events)>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let proxy = Arc::new(event_loop.create_proxy());
-    event_loop.run_app(&mut RUNTIME.block_on(App::new(proxy))?)?;
+    let events_manager = EventsManager::new(event_loop.create_proxy());
+    event_loop.run_app(&mut RUNTIME.block_on(App::new(events_manager))?)?;
 
     shutdown()?;
     Ok(())
