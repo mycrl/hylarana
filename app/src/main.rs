@@ -25,6 +25,8 @@ use self::{
 
 static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
+static CACHE_PATH: Lazy<String> = Lazy::new(|| format!("{}/ui/dist/", env!("CARGO_MANIFEST_DIR")));
+
 struct App {
     webview: Arc<Webview>,
     windows_manager: WindowsManager,
@@ -36,7 +38,7 @@ impl App {
     async fn new(events_manager: EventsManager) -> Result<Self> {
         let webview = Webview::new(&WebviewOptions {
             browser_subprocess_path: None,
-            cache_path: None,
+            cache_path: Some(&CACHE_PATH),
             scheme_path: Some(
                 &option_env!("SCHEME_PATH")
                     .map(|it| it.to_string())
