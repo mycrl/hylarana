@@ -18,6 +18,7 @@ export const DefaultSystemSender = {
 };
 
 export const DefaultSystem = {
+    deviceName: Date.now().toString(),
     language: "english",
     sender: DefaultSystemSender,
 };
@@ -65,8 +66,8 @@ if (!localStorage.Settings) {
 
 const Settings = ref(JSON.parse(localStorage.getItem("Settings")));
 
-export default Settings;
-
-export function updateSettings() {
+export function update() {
     localStorage.setItem("Settings", JSON.stringify(Settings.value));
 }
+
+export default Settings;

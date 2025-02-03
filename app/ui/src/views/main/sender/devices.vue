@@ -14,6 +14,42 @@
                     <span>192.168.0.100</span>
                 </div>
             </div>
+            <div class="device click">
+                <div class="logo">
+                    <FontAwesomeIcon class="icon" :icon="faTablet" />
+                </div>
+                <div class="info">
+                    <p>Apple Lepidodendraceae</p>
+                    <span>192.168.0.100</span>
+                </div>
+            </div>
+            <div class="device click">
+                <div class="logo">
+                    <FontAwesomeIcon class="icon" :icon="faTablet" />
+                </div>
+                <div class="info">
+                    <p>Apple Lepidodendraceae</p>
+                    <span>192.168.0.100</span>
+                </div>
+            </div>
+            <div class="device click">
+                <div class="logo">
+                    <FontAwesomeIcon class="icon" :icon="faTablet" />
+                </div>
+                <div class="info">
+                    <p>Apple Lepidodendraceae</p>
+                    <span>192.168.0.100</span>
+                </div>
+            </div>
+            <div class="device click">
+                <div class="logo">
+                    <FontAwesomeIcon class="icon" :icon="faTablet" />
+                </div>
+                <div class="info">
+                    <p>Apple Lepidodendraceae</p>
+                    <span>192.168.0.100</span>
+                </div>
+            </div>
             <span id="tips">{{ Text.DevicesSearchHelp }}</span>
         </div>
     </div>
@@ -42,18 +78,23 @@ import { faTablet, faMobile } from "@fortawesome/free-solid-svg-icons";
 }
 
 .items {
-    height: 310px;
-    padding-top: 10px;
+    width: 965px;
+    height: 320px;
     position: relative;
+    display: table;
+    left: -5px;
 }
 
 .items #tips {
     position: absolute;
+    left: 0;
     bottom: 5px;
     width: 100%;
     text-align: center;
     color: #999;
     z-index: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .items .device {
@@ -61,8 +102,11 @@ import { faTablet, faMobile } from "@fortawesome/free-solid-svg-icons";
     background-color: #eee;
     border-radius: 5px;
     height: 50px;
-    width: 210px;
+    width: 234px;
     display: flex;
+    margin-left: 5px;
+    margin-top: 5px;
+    float: left;
 }
 
 .items .device .logo {

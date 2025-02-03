@@ -8,10 +8,10 @@
 </template>
 
 <script setup>
-import MainHeader from "@/components/main/Header.vue";
-import Settings from "@/components/main/Settings.vue";
-import Sender from "@/components/main/sender/Index.vue";
-import Receiver from "@/components/main/Receiver.vue";
+import MainHeader from "./header.vue";
+import Settings from "./settings.vue";
+import Sender from "./sender/index.vue";
+import Receiver from "./receiver.vue";
 
 import { ref } from "vue";
 

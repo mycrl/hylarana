@@ -4,6 +4,12 @@
             <!-- system -->
             <div class="module">
                 <h1>{{ Text.System }}</h1>
+                
+                <!-- Device Name -->
+                <div class="item">
+                    <p>{{ Text.DeviceName }}:</p>
+                    <input type="text" v-model="Settings.system.deviceName" :disabled="disabled" />
+                </div>
 
                 <!-- Language -->
                 <div class="item">
@@ -222,7 +228,7 @@
 import { ref } from "vue";
 
 import Text from "@/text";
-import Settings, { updateSettings, VideoEncoders, VideoDecoders } from "@/settings";
+import Settings, { update as updateSettings, VideoEncoders, VideoDecoders } from "@/settings";
 
 const disabled = ref(false);
 

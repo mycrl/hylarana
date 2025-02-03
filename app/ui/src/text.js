@@ -2,6 +2,7 @@ import { computed } from "vue";
 import Settings from "./settings";
 
 const Chinase = {
+    DeviceName: "设备名称",
     Type: "类型",
     System: "系统",
     Language: "语言",
@@ -51,6 +52,7 @@ const Chinase = {
 };
 
 const English = {
+    DeviceName: "device name",
     Type: "type",
     System: "system",
     Language: "language",
@@ -105,8 +107,6 @@ export const LanguageMapping = {
     english: English,
 };
 
-const Text = computed(() => {
+export default computed(() => {
     return LanguageMapping[Settings.value.system.language];
 });
-
-export default Text;

@@ -13,7 +13,7 @@
 <script setup>
 import Text from "@/text";
 
-import Switch from "@/components/Switch.vue";
+import Switch from "@/components/switch.vue";
 </script>
 
 <style scoped>

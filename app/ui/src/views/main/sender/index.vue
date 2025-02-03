@@ -13,7 +13,9 @@
             </div>
             <div id="control">
                 <Info />
-                <div id="settings"></div>
+                <div id="settings">
+                    
+                </div>
             </div>
         </div>
     </div>
@@ -21,10 +23,10 @@
 
 <script setup>
 import Text from "@/text";
-import Settings, { updateSettings } from "@/settings";
-import Switch from "@/components/Switch.vue";
-import Info from "./Info.vue";
-import Devices from "./Devices.vue";
+import Settings, { update as updateSettings } from "@/settings";
+import Switch from "@/components/switch.vue";
+import Info from "./info.vue";
+import Devices from "./devices.vue";
 
 function setBroadcast(it) {
     Settings.value.system.sender.broadcast = it;
@@ -83,5 +85,9 @@ function setBroadcast(it) {
 
 #content #control > div {
     flex: 1;
+}
+    
+#control #settings {
+    display: flex;
 }
 </style>
