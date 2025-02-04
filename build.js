@@ -83,6 +83,7 @@ void (async () => {
         for (const item of [
             [`./target/${Profile}/hylarana-example.exe`, "./target/build/hylarana-example.exe"],
             [`./target/${Profile}/hylarana-server.exe`, "./target/build/hylarana-server.exe"],
+            [`./target/${Profile}/hylarana-app.exe`, "./target/build/hylarana-app.exe"],
             [`${FFmpegOutputDir}/bin/avcodec-61.dll`, "./target/build/avcodec-61.dll"],
             [`${FFmpegOutputDir}/bin/avutil-59.dll`, "./target/build/avutil-59.dll"],
             [`${FFmpegOutputDir}/bin/swresample-5.dll`, "./target/build/swresample-5.dll"],
@@ -95,6 +96,7 @@ void (async () => {
         for (const item of [
             [`./target/${Profile}/hylarana-example`, "./target/build/hylarana-example"],
             [`./target/${Profile}/hylarana-server`, "./target/build/hylarana-server"],
+            [`./target/${Profile}/hylarana-app`, "./target/build/hylarana-app"],
         ]) {
             fs.cpSync(...item, DefaultFsOptions);
         }
@@ -102,6 +104,7 @@ void (async () => {
         for (const item of [
             [`./target/${Profile}/hylarana-example`, "./target/build/hylarana-example"],
             [`./target/${Profile}/hylarana-server`, "./target/build/hylarana-server"],
+            [`./target/${Profile}/hylarana-app`, "./target/build/hylarana-app"],
             [`${FFmpegOutputDir}/lib`, "./target/build/"],
         ]) {
             fs.cpSync(...item, DefaultFsOptions);
@@ -110,8 +113,9 @@ void (async () => {
 
     if (process.platform == "win32") {
         for (const item of [
-            ["./target/debug/hylarana_server.pdb", "./target/build/hylarana-server.pdb"],
             ["./target/debug/hylarana_example.pdb", "./target/build/hylarana-example.pdb"],
+            ["./target/debug/hylarana_server.pdb", "./target/build/hylarana-server.pdb"],
+            ["./target/debug/hylarana_app.pdb", "./target/build/hylarana-app.pdb"],
         ]) {
             if (!Args.release) {
                 fs.cpSync(...item, DefaultFsOptions);

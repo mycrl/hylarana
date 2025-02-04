@@ -1,4 +1,5 @@
-mod discovery;
+mod devices;
+mod env;
 mod events;
 mod window;
 
@@ -19,15 +20,15 @@ use winit::{
 };
 
 use self::{
+    env::Env,
     events::Events,
     window::{WindowId, WindowsManager},
 };
 
 static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
-static CACHE_PATH: Lazy<String> = Lazy::new(|| format!("{}/ui/dist/", env!("CARGO_MANIFEST_DIR")));
-
 struct App {
+    env: Arc<Env>,
     webview: Arc<Webview>,
     windows_manager: WindowsManager,
     events_manager: EventsManager,
@@ -35,15 +36,11 @@ struct App {
 }
 
 impl App {
-    async fn new(events_manager: EventsManager) -> Result<Self> {
+    async fn new(env: Arc<Env>, events_manager: EventsManager) -> Result<Self> {
         let webview = Webview::new(&WebviewOptions {
             browser_subprocess_path: None,
-            cache_path: Some(&CACHE_PATH),
-            scheme_path: Some(
-                &option_env!("SCHEME_PATH")
-                    .map(|it| it.to_string())
-                    .unwrap_or_else(|| format!("{}/ui/dist/", env!("CARGO_MANIFEST_DIR"))),
-            ),
+            cache_path: Some(&env.cache_path),
+            scheme_path: Some(&env.scheme_path),
         })
         .await?;
 
@@ -52,6 +49,7 @@ impl App {
             events_manager,
             tray: None,
             webview,
+            env,
         })
     }
 }
@@ -146,8 +144,9 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::<(WindowId, Events)>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);
 
+    let env = Arc::new(Env::default());
     let events_manager = EventsManager::new(event_loop.create_proxy());
-    event_loop.run_app(&mut RUNTIME.block_on(App::new(events_manager))?)?;
+    event_loop.run_app(&mut RUNTIME.block_on(App::new(env, events_manager))?)?;
 
     shutdown()?;
     Ok(())

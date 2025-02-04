@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
 use serde::{Deserialize, Serialize};
-use webview::{Observer, Page, PageOptions, PageState, Webview, BridgeObserver};
+use webview::{BridgeObserver, Observer, Page, PageOptions, PageState, Webview};
 
 pub struct MainWindow {
     events_manager: EventsManager,
@@ -39,7 +39,7 @@ impl WindowHandler for MainWindow {
                 if self.page.is_none() {
                     {
                         let page = RUNTIME.block_on(self.webview.create_page(
-                            "webview://index.html",
+                            "http://localhost:5173",
                             &PageOptions {
                                 frame_rate: 30,
                                 width: Self::WIDTH,
@@ -133,13 +133,10 @@ fn update_page_window_style(page: &Page) -> Result<()> {
 }
 
 #[derive(Debug, Deserialize)]
-enum Request {
-}
+enum Request {}
 
 #[derive(Debug, Serialize)]
-enum Response {
-
-}
+enum Response {}
 
 struct PageHandler;
 
@@ -150,9 +147,7 @@ impl BridgeObserver for PageHandler {
     type Err = anyhow::Error;
 
     async fn on(&self, req: Self::Req) -> Result<Self::Res, Self::Err> {
-        match req {
-
-        }
+        match req {}
 
         todo!()
     }

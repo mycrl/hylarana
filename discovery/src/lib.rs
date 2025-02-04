@@ -1,9 +1,15 @@
-use std::{fmt::Debug, net::Ipv4Addr, thread};
+use std::{fmt::Debug, net::Ipv4Addr, sync::atomic::{AtomicBool, Ordering}, thread};
 
 use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent, ServiceInfo};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Server,
+    Client,
+}
 
 #[derive(Debug, Error)]
 pub enum DiscoveryError {
@@ -17,7 +23,11 @@ pub enum DiscoveryError {
 ///
 /// which exposes its services through the MDNS protocol
 /// and can allow other nodes or clients to discover the current service.
-pub struct DiscoveryService(ServiceDaemon);
+pub struct DiscoveryService {
+    kind: Kind, 
+    runing: AtomicBool,
+    service: ServiceDaemon,
+}
 
 impl DiscoveryService {
     /// Register the service, the service type is fixed, you can customize the
@@ -28,11 +38,11 @@ impl DiscoveryService {
         name: &str,
         properties: &P,
     ) -> Result<Self, DiscoveryError> {
-        let mdns = ServiceDaemon::new()?;
-        mdns.disable_interface(IfKind::IPv6)?;
+        let service = ServiceDaemon::new()?;
+        service.disable_interface(IfKind::IPv6)?;
 
         let id = Uuid::new_v4().to_string();
-        mdns.register(
+        service.register(
             ServiceInfo::new(
                 "_hylarana._udp.local.",
                 name,
@@ -51,7 +61,11 @@ impl DiscoveryService {
             properties
         );
 
-        Ok(Self(mdns))
+        Ok(Self {
+            runing: AtomicBool::new(true),
+            kind: Kind::Server, 
+            service,
+        })
     }
 
     /// Query the registered service, the service type is fixed, when the query
@@ -60,10 +74,10 @@ impl DiscoveryService {
     pub fn query<P: DeserializeOwned + Debug, T: Fn(&str, Vec<Ipv4Addr>, P) + Send + 'static>(
         func: T,
     ) -> Result<Self, DiscoveryError> {
-        let mdns = ServiceDaemon::new()?;
-        mdns.disable_interface(IfKind::IPv6)?;
+        let service = ServiceDaemon::new()?;
+        service.disable_interface(IfKind::IPv6)?;
 
-        let receiver = mdns.browse("_hylarana._udp.local.")?;
+        let receiver = service.browse("_hylarana._udp.local.")?;
         thread::spawn(move || {
             let process = |info: ServiceInfo| {
                 if let Some(properties) = info.get_property("p") {
@@ -97,7 +111,7 @@ impl DiscoveryService {
                         }
                     }
                     Err(e) => {
-                        log::error!("discovery service query error={:?}", e);
+                        log::warn!("discovery service query error={:?}", e);
 
                         break;
                     }
@@ -108,13 +122,34 @@ impl DiscoveryService {
             }
         });
 
-        Ok(Self(mdns))
+        Ok(Self {
+            runing: AtomicBool::new(true),
+            kind: Kind::Client, 
+            service,
+        })
+    }
+
+    pub fn stop(&self) -> Result<(), DiscoveryError> {
+        if self.runing.load(Ordering::Relaxed) {
+            self.runing.store(false, Ordering::Relaxed);
+        } else {
+            return Ok(());
+        }
+        
+        if self.kind == Kind::Server {
+            drop(self.service.unregister("_hylarana._udp.local.")?.recv());
+        } else {
+            self.service.stop_browse("_hylarana._udp.local.")?;
+        }
+
+        Ok(())
     }
 }
 
 impl Drop for DiscoveryService {
     fn drop(&mut self) {
-        let _ = self.0.unregister("_hylarana._udp.local.");
-        let _ = self.0.stop_browse("_hylarana._udp.local.");
+        if let Err(e) = self.stop() {
+            log::error!("discovery service drop error={:?}", e);
+        }
     }
 }
