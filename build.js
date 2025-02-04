@@ -52,11 +52,18 @@ const SearchBuild = (package, subdir) => {
     return null;
 };
 
+const DefaultFsOptions = { force: true, recursive: true };
+
 /* async block */
 void (async () => {
-    const Profile = Args.release ? "Release" : "Debug";
+    const Profile = Args.release ? "release" : "debug";
 
-    for (const path of ["./target", "./build", "./build/bin"]) {
+    for (const path of [
+        "./target",
+        "./target/build",
+        "./target/build",
+        "./target/build/resources",
+    ]) {
         if (!fs.existsSync(path)) {
             fs.mkdirSync(path);
         }
@@ -64,6 +71,7 @@ void (async () => {
 
     await Command(`cargo build ${Args.release ? "--release" : ""} -p hylarana-example`);
     await Command(`cargo build ${Args.release ? "--release" : ""} -p hylarana-server`);
+    await Command(`cargo build ${Args.release ? "--release" : ""} -p hylarana-app`);
 
     const CefOutputDir = SearchBuild("webview-sys", "cef");
     const FFmpegOutputDir = SearchBuild(
@@ -71,57 +79,53 @@ void (async () => {
         "ffmpeg-n7.1-latest-win64-gpl-shared-7.1"
     );
 
-    for (const item of [
-        ["./README.md", "./build/README.md"],
-        ["./LICENSE", "./build/LICENSE"],
-    ]) {
-        fs.cpSync(...item, { force: true, recursive: true });
-    }
-
     if (process.platform == "win32") {
         for (const item of [
-            [`./target/${Profile.toLowerCase()}/hylarana-example.exe`, "./build/bin/example.exe"],
-            [
-                `./target/${Profile.toLowerCase()}/hylarana-server.exe`,
-                "./build/bin/hylarana-server.exe",
-            ],
-            [`${FFmpegOutputDir}/bin/avcodec-61.dll`, "./build/bin/avcodec-61.dll"],
-            [`${FFmpegOutputDir}/bin/avutil-59.dll`, "./build/bin/avutil-59.dll"],
-            [`${FFmpegOutputDir}/bin/swresample-5.dll`, "./build/bin/swresample-5.dll"],
-            [`${CefOutputDir}/Release`, "./build/bin"],
-            [`${CefOutputDir}/Resources`, "./build/bin"],
+            [`./target/${Profile}/hylarana-example.exe`, "./target/build/hylarana-example.exe"],
+            [`./target/${Profile}/hylarana-server.exe`, "./target/build/hylarana-server.exe"],
+            [`${FFmpegOutputDir}/bin/avcodec-61.dll`, "./target/build/avcodec-61.dll"],
+            [`${FFmpegOutputDir}/bin/avutil-59.dll`, "./target/build/avutil-59.dll"],
+            [`${FFmpegOutputDir}/bin/swresample-5.dll`, "./target/build/swresample-5.dll"],
+            [`${CefOutputDir}/Release/`, "./target/build/"],
+            [`${CefOutputDir}/Resources/`, "./target/build/"],
         ]) {
-            fs.cpSync(...item, { force: true, recursive: true });
+            fs.cpSync(...item, DefaultFsOptions);
         }
     } else if (process.platform == "darwin") {
         for (const item of [
-            [`./target/${Profile.toLowerCase()}/hylarana-example`, "./build/bin/example"],
-            [`./target/${Profile.toLowerCase()}/hylarana-server`, "./build/bin/hylarana-server"],
+            [`./target/${Profile}/hylarana-example`, "./target/build/hylarana-example"],
+            [`./target/${Profile}/hylarana-server`, "./target/build/hylarana-server"],
         ]) {
-            fs.cpSync(...item, { force: true, recursive: true });
+            fs.cpSync(...item, DefaultFsOptions);
         }
     } else if (process.platform == "linux") {
         for (const item of [
-            [`./target/${Profile.toLowerCase()}/hylarana-example`, "./build/bin/example"],
-            [`./target/${Profile.toLowerCase()}/hylarana-server`, "./build/bin/hylarana-server"],
-            [`${FFmpegOutputDir}/lib`, "./build/bin"],
+            [`./target/${Profile}/hylarana-example`, "./target/build/hylarana-example"],
+            [`./target/${Profile}/hylarana-server`, "./target/build/hylarana-server"],
+            [`${FFmpegOutputDir}/lib`, "./target/build/"],
         ]) {
-            fs.cpSync(...item, { force: true, recursive: true });
+            fs.cpSync(...item, DefaultFsOptions);
         }
     }
 
     if (process.platform == "win32") {
         for (const item of [
-            ["./target/debug/hylarana_server.pdb", "./build/bin/server.pdb"],
-            ["./target/debug/hylarana_example.pdb", "./build/bin/example.pdb"],
+            ["./target/debug/hylarana_server.pdb", "./target/build/hylarana-server.pdb"],
+            ["./target/debug/hylarana_example.pdb", "./target/build/hylarana-example.pdb"],
         ]) {
             if (!Args.release) {
-                fs.cpSync(...item, { force: true, recursive: true });
+                fs.cpSync(...item, DefaultFsOptions);
             } else {
-                fs.rmSync(item[1], { force: true, recursive: true });
+                fs.rmSync(item[1], DefaultFsOptions);
             }
         }
     }
+
+    await Command("npm run build", { cwd: __dirname + "/app/ui" });
+    fs.cpSync("./app/ui/dist/", "./target/build/resources/", DefaultFsOptions);
+
+    fs.rmSync("./target/build/cef_sandbox.lib", DefaultFsOptions);
+    fs.rmSync("./target/build/libcef.lib", DefaultFsOptions);
 
     /* async block end */
 })().catch((e) => {
