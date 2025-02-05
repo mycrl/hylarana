@@ -7,13 +7,16 @@
             </div>
             <p>{{ Text.AutoAllowHelp }}</p>
         </div>
+        <div class="devices">
+            <Devices />
+        </div>
     </div>
 </template>
 
 <script setup>
 import Text from "@/text";
-
 import Switch from "@/components/switch.vue";
+import Devices from "./devices.vue";
 </script>
 
 <style scoped>
@@ -46,9 +49,10 @@ import Switch from "@/components/switch.vue";
     font-size: 10px;
 }
 
-#scan {
+.devices {
     position: absolute;
-    bottom: 50px;
-    left: 350px;
+    left: 20px;
+    right: 20px;
+    top: 70px;
 }
 </style>

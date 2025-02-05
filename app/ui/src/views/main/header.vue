@@ -2,20 +2,15 @@
     <div id="Header">
         <div id="navigation">
             <FontAwesomeIcon
-                :icon="faGear"
-                v-show="props.type != 'settings'"
                 class="icon click transition"
-                @click="() => change('settings')"
+                :icon="props.type == 'settings' ? faAngleLeft : faGear"
+                @click="() => change(props.type == 'settings' ? 'sender' : 'settings')"
             />
-            <FontAwesomeIcon
-                :icon="faAngleLeft"
-                v-show="props.type == 'settings'"
-                class="icon click transition"
-                @click="() => change('sender')"
-            />
-            <span>{{ props.type != "settings" ? Text.Settings : Text.BackToHome }}</span>
+            <span>
+                {{ props.type != "settings" ? Text.Settings : Text.BackToHome }}
+            </span>
         </div>
-        <div id="switch" v-show="props.type != 'settings'">
+        <div id="switch" v-if="props.type != 'settings'">
             <div
                 class="item click transition left"
                 :id="props.type == 'sender' ? 'selected' : null"

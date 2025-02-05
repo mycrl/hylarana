@@ -21,8 +21,7 @@ const Chinase = {
     NetworkServer: "服务器",
     NetworkServerHelp: "转发服务器的地址，例如192.168.1.100:8080。",
     NetworkMtu: "最大传输单元",
-    NetworkMtuHelp:
-        "最大传输单元（英语：Maximum Transmission Unit，缩写MTU）是指数据链路层上面所能通过的最大数据包大小（以字节为单位）",
+    NetworkMtuHelp: "最大传输单元（英语：Maximum Transmission Unit，缩写MTU）是指数据链路层上面所能通过的最大数据包大小（以字节为单位）",
     Codec: "编解码器",
     CodecDecoder: "解码器",
     CodecDecoderHelp: "视频解码器，H264是兼容性最好的软件解码器。",
@@ -32,6 +31,7 @@ const Chinase = {
     VideoSize: "宽高",
     VideoSizeHelp: "发送方视频的宽度和高度。",
     VideoFrameRate: "刷新率",
+    VideoFormat: "格式",
     VideoFrameRateHelp: "视频的刷新率通常为24/30/60。",
     VideoBitRateHelp: "视频流的比特率，以bit/s为单位。",
     VideoKeyFrameInterval: "关键帧间隔",
@@ -49,6 +49,9 @@ const Chinase = {
     Devices: "设备列表",
     DevicesHelp: "查找到的所有可以投屏的设备",
     DevicesSearchHelp: "正在查找可用设备...",
+    Direct: "直连",
+    Relay: "转发",
+    Multicast: "多播",
 };
 
 const English = {
@@ -71,8 +74,7 @@ const English = {
     NetworkServer: "server",
     NetworkServerHelp: "The address of the forwarding server, such as 192.168.1.100:8080.",
     NetworkMtu: "mtu",
-    NetworkMtuHelp:
-        "In computer networking, the maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be communicated in a single network layer transaction.",
+    NetworkMtuHelp: "In computer networking, the maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be communicated in a single network layer transaction.",
     Codec: "codec",
     CodecDecoder: "decoder",
     CodecDecoderHelp: "Video decoder, H264 is a software decoder with the best compatibility.",
@@ -82,11 +84,11 @@ const English = {
     VideoSize: "size",
     VideoSizeHelp: "The width and height of the video on the sender side.",
     VideoFrameRate: "frame rate",
+    VideoFormat: "format",
     VideoFrameRateHelp: "The refresh rate of the video is usually 24 / 30 / 60.",
     VideoBitRateHelp: "The bit rate of the video stream, in bit/s.",
     VideoKeyFrameInterval: "key frame interval",
-    VideoKeyFrameIntervalHelp:
-        "It is recommended that the key frame interval be consistent with the video frame rate, which helps reduce the size of the video stream.",
+    VideoKeyFrameIntervalHelp: "It is recommended that the key frame interval be consistent with the video frame rate, which helps reduce the size of the video stream.",
     Audio: "audio",
     AudioChannel: "channel",
     AudioSampleBit: "sample bit",
@@ -100,6 +102,9 @@ const English = {
     Devices: "devices",
     DevicesHelp: "all devices that can be screen cast are found.",
     DevicesSearchHelp: "Searching for available devices...",
+    Direct: "Direct",
+    Relay: "Relay",
+    Multicast: "Multicast",
 };
 
 export const LanguageMapping = {

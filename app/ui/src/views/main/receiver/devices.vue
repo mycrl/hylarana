@@ -2,10 +2,10 @@
     <div id="Devices">
         <div class="header">
             <p>{{ Text.Devices }}</p>
-            <span>{{ Text.DevicesHelp }}</span>
+            <span>All devices that are casting the screen.</span>
         </div>
         <div class="items">
-            <div class="device click" v-for="it of devices">
+            <div class="device" v-for="it of devices">
                 <div class="logo">
                     <FontAwesomeIcon class="icon" v-if="it.type == 'windows'" :icon="faWindows" />
                     <FontAwesomeIcon class="icon" v-if="it.type == 'android'" :icon="faAndroid" />
@@ -13,7 +13,28 @@
                 </div>
                 <div class="info">
                     <p>{{ it.name }}</p>
-                    <span>1{{ it.addr }}</span>
+                    <span>{{ it.addr }}</span>
+                </div>
+                <div class="description">
+                    <div class="item">
+                        <p>{{ Text.Video }} -</p>
+                        <span
+                            >{{ Text.Codec }}: H264 / {{ Text.VideoSize }}: 1280x720 /
+                            {{ Text.VideoFrameRate }}: 30 / {{ Text.BitRate }}: 10000000 /
+                            {{ Text.VideoFormat }}: NV12</span
+                        >
+                    </div>
+                    <div class="item">
+                        <p>{{ Text.Audio }} -</p>
+                        <span
+                            >{{ Text.Codec }}: OPUS / {{ Text.AudioChannel }}:
+                            {{ Text.AudioStereo }} / {{ Text.AudioSampleRate }}: 48000 /
+                            {{ Text.AudioSampleBit }}: 16 / {{ Text.BitRate }}: 64000</span
+                        >
+                    </div>
+                </div>
+                <div class="accept click">
+                    <span>Accapt</span>
                 </div>
             </div>
             <span id="tips">
@@ -56,11 +77,8 @@ const devices = ref([
 }
 
 .items {
-    width: 965px;
-    height: 320px;
-    position: relative;
-    display: table;
-    left: -5px;
+    width: 958px;
+    height: 455px;
 }
 
 .items #tips {
@@ -78,19 +96,17 @@ const devices = ref([
 .items .device {
     border: 1px solid #ddd;
     background-color: #eee;
-    border-radius: 5px;
     height: 50px;
-    width: 234px;
+    width: 100%;
     display: flex;
-    margin-left: 5px;
-    margin-top: 5px;
-    float: left;
+    margin-top: 10px;
+    border-radius: 5px;
 }
 
 .items .device .logo {
-    border-radius: 5px;
     height: 52px;
     width: 52px;
+    border-radius: 5px 0 0 5px;
     background-color: #829bff;
     color: #fff;
     text-align: center;
@@ -107,7 +123,9 @@ const devices = ref([
 }
 
 .items .device .info {
-    padding: 7px;
+    padding: 7px 15px;
+    border-right: 1px solid #ddd;
+    width: 160px;
 }
 
 .items .device .info p {
@@ -117,5 +135,27 @@ const devices = ref([
 
 .items .device .info span {
     color: #555;
+}
+
+.items .device .description {
+    width: 600px;
+    padding-left: 15px;
+    padding-right: 0;
+    padding-top: 9px;
+}
+
+.items .device .description .item p {
+    display: inline;
+    color: #829bff;
+}
+
+.items .device .accept {
+    position: absolute;
+    border-left: 1px solid #ddd;
+    right: 0;
+    height: 51px;
+    width: 70px;
+    text-align: center;
+    line-height: 49px;
 }
 </style>

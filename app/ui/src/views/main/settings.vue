@@ -4,7 +4,7 @@
             <!-- system -->
             <div class="module">
                 <h1>{{ Text.System }}</h1>
-                
+
                 <!-- Device Name -->
                 <div class="item">
                     <p>{{ Text.DeviceName }}:</p>
@@ -250,7 +250,7 @@ function submit() {
     position: absolute;
     width: 975px;
     top: 100px;
-    bottom: 100px;
+    bottom: 75px;
     padding-left: 25px;
     overflow-y: scroll;
 }

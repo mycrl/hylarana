@@ -4,6 +4,7 @@
         <Sender v-if="type == 'sender'" />
         <Receiver v-if="type == 'receiver'" />
         <Settings v-if="type == 'settings'" />
+        <Info v-if="type != 'settings'" />
     </div>
 </template>
 
@@ -11,14 +12,15 @@
 import MainHeader from "./header.vue";
 import Settings from "./settings.vue";
 import Sender from "./sender/index.vue";
-import Receiver from "./receiver.vue";
+import Receiver from "./receiver/index.vue";
+import Info from "./info.vue";
 
 import { ref } from "vue";
 
-const type = ref("sender");
+const type = ref("receiver");
 
-function changeType(kind) {
-    type.value = kind;
+function changeType(it) {
+    type.value = it;
 }
 </script>
 

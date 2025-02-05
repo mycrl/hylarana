@@ -8,13 +8,39 @@
             <p>{{ Text.BroadcastHelp }}</p>
         </div>
         <div id="content">
-            <div id="body">
-                <Devices v-show="!Settings.system.sender.broadcast" />
-            </div>
+            <Devices v-if="!Settings.system.sender.broadcast" />
+            <div class="padding" v-if="Settings.system.sender.broadcast"></div>
             <div id="control">
-                <Info />
-                <div id="settings">
-                    
+                <div class="box">
+                    <div class="items">
+                        <div class="item">
+                            <div class="icon">
+                                <FontAwesomeIcon :icon="faVolumeLow" />
+                            </div>
+                            <select class="click">
+                                <option>Redmi电脑音响</option>
+                            </select>
+                        </div>
+                        <div class="item">
+                            <div class="icon">
+                                <FontAwesomeIcon :icon="faDisplay" />
+                            </div>
+                            <select class="click">
+                                <option>P27QBB-RA</option>
+                            </select>
+                        </div>
+                        <div class="item">
+                            <div class="icon">
+                                <FontAwesomeIcon :icon="faNetworkWired" />
+                            </div>
+                            <select class="click">
+                                <option>{{ Text.Direct }}</option>
+                                <option>{{ Text.Relay }}</option>
+                                <option>{{ Text.Multicast }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="click">Start</button>
                 </div>
             </div>
         </div>
@@ -25,8 +51,10 @@
 import Text from "@/text";
 import Settings, { update as updateSettings } from "@/settings";
 import Switch from "@/components/switch.vue";
-import Info from "./info.vue";
 import Devices from "./devices.vue";
+
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { faVolumeLow, faDisplay, faNetworkWired } from "@fortawesome/free-solid-svg-icons";
 
 function setBroadcast(it) {
     Settings.value.system.sender.broadcast = it;
@@ -68,26 +96,64 @@ function setBroadcast(it) {
     position: absolute;
     left: 20px;
     right: 20px;
-    bottom: 20px;
     top: 70px;
 }
 
-#content #body {
+#content .padding {
+    height: 355px;
     width: 100%;
-    height: 70%;
-    border-bottom: 1px solid #e3e9ff;
 }
 
 #content #control {
-    display: flex;
-    height: 30%;
+    border-top: 1px solid #e3e9ff;
 }
 
-#content #control > div {
+#content #control .box {
+    margin: 0 auto;
+    width: 50%;
+    text-align: center;
+}
+
+#content #control .box .items {
+    display: flex;
+    margin-top: 20px;
+}
+
+#content #control .box .items .item {
     flex: 1;
 }
-    
-#control #settings {
-    display: flex;
+
+#content #control .box .items .item .icon {
+    text-align: center;
+}
+
+#content #control .box .items .item .icon > * {
+    color: #829bff;
+    font-size: 17px;
+}
+
+#content #control .box .items .item select {
+    width: 90%;
+    margin: 0 5%;
+    margin-top: 5px;
+    text-align: center;
+    border: 0;
+    background-color: #fff;
+    border-bottom: 1px solid #dddddd;
+    border-radius: 0;
+}
+
+#content #control .box .items .item select:focus {
+    outline: none;
+}
+
+#content #control .box button {
+    height: 40px;
+    width: 170px;
+    border-radius: 40px;
+    margin-top: 18px;
+    border: 0;
+    background-color: #3951af;
+    color: #fff;
 }
 </style>
