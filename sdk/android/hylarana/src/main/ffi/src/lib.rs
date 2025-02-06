@@ -11,10 +11,10 @@ use std::{
 };
 
 use anyhow::Result;
-use common::{logger, MediaStreamDescription};
+use common::logger;
 use jni::{
     objects::{JByteArray, JClass, JObject, JString},
-    sys::{jint, JNI_VERSION_1_6},
+    sys::JNI_VERSION_1_6,
     JNIEnv, JavaVM,
 };
 
@@ -326,17 +326,14 @@ extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportRecei
 extern "system" fn Java_com_github_mycrl_hylarana_Discovery_registerDiscoveryService(
     mut env: JNIEnv,
     _this: JClass,
-    port: jint,
     name: JString,
     description: JString,
 ) -> *const DiscoveryService {
     ok_or_check(&mut env, |env| {
         let name: String = env.get_string(&name)?.into();
         let description: String = env.get_string(&description)?.into();
-        let description: MediaStreamDescription = serde_json::from_str(&description)?;
 
         Ok(Box::into_raw(Box::new(DiscoveryService::register(
-            port as u16,
             &name,
             &description,
         )?)))
@@ -357,13 +354,7 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_queryDiscoveryServic
     ok_or_check(&mut env, |env| {
         let observer = DiscoveryServiceObserver(env.new_global_ref(observer)?);
 
-        Ok(Box::into_raw(Box::new(DiscoveryService::query(
-            move |name, addrs, description: MediaStreamDescription| {
-                if let Err(e) = observer.resolve(name, &addrs, &description) {
-                    log::warn!("{:?}", e);
-                }
-            },
-        )?)))
+        Ok(Box::into_raw(Box::new(DiscoveryService::query(observer)?)))
     })
     .unwrap_or_else(|| null_mut())
 }

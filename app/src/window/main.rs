@@ -1,29 +1,42 @@
 use std::sync::Arc;
 
-use super::{ActiveEventLoop, Events, EventsManager, WindowHandler, WindowId};
-use crate::RUNTIME;
+use crate::devices::DeviceInfo;
+
+use super::{
+    ActiveEventLoop, DevicesManager, Env, Events, EventsManager, WindowHandler, WindowId, RUNTIME,
+};
 
 use anyhow::Result;
-use async_trait::async_trait;
+use common::MediaStreamDescription;
 use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
 use serde::{Deserialize, Serialize};
-use webview::{BridgeObserver, Observer, Page, PageOptions, PageState, Webview};
+use tokio::sync::RwLock;
+use webview::{Observer, Page, PageOptions, PageState, Webview};
 
 pub struct MainWindow {
+    devices_manager: Arc<DevicesManager>,
     events_manager: EventsManager,
     webview: Arc<Webview>,
     page: Option<Arc<Page>>,
+    env: Arc<RwLock<Env>>,
 }
 
 impl MainWindow {
     const WIDTH: u32 = 1000;
     const HEIGHT: u32 = 600;
 
-    pub fn new(events_manager: EventsManager, webview: Arc<Webview>) -> Self {
+    pub fn new(
+        env: Arc<RwLock<Env>>,
+        devices_manager: Arc<DevicesManager>,
+        events_manager: EventsManager,
+        webview: Arc<Webview>,
+    ) -> Self {
         Self {
             page: None,
+            devices_manager,
             events_manager,
             webview,
+            env,
         }
     }
 }
@@ -38,20 +51,20 @@ impl WindowHandler for MainWindow {
             Events::EnableWindow => {
                 if self.page.is_none() {
                     {
-                        let page = RUNTIME.block_on(self.webview.create_page(
+                        let page = self.webview.create_page(
                             "http://localhost:5173",
                             &PageOptions {
                                 frame_rate: 30,
                                 width: Self::WIDTH,
                                 height: Self::HEIGHT,
-                                device_scale_factor: 1.0,
                                 is_offscreen: false,
                                 window_handle: None,
+                                device_scale_factor: 1.0,
                             },
                             PageObserver {
                                 events_manager: self.events_manager.clone(),
                             },
-                        ))?;
+                        )?;
 
                         // The standalone windows created by cef have many limitations that cannot
                         // be adjusted directly through configuration. Here the windows created by
@@ -59,7 +72,23 @@ impl WindowHandler for MainWindow {
                         update_page_window_style(&page)?;
 
                         page.set_devtools_state(true);
-                        page.on_bridge(PageHandler);
+                        // page.on_bridge(PageHandler {
+                        //     devices_manager: self.devices_manager.clone(),
+                        //     env: self.env.clone(),
+                        // });
+
+                        // let page_ = Arc::downgrade(&page);
+                        // let mut watcher = self.devices_manager.get_watcher();
+                        // RUNTIME.spawn(async move {
+                        //     while watcher.change().await {
+                        //         if let Some(page) = page_.upgrade() {
+                        //             let _ = page
+                        //                 .call_bridge::<_, ()>(&MainRequest::DevicesChange)
+                        //                 .await;
+                        //         }
+                        //     }
+                        // });
+
                         self.page.replace(page);
                     }
                 }
@@ -132,23 +161,73 @@ fn update_page_window_style(page: &Page) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
-enum Request {}
+// #[derive(Debug, Serialize)]
+// #[serde(tag = "type", content = "content")]
+// enum MainRequest {
+//     DevicesChange,
+// }
 
-#[derive(Debug, Serialize)]
-enum Response {}
+// #[derive(Debug, Deserialize)]
+// #[serde(tag = "type", content = "content")]
+// enum PageRequest {
+//     GetName,
+//     SetName {
+//         name: String,
+//     },
+//     GetDevices,
+//     SendDescription {
+//         names: Vec<String>,
+//         description: MediaStreamDescription,
+//     },
+//     SetAutoAllow {
+//         enable: bool,
+//     },
+// }
 
-struct PageHandler;
+// #[derive(Debug, Serialize)]
+// #[serde(tag = "type", content = "content")]
+// enum PageRespone {
+//     GetName { name: String },
+//     SetName,
+//     GetDevices { devices: Vec<DeviceInfo> },
+//     SendDescription,
+//     SetAutoAllow,
+// }
 
-#[async_trait]
-impl BridgeObserver for PageHandler {
-    type Req = Request;
-    type Res = Option<Response>;
-    type Err = anyhow::Error;
+// struct PageHandler {
+//     devices_manager: Arc<DevicesManager>,
+//     env: Arc<RwLock<Env>>,
+// }
 
-    async fn on(&self, req: Self::Req) -> Result<Self::Res, Self::Err> {
-        match req {}
+// #[async_trait]
+// impl BridgeObserver for PageHandler {
+//     type Req = PageRequest;
+//     type Res = PageRespone;
+//     type Err = anyhow::Error;
 
-        todo!()
-    }
-}
+//     async fn on(&self, req: Self::Req) -> Result<Self::Res, Self::Err> {
+//         log::info!("main page receiver a request={:?}", req);
+
+//         Ok(match req {
+//             PageRequest::GetName => PageRespone::GetName {
+//                 name: self.env.read().await.settings.name.clone(),
+//             },
+//             PageRequest::SetName { name } => {
+//                 self.env.write().await.update_name(name)?;
+
+//                 PageRespone::SetName
+//             }
+//             PageRequest::GetDevices => PageRespone::GetDevices {
+//                 devices: self.devices_manager.get_devices().await,
+//             },
+//             PageRequest::SendDescription { names, description } => {
+//                 self.devices_manager
+//                     .send_description(names, description)
+//                     .await;
+
+//                 PageRespone::SendDescription
+//             }
+//             PageRequest::SetAutoAllow { enable } => PageRespone::SetAutoAllow,
+//         })
+//     }
+// }

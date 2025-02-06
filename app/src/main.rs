@@ -3,14 +3,14 @@ mod env;
 mod events;
 mod window;
 
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 
 use anyhow::Result;
 use events::EventsManager;
 use hylarana::{shutdown, startup};
 use image::{DynamicImage, ImageFormat};
 use once_cell::sync::Lazy;
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, sync::RwLock};
 use tray_icon::{Icon, MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use webview::{execute_subprocess, is_subprocess, Webview, WebviewOptions};
 use winit::{
@@ -20,6 +20,7 @@ use winit::{
 };
 
 use self::{
+    devices::DevicesManager,
     env::Env,
     events::Events,
     window::{WindowId, WindowsManager},
@@ -28,28 +29,36 @@ use self::{
 static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
 struct App {
-    env: Arc<Env>,
-    webview: Arc<Webview>,
     windows_manager: WindowsManager,
     events_manager: EventsManager,
     tray: Option<TrayIcon>,
 }
 
 impl App {
-    async fn new(env: Arc<Env>, events_manager: EventsManager) -> Result<Self> {
-        let webview = Webview::new(&WebviewOptions {
-            browser_subprocess_path: None,
-            cache_path: Some(&env.cache_path),
-            scheme_path: Some(&env.scheme_path),
-        })
-        .await?;
+    async fn new(
+        env: Arc<RwLock<Env>>,
+        events_manager: EventsManager,
+        webview: Webview,
+    ) -> Result<Self> {
+        let devices_manager = Arc::new(DevicesManager::new(env.clone()).await?);
+        let webview = Arc::new(webview);
+
+        // let webview_ = webview.clone();
+        // let events_manager_ = events_manager.clone();
+        // thread::spawn(move || {
+        //     webview_.wait_exit();
+        //     events_manager_.broadcast(Events::CloseRequested);
+        // });
 
         Ok(Self {
-            windows_manager: WindowsManager::new(events_manager.clone(), webview.clone()),
+            windows_manager: WindowsManager::new(
+                env,
+                devices_manager,
+                events_manager.clone(),
+                webview.clone(),
+            ),
             events_manager,
             tray: None,
-            webview,
-            env,
         })
     }
 }
@@ -57,13 +66,6 @@ impl App {
 impl ApplicationHandler<(WindowId, Events)> for App {
     fn resumed(&mut self, _: &ActiveEventLoop) {
         startup().unwrap();
-
-        let webview = self.webview.clone();
-        let events_manager = self.events_manager.clone();
-        RUNTIME.spawn(async move {
-            webview.wait_exit().await;
-            events_manager.broadcast(Events::CloseRequested);
-        });
 
         self.tray.replace(
             TrayIconBuilder::new()
@@ -144,10 +146,18 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::<(WindowId, Events)>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let env = Arc::new(Env::default());
     let events_manager = EventsManager::new(event_loop.create_proxy());
-    event_loop.run_app(&mut RUNTIME.block_on(App::new(env, events_manager))?)?;
+    let env = Arc::new(RwLock::new(Env::new()?));
+    let webview = {
+        let env = env.blocking_read();
+        Webview::new(&WebviewOptions {
+            browser_subprocess_path: None,
+            cache_path: Some(&env.cache_path),
+            scheme_path: Some(&env.scheme_path),
+        })?
+    };
 
+    event_loop.run_app(&mut RUNTIME.block_on(App::new(env, events_manager, webview))?)?;
     shutdown()?;
     Ok(())
 }

@@ -4,10 +4,16 @@ mod screen;
 use std::sync::Arc;
 
 use anyhow::Result;
+use tokio::sync::RwLock;
 use webview::Webview;
 use winit::{event::WindowEvent, event_loop::ActiveEventLoop};
 
-use crate::events::{Events, EventsManager};
+use crate::{
+    devices::DevicesManager,
+    env::Env,
+    events::{Events, EventsManager},
+    RUNTIME,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum WindowId {
@@ -35,11 +41,21 @@ pub trait WindowHandler: Send {
 pub struct WindowsManager(Vec<Box<dyn WindowHandler + 'static>>);
 
 impl WindowsManager {
-    pub fn new(events_manager: EventsManager, webview: Arc<Webview>) -> Self {
-        Self(vec![Box::new(main::MainWindow::new(
-            events_manager,
-            webview,
-        ))])
+    pub fn new(
+        env: Arc<RwLock<Env>>,
+        devices_manager: Arc<DevicesManager>,
+        events_manager: EventsManager,
+        webview: Arc<Webview>,
+    ) -> Self {
+        Self(vec![
+            Box::new(screen::ScreenWindow::new(events_manager.clone())),
+            Box::new(main::MainWindow::new(
+                env,
+                devices_manager,
+                events_manager,
+                webview,
+            )),
+        ])
     }
 }
 

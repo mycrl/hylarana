@@ -13,7 +13,7 @@ pub use common::{
     MediaVideoStreamDescription, Size, TransportOptions, TransportStrategy,
 };
 
-pub use discovery::{DiscoveryError, DiscoveryService};
+pub use discovery::{DiscoveryError, DiscoveryObserver, DiscoveryService};
 pub use renderer::{raw_window_handle, SurfaceTarget};
 
 #[cfg(target_os = "windows")]

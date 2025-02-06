@@ -17,7 +17,7 @@ import Info from "./info.vue";
 
 import { ref } from "vue";
 
-const type = ref("receiver");
+const type = ref("sender");
 
 function changeType(it) {
     type.value = it;

@@ -7,11 +7,11 @@ use anyhow::Result;
 use clap::Parser;
 use hylarana::{
     create_receiver, create_sender, shutdown, startup, AVFrameObserver, AVFrameStreamPlayer,
-    AVFrameStreamPlayerOptions, AudioOptions, Capture, DiscoveryService, HylaranaReceiver,
-    HylaranaReceiverOptions, HylaranaSender, HylaranaSenderMediaOptions, HylaranaSenderOptions,
-    HylaranaSenderTrackOptions, MediaStreamDescription, Size, SourceType, TransportOptions,
-    TransportStrategy, VideoDecoderType, VideoEncoderType, VideoOptions, VideoRenderBackend,
-    VideoRenderOptionsBuilder, VideoRenderSurfaceOptions,
+    AVFrameStreamPlayerOptions, AudioOptions, Capture, DiscoveryObserver, DiscoveryService,
+    HylaranaReceiver, HylaranaReceiverOptions, HylaranaSender, HylaranaSenderMediaOptions,
+    HylaranaSenderOptions, HylaranaSenderTrackOptions, MediaStreamDescription, Size, SourceType,
+    TransportOptions, TransportStrategy, VideoDecoderType, VideoEncoderType, VideoOptions,
+    VideoRenderBackend, VideoRenderOptionsBuilder, VideoRenderSurfaceOptions,
 };
 
 use winit::{
@@ -103,7 +103,7 @@ impl Sender {
         // Register the current sender's information with the LAN discovery service so
         // that other receivers can know that the sender has been created and can access
         // the sender's information.
-        let discovery = DiscoveryService::register(3456, "sender", sender.get_description())?;
+        let discovery = DiscoveryService::register("sender", sender.get_description())?;
 
         Ok(Self { discovery, sender })
     }
@@ -146,6 +146,18 @@ impl Receiver {
         )?;
 
         Ok(Self(receiver))
+    }
+}
+
+struct ReceiverObserver(Arc<EventLoopProxy<Events>>);
+
+impl DiscoveryObserver<MediaStreamDescription> for ReceiverObserver {
+    fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, description: MediaStreamDescription) {
+        if name == "sender" {
+            self.0
+                .send_event(Events::CreateReceiver(addrs, description))
+                .unwrap();
+        }
     }
 }
 
@@ -219,20 +231,10 @@ impl ApplicationHandler<Events> for App {
                             }
                             KeyCode::KeyR => {
                                 if self.service.is_none() {
-                                    let event_loop = self.event_loop.clone();
                                     self.service.replace(
-                                        DiscoveryService::query(
-                                            move |name, addrs, description: MediaStreamDescription| {
-                                                if name == "sender" {
-                                                    event_loop
-                                                    .send_event(Events::CreateReceiver(
-                                                        addrs,
-                                                        description,
-                                                    ))
-                                                    .unwrap();
-                                                }
-                                            },
-                                        )
+                                        DiscoveryService::query(ReceiverObserver(
+                                            self.event_loop.clone(),
+                                        ))
                                         .unwrap(),
                                     );
                                 }
