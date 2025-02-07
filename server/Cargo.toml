@@ -8,11 +8,11 @@ readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
-anyhow = "1.0.79"
-log = "0.4.20"
+anyhow = "1.0"
+log = "0.4"
 simple_logger = "4"
 common = { path = "../common", version = "0.3.0", package = "hylarana-common" }
 transport = { path = "../transport", version = "0.3.0", package = "hylarana-transport" }
 clap = { version = "4", features = ["derive"] }
-mimalloc = { version = "0.1.43", default-features = false }
+mimalloc = { version = "0.1", default-features = false }
 parking_lot = "0.12"

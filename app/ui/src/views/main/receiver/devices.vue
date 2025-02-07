@@ -1,7 +1,7 @@
 <template>
     <div id="Devices">
         <div class="header">
-            <p>{{ Text.Devices }}</p>
+            <p>{{ Locales.Devices }}</p>
             <span>All devices that are casting the screen.</span>
         </div>
         <div class="items">
@@ -17,19 +17,19 @@
                 </div>
                 <div class="description">
                     <div class="item">
-                        <p>{{ Text.Video }} -</p>
+                        <p>{{ Locales.Video }} -</p>
                         <span
-                            >{{ Text.Codec }}: H264 / {{ Text.VideoSize }}: 1280x720 /
-                            {{ Text.VideoFrameRate }}: 30 / {{ Text.BitRate }}: 10000000 /
-                            {{ Text.VideoFormat }}: NV12</span
+                            >{{ Locales.Codec }}: H264 / {{ Locales.VideoSize }}: 1280x720 /
+                            {{ Locales.VideoFrameRate }}: 30 / {{ Locales.BitRate }}: 10000000 /
+                            {{ Locales.VideoFormat }}: NV12</span
                         >
                     </div>
                     <div class="item">
-                        <p>{{ Text.Audio }} -</p>
+                        <p>{{ Locales.Audio }} -</p>
                         <span
-                            >{{ Text.Codec }}: OPUS / {{ Text.AudioChannel }}:
-                            {{ Text.AudioStereo }} / {{ Text.AudioSampleRate }}: 48000 /
-                            {{ Text.AudioSampleBit }}: 16 / {{ Text.BitRate }}: 64000</span
+                            >{{ Locales.Codec }}: OPUS / {{ Locales.AudioChannel }}:
+                            {{ Locales.AudioStereo }} / {{ Locales.AudioSampleRate }}: 48000 /
+                            {{ Locales.AudioSampleBit }}: 16 / {{ Locales.BitRate }}: 64000</span
                         >
                     </div>
                 </div>
@@ -38,16 +38,16 @@
                 </div>
             </div>
             <span id="tips">
-                {{ Text.DevicesSearchHelp }}
+                {{ Locales.DevicesSearchHelp }}
             </span>
         </div>
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
 
-import Text from "@/text";
+import Locales from "@/locales";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
 

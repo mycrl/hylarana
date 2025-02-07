@@ -3,17 +3,17 @@
         <div id="content">
             <!-- system -->
             <div class="module">
-                <h1>{{ Text.System }}</h1>
+                <h1>{{ Locales.System }}</h1>
 
                 <!-- Device Name -->
                 <div class="item">
-                    <p>{{ Text.DeviceName }}:</p>
+                    <p>{{ Locales.DeviceName }}:</p>
                     <input type="text" v-model="Settings.system.deviceName" :disabled="disabled" />
                 </div>
 
                 <!-- Language -->
                 <div class="item">
-                    <p>{{ Text.Language }}:</p>
+                    <p>{{ Locales.Language }}:</p>
                     <select v-model="Settings.system.language" :disabled="disabled">
                         <option value="chinase">简体中文</option>
                         <option value="english">English</option>
@@ -23,7 +23,7 @@
 
             <!-- Network -->
             <div class="module">
-                <h1>{{ Text.Network }}</h1>
+                <h1>{{ Locales.Network }}</h1>
 
                 <!-- 
                 Interface
@@ -31,8 +31,8 @@
                 Bound NIC interfaces, 0.0.0.0 means all NICs are bound. 
                  -->
                 <div class="item">
-                    <p>{{ Text.NetworkInterface }}:</p>
-                    <sub>{{ Text.NetworkInterfaceHelp }}</sub>
+                    <p>{{ Locales.NetworkInterface }}:</p>
+                    <sub>{{ Locales.NetworkInterfaceHelp }}</sub>
                     <input type="text" v-model="Settings.network.interface" :disabled="disabled" />
                 </div>
 
@@ -42,8 +42,8 @@
                 The IP address used for multicast, the default is 239.0.0.1.
                  -->
                 <div class="item">
-                    <p>{{ Text.NetworkMulticast }}:</p>
-                    <sub>{{ Text.NetworkMulticastHelp }}</sub>
+                    <p>{{ Locales.NetworkMulticast }}:</p>
+                    <sub>{{ Locales.NetworkMulticastHelp }}</sub>
                     <input type="text" v-model="Settings.network.multicast" :disabled="disabled" />
                 </div>
 
@@ -53,8 +53,8 @@
                 The address of the forwarding server, such as 192.168.1.100:8080.
                  -->
                 <div class="item">
-                    <p>{{ Text.NetworkServer }}:</p>
-                    <sub>{{ Text.NetworkServerHelp }}</sub>
+                    <p>{{ Locales.NetworkServer }}:</p>
+                    <sub>{{ Locales.NetworkServerHelp }}</sub>
                     <input type="text" v-model="Settings.network.server" :disabled="disabled" />
                 </div>
 
@@ -66,8 +66,8 @@
                 communicated in a single network layer transaction.
                 -->
                 <div class="item">
-                    <p>{{ Text.NetworkMtu }}:</p>
-                    <sub>{{ Text.NetworkMtuHelp }}</sub>
+                    <p>{{ Locales.NetworkMtu }}:</p>
+                    <sub>{{ Locales.NetworkMtuHelp }}</sub>
                     <input
                         type="number"
                         v-model.number="Settings.network.mtu"
@@ -78,7 +78,7 @@
 
             <!-- Codec -->
             <div class="module">
-                <h1>{{ Text.Codec }}</h1>
+                <h1>{{ Locales.Codec }}</h1>
 
                 <!-- 
                 Decoder
@@ -86,8 +86,8 @@
                 Video decoder, H264 is a software decoder with the best compatibility.
                 -->
                 <div class="item">
-                    <p>{{ Text.CodecDecoder }}:</p>
-                    <sub>{{ Text.CodecDecoderHelp }}</sub>
+                    <p>{{ Locales.CodecDecoder }}:</p>
+                    <sub>{{ Locales.CodecDecoderHelp }}</sub>
                     <select v-model="Settings.codec.decoder" :disabled="disabled">
                         <option v-for="(v, k) in VideoDecoders" :value="k">{{ v }}</option>
                     </select>
@@ -99,8 +99,8 @@
                 Video encoder, X264 is a software encoder with the best compatibility.
                 -->
                 <div class="item">
-                    <p>{{ Text.CodecEncoder }}:</p>
-                    <sub>{{ Text.CodecEncoderHelp }}</sub>
+                    <p>{{ Locales.CodecEncoder }}:</p>
+                    <sub>{{ Locales.CodecEncoderHelp }}</sub>
                     <select v-model="Settings.codec.encoder" :disabled="disabled">
                         <option v-for="(v, k) in VideoEncoders" :value="k">{{ v }}</option>
                     </select>
@@ -109,7 +109,7 @@
 
             <!-- Video -->
             <div class="module">
-                <h1>{{ Text.Video }}</h1>
+                <h1>{{ Locales.Video }}</h1>
 
                 <!-- 
                 Size 
@@ -117,8 +117,8 @@
                 The width and height of the video on the sender side.
                 -->
                 <div class="item">
-                    <p>{{ Text.VideoSize }}:</p>
-                    <sub>{{ Text.VideoSizeHelp }}</sub>
+                    <p>{{ Locales.VideoSize }}:</p>
+                    <sub>{{ Locales.VideoSizeHelp }}</sub>
                     <div>
                         <input
                             type="number"
@@ -140,8 +140,8 @@
                 The refresh rate of the video is usually 24 / 30 / 60.
                 -->
                 <div class="item">
-                    <p>{{ Text.VideoFrameRate }}:</p>
-                    <sub>{{ Text.VideoFrameRateHelp }}</sub>
+                    <p>{{ Locales.VideoFrameRate }}:</p>
+                    <sub>{{ Locales.VideoFrameRateHelp }}</sub>
                     <input
                         type="number"
                         v-model.number="Settings.video.frameRate"
@@ -155,8 +155,8 @@
                 The bit rate of the video stream, in bit/s.
                 -->
                 <div class="item">
-                    <p>{{ Text.BitRate }}:</p>
-                    <sub>{{ Text.VideoBitRateHelp }}</sub>
+                    <p>{{ Locales.BitRate }}:</p>
+                    <sub>{{ Locales.VideoBitRateHelp }}</sub>
                     <input
                         type="number"
                         v-model.number="Settings.video.bitRate"
@@ -171,8 +171,8 @@
                 the video frame rate, which helps reduce the size of the video stream.
                 -->
                 <div class="item">
-                    <p>{{ Text.VideoKeyFrameInterval }}:</p>
-                    <sub>{{ Text.VideoKeyFrameIntervalHelp }}</sub>
+                    <p>{{ Locales.VideoKeyFrameInterval }}:</p>
+                    <sub>{{ Locales.VideoKeyFrameIntervalHelp }}</sub>
                     <input
                         type="number"
                         v-model.number="Settings.video.keyFrameInterval"
@@ -183,7 +183,7 @@
 
             <!-- Audio -->
             <div class="module">
-                <h1>{{ Text.Audio }}</h1>
+                <h1>{{ Locales.Audio }}</h1>
 
                 <!-- 
                 SampleRate 
@@ -191,8 +191,8 @@
                 The audio sampling rate is recommended to be 48Khz.
                 -->
                 <div class="item">
-                    <p>{{ Text.AudioSampleRate }}:</p>
-                    <sub>{{ Text.AudioSampleRateHelp }}</sub>
+                    <p>{{ Locales.AudioSampleRate }}:</p>
+                    <sub>{{ Locales.AudioSampleRateHelp }}</sub>
                     <input
                         type="number"
                         v-model.number="Settings.audio.sampleRate"
@@ -206,8 +206,8 @@
                 The bit rate of the audio stream, in bit/s.
                 -->
                 <div class="item">
-                    <p>{{ Text.BitRate }}:</p>
-                    <sub>{{ Text.AudioBitRateHelp }}</sub>
+                    <p>{{ Locales.BitRate }}:</p>
+                    <sub>{{ Locales.AudioBitRateHelp }}</sub>
                     <input
                         type="number"
                         v-model.number="Settings.audio.bitRate"
@@ -219,24 +219,31 @@
 
         <!-- apply button -->
         <button v-if="!disabled" id="apply" class="click" @click="submit">
-            {{ Text.Apply }}
+            {{ Locales.Apply }}
         </button>
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
 
-import Text from "@/text";
+import Locales from "@/locales";
+import { MessageRouter } from "@/message";
 import Settings, { update as updateSettings, VideoEncoders, VideoDecoders } from "@/settings";
 
 const disabled = ref(false);
 
 function submit() {
-    updateSettings();
+    MessageRouter.call("SetName", Settings.value.system.deviceName).then(() => {
+        updateSettings();
 
-    disabled.value = true;
+        disabled.value = true;
+    });
 }
+
+MessageRouter.call("GetName").then((name) => {
+    Settings.value.system.deviceName = name;
+});
 </script>
 
 <style scoped>

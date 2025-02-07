@@ -1,13 +1,16 @@
 <template>
     <div id="Switch" class="click" @click="click">
-        <div class="round" :id="state ? 'selected' : null"></div>
+        <div class="round" :id="state ? 'selected' : ''"></div>
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
 
-const props = defineProps(["value"]);
+const props = defineProps<{
+    value: boolean;
+}>();
+
 const emit = defineEmits(["change"]);
 
 const state = ref(props.value || false);

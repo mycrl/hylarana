@@ -1,42 +1,38 @@
 <template>
     <div id="Devices">
         <div class="header">
-            <p>{{ Text.Devices }}</p>
-            <span>{{ Text.DevicesHelp }}</span>
+            <p>{{ Locales.Devices }}</p>
+            <span>{{ Locales.DevicesHelp }}</span>
         </div>
         <div class="items">
-            <div class="device click" v-for="it of devices">
+            <div class="device click" v-for="it of props.devices" v-if="it && it.description">
                 <div class="logo">
-                    <FontAwesomeIcon class="icon" v-if="it.type == 'windows'" :icon="faWindows" />
-                    <FontAwesomeIcon class="icon" v-if="it.type == 'android'" :icon="faAndroid" />
-                    <FontAwesomeIcon class="icon" v-if="it.type == 'apple'" :icon="faApple" />
+                    <FontAwesomeIcon class="icon" v-if="it.kind == 'Windows'" :icon="faWindows" />
+                    <FontAwesomeIcon class="icon" v-if="it.kind == 'Android'" :icon="faAndroid" />
+                    <FontAwesomeIcon class="icon" v-if="it.kind == 'Apple'" :icon="faApple" />
                 </div>
                 <div class="info">
                     <p>{{ it.name }}</p>
-                    <span>1{{ it.addr }}</span>
+                    <span>{{ it.addrs[0] }}</span>
                 </div>
             </div>
             <span id="tips">
-                {{ Text.DevicesSearchHelp }}
+                {{ Locales.DevicesSearchHelp }}
             </span>
         </div>
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
-
-import Text from "@/text";
+import { DeviceInfo } from "@/interfaces";
+import Locales from "@/locales";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
 
-const devices = ref([
-    {
-        type: "windows",
-        name: "Apple Lepidodendraceae",
-        addr: "192.168.0.100",
-    },
-]);
+const props = defineProps<{
+    devices: Array<DeviceInfo>;
+}>();
 </script>
 
 <style scoped>

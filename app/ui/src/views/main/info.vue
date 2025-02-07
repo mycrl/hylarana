@@ -1,24 +1,26 @@
 <template>
     <div id="Info">
-        <span>{{ Text.Network }}:</span>
-        <p>{{ Text.Direct }}-{{ Settings.network.interface }}</p>
+        <span>{{ Locales.Network }}:</span>
+        <p>{{ Locales.Direct }}-{{ Settings.network.interface }}</p>
         <sub>/</sub>
-        <span>{{ Text.Video }}:</span>
+        <span>{{ Locales.Video }}:</span>
         <p>
             {{ Settings.video.size.width }}x{{ Settings.video.size.height }}/{{
                 Settings.video.frameRate
             }}/{{ Settings.video.bitRate }}
         </p>
         <sub>/</sub>
-        <span>{{ Text.Audio }}:</span>
-        <p>{{ Text.AudioStereo }}/{{ Settings.audio.sampleRate }}/{{ Settings.audio.bitRate }}</p>
+        <span>{{ Locales.Audio }}:</span>
+        <p>
+            {{ Locales.AudioStereo }}/{{ Settings.audio.sampleRate }}/{{ Settings.audio.bitRate }}
+        </p>
 
         <div class="timer">00:00:00</div>
     </div>
 </template>
 
-<script setup>
-import Text from "@/text";
+<script setup lang="ts">
+import Locales from "@/locales";
 import Settings, { VideoEncoders } from "@/settings";
 </script>
 

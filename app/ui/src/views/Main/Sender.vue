@@ -2,13 +2,13 @@
     <div id="Sender">
         <div id="switch">
             <div class="body">
-                <span>{{ Text.Broadcast }}</span>
+                <span>{{ Locales.Broadcast }}</span>
                 <Switch :value="Settings.system.sender.broadcast" @change="setBroadcast" />
             </div>
-            <p>{{ Text.BroadcastHelp }}</p>
+            <p>{{ Locales.BroadcastHelp }}</p>
         </div>
         <div id="content">
-            <Devices v-if="!Settings.system.sender.broadcast" />
+            <Devices v-if="!Settings.system.sender.broadcast" :devices="props.devices" />
             <div class="padding" v-if="Settings.system.sender.broadcast"></div>
             <div id="control">
                 <div class="box">
@@ -34,9 +34,9 @@
                                 <FontAwesomeIcon :icon="faNetworkWired" />
                             </div>
                             <select class="click">
-                                <option>{{ Text.Direct }}</option>
-                                <option>{{ Text.Relay }}</option>
-                                <option>{{ Text.Multicast }}</option>
+                                <option>{{ Locales.Direct }}</option>
+                                <option>{{ Locales.Relay }}</option>
+                                <option>{{ Locales.Multicast }}</option>
                             </select>
                         </div>
                     </div>
@@ -47,16 +47,20 @@
     </div>
 </template>
 
-<script setup>
-import Text from "@/text";
+<script setup lang="ts">
+import Locales from "@/locales";
 import Settings, { update as updateSettings } from "@/settings";
-import Switch from "@/components/switch.vue";
-import Devices from "./devices.vue";
-
+import Switch from "@/components/Switch.vue";
+import Devices from "./Sender/Devices.vue";
+import { DeviceInfo } from "@/interfaces";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faVolumeLow, faDisplay, faNetworkWired } from "@fortawesome/free-solid-svg-icons";
 
-function setBroadcast(it) {
+const props = defineProps<{
+    devices: Array<DeviceInfo>;
+}>();
+
+function setBroadcast(it: boolean) {
     Settings.value.system.sender.broadcast = it;
     updateSettings();
 }

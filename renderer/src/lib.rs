@@ -90,7 +90,7 @@ impl<'a> Renderer<'a> {
             source,
         }: RendererOptions<T>,
     ) -> Result<Self, GraphicsError> {
-        let instance = Instance::new(InstanceDescriptor {
+        let instance = Instance::new(&InstanceDescriptor {
             backends: if cfg!(target_os = "windows") {
                 Backends::DX12
             } else if cfg!(target_os = "linux") {

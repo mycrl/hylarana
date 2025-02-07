@@ -7,31 +7,31 @@
                 @click="() => change(props.type == 'settings' ? 'sender' : 'settings')"
             />
             <span>
-                {{ props.type != "settings" ? Text.Settings : Text.BackToHome }}
+                {{ props.type != "settings" ? Locales.Settings : Locales.BackToHome }}
             </span>
         </div>
         <div id="switch" v-if="props.type != 'settings'">
             <div
                 class="item click transition left"
-                :id="props.type == 'sender' ? 'selected' : null"
+                :id="props.type == 'sender' ? 'selected' : ''"
                 @click="() => change('sender')"
             >
-                <p>{{ Text.Sender }}</p>
+                <p>{{ Locales.Sender }}</p>
             </div>
             <div
                 class="item click transition right"
-                :id="props.type == 'receiver' ? 'selected' : null"
+                :id="props.type == 'receiver' ? 'selected' : ''"
                 @click="() => change('receiver')"
             >
-                <p>{{ Text.Receiver }}</p>
+                <p>{{ Locales.Receiver }}</p>
             </div>
         </div>
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
-import Text from "@/text";
+import Locales from "@/locales";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faGear, faAngleLeft } from "@fortawesome/free-solid-svg-icons";
@@ -39,7 +39,7 @@ import { faGear, faAngleLeft } from "@fortawesome/free-solid-svg-icons";
 const props = defineProps(["type"]);
 const emit = defineEmits(["change"]);
 
-function change(kind) {
+function change(kind: string) {
     emit("change", kind);
 }
 </script>

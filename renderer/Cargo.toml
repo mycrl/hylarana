@@ -8,10 +8,10 @@ readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
-pollster = "0.3.0"
+pollster = "0.3"
 thiserror = "2.0"
-smallvec = "1.13.2"
-wgpu = "23"
-bytemuck = { version = "1.17.1", features = ["derive"] }
+smallvec = "1.13"
+wgpu = "24"
+bytemuck = { version = "1.17", features = ["derive"] }
 common = { path = "../common", version = "0.3.0", package = "hylarana-common" }
 resample = { path = "../resample", version = "0.3.0", package = "hylarana-resample" }

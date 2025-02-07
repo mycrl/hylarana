@@ -61,10 +61,10 @@ export const DefaultSettings = {
 };
 
 if (!localStorage.Settings) {
-    localStorage.setItem("Settings", JSON.stringify(DefaultSettings));
+    localStorage.Settings = JSON.stringify(DefaultSettings);
 }
 
-const Settings = ref(JSON.parse(localStorage.getItem("Settings")));
+const Settings = ref(JSON.parse(localStorage.Settings));
 
 export function update() {
     localStorage.setItem("Settings", JSON.stringify(Settings.value));

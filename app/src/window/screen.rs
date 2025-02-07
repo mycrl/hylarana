@@ -97,7 +97,7 @@ impl WindowHandler for ScreenWindow {
                 self.events_manager
                     .send(WindowId::Main, Events::CreateReceiverResult(func().is_ok()));
             }
-            Events::DisableWindow => {
+            Events::CloseWindow => {
                 drop(self.receiver.take());
             }
             _ => (),
@@ -114,6 +114,6 @@ struct Player {
 impl AVFrameObserver for Player {
     fn close(&self) {
         self.events_manager
-            .send(WindowId::Screen, Events::DisableWindow);
+            .send(WindowId::Screen, Events::CloseWindow);
     }
 }

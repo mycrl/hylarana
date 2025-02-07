@@ -1,7 +1,6 @@
-import { computed } from "vue";
-import Settings from "./settings";
+import React, { createContext, useContext, useState } from "react";
 
-const Chinase = {
+const chinase = {
     DeviceName: "设备名称",
     Type: "类型",
     System: "系统",
@@ -21,7 +20,8 @@ const Chinase = {
     NetworkServer: "服务器",
     NetworkServerHelp: "转发服务器的地址，例如192.168.1.100:8080。",
     NetworkMtu: "最大传输单元",
-    NetworkMtuHelp: "最大传输单元（英语：Maximum Transmission Unit，缩写MTU）是指数据链路层上面所能通过的最大数据包大小（以字节为单位）",
+    NetworkMtuHelp:
+        "最大传输单元（英语：Maximum Transmission Unit，缩写MTU）是指数据链路层上面所能通过的最大数据包大小（以字节为单位）",
     Codec: "编解码器",
     CodecDecoder: "解码器",
     CodecDecoderHelp: "视频解码器，H264是兼容性最好的软件解码器。",
@@ -54,7 +54,7 @@ const Chinase = {
     Multicast: "多播",
 };
 
-const English = {
+const english = {
     DeviceName: "device name",
     Type: "type",
     System: "system",
@@ -74,7 +74,8 @@ const English = {
     NetworkServer: "server",
     NetworkServerHelp: "The address of the forwarding server, such as 192.168.1.100:8080.",
     NetworkMtu: "mtu",
-    NetworkMtuHelp: "In computer networking, the maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be communicated in a single network layer transaction.",
+    NetworkMtuHelp:
+        "In computer networking, the maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be communicated in a single network layer transaction.",
     Codec: "codec",
     CodecDecoder: "decoder",
     CodecDecoderHelp: "Video decoder, H264 is a software decoder with the best compatibility.",
@@ -88,7 +89,8 @@ const English = {
     VideoFrameRateHelp: "The refresh rate of the video is usually 24 / 30 / 60.",
     VideoBitRateHelp: "The bit rate of the video stream, in bit/s.",
     VideoKeyFrameInterval: "key frame interval",
-    VideoKeyFrameIntervalHelp: "It is recommended that the key frame interval be consistent with the video frame rate, which helps reduce the size of the video stream.",
+    VideoKeyFrameIntervalHelp:
+        "It is recommended that the key frame interval be consistent with the video frame rate, which helps reduce the size of the video stream.",
     Audio: "audio",
     AudioChannel: "channel",
     AudioSampleBit: "sample bit",
@@ -107,11 +109,11 @@ const English = {
     Multicast: "Multicast",
 };
 
-export const LanguageMapping = {
-    chinase: Chinase,
-    english: English,
+export const translations = {
+    chinase,
+    english,
 };
 
-export default computed(() => {
-    return LanguageMapping[Settings.value.system.language];
-});
+interface LocalesContextType {}
+
+const LocalesContext = createContext<LangContextType | null>(null);

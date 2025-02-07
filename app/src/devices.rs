@@ -25,10 +25,30 @@ use tokio_tungstenite::{
 
 use crate::env::Env;
 
+#[cfg(target_os = "windows")]
+pub static DEVICE_TYPE: DeviceType = DeviceType::Windows;
+
+#[cfg(target_os = "macos")]
+pub static DEVICE_TYPE: DeviceType = DeviceType::Macos;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ServiceInfo {
+    port: u16,
+    kind: DeviceType,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum DeviceType {
+    Windows,
+    Android,
+    Apple,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DeviceInfo {
     pub description: Option<MediaStreamDescription>,
     pub addrs: Vec<Ipv4Addr>,
+    pub kind: DeviceType,
     pub name: String,
     pub port: u16,
 }
@@ -38,15 +58,20 @@ pub struct Device {
     sender: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
     description: Arc<RwLock<Option<MediaStreamDescription>>>,
     addrs: Vec<Ipv4Addr>,
+    kind: DeviceType,
     port: u16,
 }
 
 impl Device {
-    async fn new(addrs: Vec<Ipv4Addr>, port: u16) -> Result<(Self, oneshot::Receiver<()>)> {
+    async fn new(
+        kind: DeviceType,
+        addrs: Vec<Ipv4Addr>,
+        port: u16,
+    ) -> Result<(Self, oneshot::Receiver<()>)> {
         let (socket, response) =
             connect_async(format!("ws://{}:{}", addrs[0], port).into_client_request()?).await?;
 
-        if response.status() == StatusCode::SWITCHING_PROTOCOLS {
+        if response.status() != StatusCode::SWITCHING_PROTOCOLS {
             return Err(anyhow!(
                 "websocket connect status code={}",
                 response.status()
@@ -82,6 +107,7 @@ impl Device {
                 sender,
                 addrs,
                 port,
+                kind,
             },
             rx,
         ))
@@ -89,6 +115,10 @@ impl Device {
 
     pub fn get_port(&self) -> u16 {
         self.port
+    }
+
+    pub fn get_kind(&self) -> DeviceType {
+        self.kind
     }
 
     pub fn get_addrs(&self) -> Vec<Ipv4Addr> {
@@ -165,8 +195,8 @@ struct DiscoveryServiceObserver {
     runtime: Arc<Handle>,
 }
 
-impl DiscoveryObserver<u16> for DiscoveryServiceObserver {
-    fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, port: u16) {
+impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
+    fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, info: ServiceInfo) {
         if name == &self.env.blocking_read().settings.name {
             return;
         }
@@ -175,7 +205,7 @@ impl DiscoveryObserver<u16> for DiscoveryServiceObserver {
         let devices = self.devices.clone();
         let notify = self.tx.clone();
         self.runtime.spawn(async move {
-            match Device::new(addrs, port).await {
+            match Device::new(info.kind, addrs, info.port).await {
                 Ok((it, disconnection_notify)) => {
                     {
                         devices.set(&name, it).await;
@@ -230,7 +260,9 @@ impl DevicesManager {
         let devices: Arc<Devices> = Arc::new(Devices::default());
 
         let listener = TcpListener::bind("0.0.0.0:0").await?;
-        let port = listener.local_addr()?.port();
+        let local_addr = listener.local_addr()?;
+
+        log::info!("devices manager server listener addr={}", local_addr);
 
         let (tx, rx) = watch::channel::<()>(());
         let tx = Arc::new(tx);
@@ -272,7 +304,13 @@ impl DevicesManager {
         });
 
         let discoverys = (
-            DiscoveryService::register(&env.read().await.settings.name, &port)?,
+            DiscoveryService::register(
+                &env.read().await.settings.name,
+                &ServiceInfo {
+                    port: local_addr.port(),
+                    kind: DEVICE_TYPE,
+                },
+            )?,
             DiscoveryService::query(DiscoveryServiceObserver {
                 runtime: Arc::new(Handle::current()),
                 devices: devices.clone(),
@@ -305,6 +343,7 @@ impl DevicesManager {
                 description: v.get_description().await,
                 addrs: v.get_addrs(),
                 port: v.get_port(),
+                kind: v.get_kind(),
                 name: k.clone(),
             });
         }

@@ -8,8 +8,8 @@ use crate::window::WindowId;
 
 #[derive(Debug, Clone)]
 pub enum Events {
-    EnableWindow,
-    DisableWindow,
+    CreateWindow,
+    CloseWindow,
     CloseRequested,
     CreateReceiver {
         description: MediaStreamDescription,

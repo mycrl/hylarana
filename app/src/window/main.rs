@@ -7,6 +7,7 @@ use super::{
 use self::router::MessageRouter;
 
 use anyhow::Result;
+use hylarana::Capture;
 use tokio::sync::{mpsc::unbounded_channel, RwLock};
 use webview::{Observer, Page, PageOptions, PageState, Webview};
 
@@ -45,21 +46,21 @@ impl WindowHandler for MainWindow {
 
     fn user_event(&mut self, _: &ActiveEventLoop, event: &Events) -> Result<()> {
         match event {
-            Events::EnableWindow => {
+            Events::CreateWindow => {
                 if self.page.is_none() {
                     {
                         let (tx, mut rx) = unbounded_channel();
                         let message_router = Arc::new(MessageRouter::new(tx)?);
 
                         let page = self.webview.create_page(
-                            "http://localhost:5173",
+                            {
+                                &std::env::var(Env::ENV_WEBVIEW_MAIN_PAGE_URL)
+                                    .unwrap_or_else(|_| "webview://index.html".to_string())
+                            },
                             &PageOptions {
-                                frame_rate: 30,
                                 width: Self::WIDTH,
                                 height: Self::HEIGHT,
-                                is_offscreen: false,
-                                window_handle: None,
-                                device_scale_factor: 1.0,
+                                ..Default::default()
                             },
                             PageObserver {
                                 events_manager: self.events_manager.clone(),
@@ -67,36 +68,87 @@ impl WindowHandler for MainWindow {
                             },
                         )?;
 
-                        let page_ = Arc::downgrade(&page);
-                        RUNTIME.spawn(async move {
-                            while let Some(message) = rx.recv().await {
-                                if let Some(page) = page_.upgrade() {
-                                    page.send_message(&message);
-                                } else {
-                                    break;
-                                }
-                            }
-                        });
-
-                        let mut watcher = self.devices_manager.get_watcher();
-                        RUNTIME.spawn(async move {
-                            while watcher.change().await {
-                                // message_router.send(message).await;
-                            }
-                        });
-
                         // The standalone windows created by cef have many limitations that cannot
                         // be adjusted directly through configuration. Here the windows created by
                         // cef are adjusted directly through the system's window management API.
                         update_page_window_style(&page)?;
 
-                        page.set_devtools_state(true);
+                        {
+                            let page_ = Arc::downgrade(&page);
+                            RUNTIME.spawn(async move {
+                                while let Some(message) = rx.recv().await {
+                                    if let Some(page) = page_.upgrade() {
+                                        page.send_message(&message);
+
+                                        log::info!("app message router send message={}", message);
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            });
+
+                            let message_router_ = Arc::downgrade(&message_router);
+                            let mut watcher = self.devices_manager.get_watcher();
+                            RUNTIME.spawn(async move {
+                                while watcher.change().await {
+                                    if let Some(message_router) = message_router_.upgrade() {
+                                        let _ = message_router
+                                            .call::<_, ()>("DevicesChangeNotify", ())
+                                            .await;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            });
+                        }
+
+                        {
+                            message_router.on(
+                                "GetName",
+                                |env, _: ()| async move {
+                                    Ok(env.read().await.settings.name.clone())
+                                },
+                                self.env.clone(),
+                            );
+
+                            message_router.on(
+                                "SetName",
+                                |env, name: String| async move {
+                                    env.write().await.update_name(name)?;
+                                    Ok(())
+                                },
+                                self.env.clone(),
+                            );
+
+                            message_router.on(
+                                "GetDevices",
+                                |devices_manager, _: ()| async move {
+                                    Ok(devices_manager.get_devices().await)
+                                },
+                                self.devices_manager.clone(),
+                            );
+
+                            message_router.on(
+                                "GetCaptureSources",
+                                |_, kind| async move {
+                                    Ok(RUNTIME
+                                        .spawn_blocking(move || Capture::get_sources(kind))
+                                        .await??)
+                                },
+                                (),
+                            );
+                        }
+
+                        if std::env::var(Env::ENV_ENABLE_WEBVIEW_DEVTOOLS).is_ok() {
+                            page.set_devtools_state(true);
+                        }
 
                         self.page.replace(page);
+                        let _ = RUNTIME.block_on(message_router.call::<_, ()>("ReadyNotify", ()));
                     }
                 }
             }
-            Events::DisableWindow => {
+            Events::CloseWindow => {
                 drop(self.page.take());
             }
             _ => (),
@@ -115,12 +167,14 @@ impl Observer for PageObserver {
     fn on_state_change(&self, state: PageState) {
         if state == PageState::Close {
             self.events_manager
-                .send(WindowId::Main, Events::DisableWindow);
+                .send(WindowId::Main, Events::CloseWindow);
         }
     }
 
     fn on_message(&self, message: String) {
-        let _ = RUNTIME.block_on(self.message_router.send(message));
+        if let Err(e) = RUNTIME.block_on(self.message_router.send(message)) {
+            log::warn!("failed to send message to message router, error={:?}", e);
+        }
     }
 }
 
@@ -167,96 +221,143 @@ fn update_page_window_style(page: &Page) -> Result<()> {
                 )?;
             }
         }
-        _ => ()
+        _ => (),
     }
 
     Ok(())
 }
 
 mod router {
-    use std::{collections::HashMap, future::Future, sync::atomic::{AtomicU64, Ordering}, time::Duration};
+    use std::{
+        collections::HashMap,
+        future::Future,
+        sync::atomic::{AtomicU64, Ordering},
+        time::Duration,
+    };
 
     use anyhow::{anyhow, Result};
     use serde::{de::DeserializeOwned, Deserialize, Serialize};
-    use serde_json::{json, Value};
-    use tokio::{sync::{mpsc::{unbounded_channel, UnboundedSender}, oneshot::{channel, Sender}, Mutex}, time::timeout};
-
-    use crate::RUNTIME;
+    use serde_json::Value;
+    use tokio::{
+        sync::{
+            mpsc::{unbounded_channel, UnboundedSender},
+            oneshot::{channel, Sender},
+            Mutex, RwLock,
+        },
+        time::timeout,
+    };
 
     pub(crate) struct MessageRouter {
         sequence: AtomicU64,
-        sender: UnboundedSender<String>,
-        requests: Mutex<HashMap<u64, Sender<Value>>>,
-        responses: Mutex<HashMap<u64, Sender<Value>>>,
+        message_channel: UnboundedSender<String>,
+        // request sender table
+        rst: Mutex<HashMap<u64, Sender<Value>>>,
+        // on receiver table
+        ort: RwLock<HashMap<String, UnboundedSender<(Sender<Result<Value>>, Value)>>>,
     }
-    
+
     impl MessageRouter {
-        pub(crate) fn new(sender: UnboundedSender<String>) -> Result<Self> {
+        pub(crate) fn new(message_channel: UnboundedSender<String>) -> Result<Self> {
             Ok(Self {
+                ort: RwLock::new(HashMap::with_capacity(100)),
+                rst: Mutex::new(HashMap::with_capacity(100)),
                 sequence: AtomicU64::new(0),
-                requests: Default::default(),
-                responses: Default::default(),
-                sender,
+                message_channel,
             })
         }
-    
+
         pub(crate) async fn send(&self, message: String) -> Result<()> {
+            log::info!("app message router recv message={}", message);
+
             let respone: Payload<Value> = serde_json::from_str(&message)?;
-            // if let Some(tx) = self.requests.lock().await.remove(&respone.sequence) {
-            //     let _ = tx.send(respone.content);
-            // }
-    
+            match respone {
+                Payload::Request {
+                    method,
+                    sequence,
+                    content,
+                } => {
+                    if let Some(sender) = self.ort.read().await.get(&method) {
+                        let (tx, rx) = channel();
+                        sender.send((tx, content))?;
+
+                        self.message_channel
+                            .send(serde_json::to_string(&Payload::Response {
+                                content: ResponseContent::from(rx.await?),
+                                sequence,
+                            })?)?;
+                    }
+                }
+                Payload::Response { sequence, content } => {
+                    if let Some(tx) = self.rst.lock().await.remove(&sequence) {
+                        let _ = tx.send(content);
+                    }
+                }
+            }
+
             Ok(())
         }
-    
-        pub(crate) async fn call<Q, S>(&self, method: &str, content: Q) -> Result<S> 
-        where 
-            Q: Serialize, 
+
+        pub(crate) async fn call<Q, S>(&self, method: &str, content: Q) -> Result<S>
+        where
+            Q: Serialize,
             S: DeserializeOwned,
         {
             let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
+            self.message_channel
+                .send(serde_json::to_string(&Payload::Request {
+                    method: method.to_string(),
+                    sequence,
+                    content,
+                })?)?;
 
-            self.sender.send(serde_json::to_string(&Payload::Request { method: method.to_string(), sequence, content })?)?;
-    
             let (tx, rx) = channel();
-            self.requests.lock().await.insert(sequence, tx);
-    
+            self.rst.lock().await.insert(sequence, tx);
+
             let response = match timeout(Duration::from_secs(5), rx).await {
                 Err(_) | Ok(Err(_)) => {
-                    drop(self.requests.lock().await.remove(&sequence));
-    
+                    drop(self.rst.lock().await.remove(&sequence));
+
                     return Err(anyhow!("request timeout"));
                 }
                 Ok(Ok(it)) => it,
             };
-    
+
             let response: ResponseContent<S> = serde_json::from_value(response)?;
             response.into()
         }
 
-        pub(crate) async fn on<T, Q, S, F>(&self, method: &str, handler: T) 
-        where 
-            T: Fn() -> F,
-            Q: Serialize, 
-            S: DeserializeOwned,
-            F: Future<Output = S>,
+        pub(crate) fn on<T, Q, S, F, C>(&self, method: &str, handle: T, ctx: C)
+        where
+            T: Fn(C, Q) -> F + Send + Sync + 'static,
+            Q: DeserializeOwned + Send,
+            S: Serialize,
+            F: Future<Output = Result<S>> + Send,
+            C: Clone + Sync + Send + 'static,
         {
-            let (tx, rx) = unbounded_channel();
-            
+            let (tx, mut rx) = unbounded_channel();
+            self.ort.blocking_write().insert(method.to_string(), tx);
 
-            RUNTIME.spawn(async move {
+            crate::RUNTIME.spawn(async move {
+                while let Some((callback, request)) = rx.recv().await {
+                    let func = async {
+                        Ok::<_, anyhow::Error>(serde_json::to_value(
+                            handle(ctx.clone(), serde_json::from_value(request)?).await?,
+                        )?)
+                    };
 
+                    let _ = callback.send(func.await);
+                }
             });
         }
     }
-    
-    #[derive(Deserialize)]
-    #[serde(tag = "type", content = "content")]
+
+    #[derive(Deserialize, Serialize)]
+    #[serde(tag = "ty", content = "content")]
     enum ResponseContent<T> {
         Ok(T),
         Err(String),
     }
-    
+
     impl<T> Into<Result<T>> for ResponseContent<T> {
         fn into(self) -> Result<T> {
             match self {
@@ -266,8 +367,17 @@ mod router {
         }
     }
 
+    impl<T> From<Result<T>> for ResponseContent<T> {
+        fn from(value: Result<T>) -> Self {
+            match value {
+                Ok(it) => Self::Ok(it),
+                Err(e) => Self::Err(e.to_string()),
+            }
+        }
+    }
+
     #[derive(Deserialize, Serialize)]
-    #[serde(tag = "type", content = "content")]
+    #[serde(tag = "ty", content = "content")]
     enum Payload<T> {
         Request {
             method: String,
@@ -277,77 +387,6 @@ mod router {
         Response {
             sequence: u64,
             content: T,
-        }
+        },
     }
 }
-
-// #[derive(Debug, Serialize)]
-// #[serde(tag = "type", content = "content")]
-// enum MainRequest {
-//     DevicesChange,
-// }
-
-// #[derive(Debug, Deserialize)]
-// #[serde(tag = "type", content = "content")]
-// enum PageRequest {
-//     GetName,
-//     SetName {
-//         name: String,
-//     },
-//     GetDevices,
-//     SendDescription {
-//         names: Vec<String>,
-//         description: MediaStreamDescription,
-//     },
-//     SetAutoAllow {
-//         enable: bool,
-//     },
-// }
-
-// #[derive(Debug, Serialize)]
-// #[serde(tag = "type", content = "content")]
-// enum PageRespone {
-//     GetName { name: String },
-//     SetName,
-//     GetDevices { devices: Vec<DeviceInfo> },
-//     SendDescription,
-//     SetAutoAllow,
-// }
-
-// struct PageHandler {
-//     devices_manager: Arc<DevicesManager>,
-//     env: Arc<RwLock<Env>>,
-// }
-
-// #[async_trait]
-// impl BridgeObserver for PageHandler {
-//     type Req = PageRequest;
-//     type Res = PageRespone;
-//     type Err = anyhow::Error;
-
-//     async fn on(&self, req: Self::Req) -> Result<Self::Res, Self::Err> {
-//         log::info!("main page receiver a request={:?}", req);
-
-//         Ok(match req {
-//             PageRequest::GetName => PageRespone::GetName {
-//                 name: self.env.read().await.settings.name.clone(),
-//             },
-//             PageRequest::SetName { name } => {
-//                 self.env.write().await.update_name(name)?;
-
-//                 PageRespone::SetName
-//             }
-//             PageRequest::GetDevices => PageRespone::GetDevices {
-//                 devices: self.devices_manager.get_devices().await,
-//             },
-//             PageRequest::SendDescription { names, description } => {
-//                 self.devices_manager
-//                     .send_description(names, description)
-//                     .await;
-
-//                 PageRespone::SendDescription
-//             }
-//             PageRequest::SetAutoAllow { enable } => PageRespone::SetAutoAllow,
-//         })
-//     }
-// }

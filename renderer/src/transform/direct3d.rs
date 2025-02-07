@@ -98,30 +98,26 @@ impl Transformer {
                 device.create_texture_from_hal::<Dx12>(
                     <Dx12 as wgpu::hal::Api>::Device::texture_from_raw(
                         {
-                            device
-                                .as_hal::<Dx12, _, _>(|hdevice| {
-                                    let mut resource = None::<ID3D12Resource>;
+                            device.as_hal::<Dx12, _, _>(|hdevice| {
+                                let mut resource = None::<ID3D12Resource>;
 
-                                    hdevice
-                                        .ok_or_else(|| TransformError::NotFoundDxBackend)?
-                                        .raw_device()
-                                        .OpenSharedHandle(
-                                            {
-                                                let handle = raw_texture.get_shared()?;
-                                                if handle.is_invalid() {
-                                                    return Err(
-                                                        TransformError::InvalidDxSharedHandle,
-                                                    );
-                                                }
+                                hdevice
+                                    .ok_or_else(|| TransformError::NotFoundDxBackend)?
+                                    .raw_device()
+                                    .OpenSharedHandle(
+                                        {
+                                            let handle = raw_texture.get_shared()?;
+                                            if handle.is_invalid() {
+                                                return Err(TransformError::InvalidDxSharedHandle);
+                                            }
 
-                                                handle
-                                            },
-                                            &mut resource,
-                                        )
-                                        .map(|_| resource.unwrap())
-                                        .map_err(|e| TransformError::WindowsError(e))
-                                })
-                                .ok_or_else(|| TransformError::NotFoundDxBackend)??
+                                            handle
+                                        },
+                                        &mut resource,
+                                    )
+                                    .map(|_| resource.unwrap())
+                                    .map_err(|e| TransformError::WindowsError(e))
+                            })?
                         },
                         desc.format,
                         desc.dimension,

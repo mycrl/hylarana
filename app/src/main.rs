@@ -99,7 +99,7 @@ impl ApplicationHandler<(WindowId, Events)> for App {
                 TrayIconEvent::DoubleClick { button, .. } => {
                     if button == MouseButton::Left {
                         self.events_manager
-                            .send(WindowId::Main, Events::EnableWindow);
+                            .send(WindowId::Main, Events::CreateWindow);
                     }
                 }
                 _ => (),

@@ -2,10 +2,10 @@
     <div id="Receiver">
         <div id="switch">
             <div class="body">
-                <span>{{ Text.AutoAllow }}</span>
+                <span>{{ Locales.AutoAllow }}</span>
                 <Switch :value="false" />
             </div>
-            <p>{{ Text.AutoAllowHelp }}</p>
+            <p>{{ Locales.AutoAllowHelp }}</p>
         </div>
         <div class="devices">
             <Devices />
@@ -13,10 +13,10 @@
     </div>
 </template>
 
-<script setup>
-import Text from "@/text";
-import Switch from "@/components/switch.vue";
-import Devices from "./devices.vue";
+<script setup lang="ts">
+import Locales from "@/locales";
+import Switch from "@/components/Switch.vue";
+import Devices from "./Receiver/Devices.vue";
 </script>
 
 <style scoped>

@@ -1,0 +1,57 @@
+#Settings {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
+#content {
+    position: absolute;
+    width: 975px;
+    top: 100px;
+    bottom: 75px;
+    padding-left: 25px;
+    overflow-y: scroll;
+}
+
+#content .module {
+    margin-bottom: 30px;
+}
+
+#content .module h1 {
+    font-size: 20px;
+    color: #999;
+    margin-bottom: 20px;
+    color: #829bff;
+    font-weight: 300;
+    text-transform: uppercase;
+}
+
+#content .module .item {
+    margin-top: 7px;
+}
+
+#content .module .item > * {
+    display: block;
+}
+
+#content .module .item sub {
+    color: #999;
+}
+
+#content .module .item input,
+#content .module .item select {
+    width: 214px;
+    margin: 2px 0;
+}
+
+#apply {
+    height: 35px;
+    width: 100px;
+    background-color: #3951af;
+    border-radius: 35px;
+    border: 0;
+    color: #fff;
+    position: absolute;
+    left: 20px;
+    bottom: 20px;
+}
