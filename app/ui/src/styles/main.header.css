@@ -7,7 +7,7 @@
     display: flex;
 }
 
-#switch {
+#Header #switch {
     background-color: #3951af;
     width: 212px;
     height: 44px;
@@ -17,43 +17,43 @@
     margin-left: 300px;
 }
 
-#navigation .icon {
+#Header #navigation .icon {
     color: #3951af;
     font-size: 17px;
 }
 
-#navigation span {
+#Header #navigation span {
     color: #555;
     margin-left: 5px;
     position: relative;
     top: -2px;
 }
 
-#switch .item {
+#Header #switch .item {
     width: 106px;
     height: 44px;
     border-radius: 44px;
 }
 
-#switch .item p {
+#Header #switch .item p {
     text-align: center;
     line-height: 44px;
 }
 
-#switch .left {
+#Header #switch .left {
     position: absolute;
     left: 0;
 }
 
-#switch .right {
+#Header #switch .right {
     position: absolute;
     right: 0;
 }
 
-#switch #selected {
+#Header #switch #selected {
     background-color: #829bff;
 }
 
-#switch #selected p {
+#Header #switch #selected p {
     color: #fff;
 }

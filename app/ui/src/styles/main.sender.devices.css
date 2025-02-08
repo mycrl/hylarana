@@ -1,19 +1,19 @@
-.header {
+#SenderDevices .header {
     border-bottom: 1px solid #e3e9ff;
 }
 
-.header p {
+#SenderDevices .header p {
     color: #829bff;
     text-transform: uppercase;
 }
 
-.header span {
+#SenderDevices .header span {
     color: #999;
     display: block;
     margin-bottom: 2px;
 }
 
-.items {
+#SenderDevices .items {
     width: 965px;
     height: 320px;
     position: relative;
@@ -21,7 +21,7 @@
     left: -5px;
 }
 
-.items #tips {
+#SenderDevices .items #tips {
     position: absolute;
     left: 0;
     bottom: 5px;
@@ -33,7 +33,7 @@
     overflow-x: hidden;
 }
 
-.items .device {
+#SenderDevices .items .device {
     border: 1px solid #ddd;
     background-color: #eee;
     border-radius: 5px;
@@ -45,7 +45,7 @@
     float: left;
 }
 
-.items .device .logo {
+#SenderDevices .items .device .logo {
     border-radius: 5px;
     height: 52px;
     width: 52px;
@@ -58,21 +58,21 @@
     left: -1px;
 }
 
-.items .device .logo .icon {
+#SenderDevices .items .device .logo .icon {
     font-size: 20px;
     position: relative;
     top: 3px;
 }
 
-.items .device .info {
+#SenderDevices .items .device .info {
     padding: 7px;
 }
 
-.items .device .info p {
+#SenderDevices .items .device .info p {
     margin-top: 1px;
     margin-bottom: 4px;
 }
 
-.items .device .info span {
+#SenderDevices .items .device .info span {
     color: #555;
 }

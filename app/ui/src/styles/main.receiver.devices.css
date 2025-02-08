@@ -1,24 +1,24 @@
-.header {
+#ReceiverDevices .header {
     border-bottom: 1px solid #e3e9ff;
 }
 
-.header p {
+#ReceiverDevices .header p {
     color: #829bff;
     text-transform: uppercase;
 }
 
-.header span {
+#ReceiverDevices .header span {
     color: #999;
     display: block;
     margin-bottom: 2px;
 }
 
-.items {
+#ReceiverDevices .items {
     width: 958px;
     height: 455px;
 }
 
-.items #tips {
+#ReceiverDevices .items #tips {
     position: absolute;
     left: 0;
     bottom: 5px;
@@ -30,7 +30,7 @@
     overflow-x: hidden;
 }
 
-.items .device {
+#ReceiverDevices .items .device {
     border: 1px solid #ddd;
     background-color: #eee;
     height: 50px;
@@ -40,7 +40,7 @@
     border-radius: 5px;
 }
 
-.items .device .logo {
+#ReceiverDevices .items .device .logo {
     height: 52px;
     width: 52px;
     border-radius: 5px 0 0 5px;
@@ -53,40 +53,40 @@
     left: -1px;
 }
 
-.items .device .logo .icon {
+#ReceiverDevices .items .device .logo .icon {
     font-size: 20px;
     position: relative;
     top: 3px;
 }
 
-.items .device .info {
+#ReceiverDevices .items .device .info {
     padding: 7px 15px;
     border-right: 1px solid #ddd;
     width: 160px;
 }
 
-.items .device .info p {
+#ReceiverDevices .items .device .info p {
     margin-top: 1px;
     margin-bottom: 4px;
 }
 
-.items .device .info span {
+#ReceiverDevices .items .device .info span {
     color: #555;
 }
 
-.items .device .description {
+#ReceiverDevices .items .device .description {
     width: 600px;
     padding-left: 15px;
     padding-right: 0;
     padding-top: 9px;
 }
 
-.items .device .description .item p {
+#ReceiverDevices .items .device .description .item p {
     display: inline;
     color: #829bff;
 }
 
-.items .device .accept {
+#ReceiverDevices .items .device .accept {
     position: absolute;
     border-left: 1px solid #ddd;
     right: 0;

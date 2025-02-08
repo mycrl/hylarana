@@ -4,20 +4,20 @@
     height: 100%;
 }
 
-#switch .body {
+#Receiver #switch .body {
     position: absolute;
     right: 20px;
     top: 20px;
     display: flex;
 }
 
-#switch .body span {
+#Receiver #switch .body span {
     margin-right: 7px;
     color: #555;
     line-height: 19px;
 }
 
-#switch p {
+#Receiver #switch p {
     text-align: right;
     position: absolute;
     top: 42px;
@@ -27,7 +27,7 @@
     font-size: 10px;
 }
 
-.devices {
+#Receiver .devices {
     position: absolute;
     left: 20px;
     right: 20px;

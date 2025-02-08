@@ -7,7 +7,7 @@
     box-shadow: inset 0 1px 1px #999;
 }
 
-.round {
+#Switch .round {
     border-radius: 19px;
     height: 19px;
     width: 19px;
@@ -17,7 +17,7 @@
     left: 0;
 }
 
-#selected {
+#Switch #selected {
     background-color: #3951af;
     right: 0;
     left: auto;

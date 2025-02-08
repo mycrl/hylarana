@@ -4,20 +4,20 @@
     height: 100%;
 }
 
-#switch .body {
+#Sender #switch .body {
     position: absolute;
     right: 20px;
     top: 20px;
     display: flex;
 }
 
-#switch .body span {
+#Sender #switch .body span {
     margin-right: 7px;
     color: #555;
     line-height: 19px;
 }
 
-#switch p {
+#Sender #switch p {
     text-align: right;
     position: absolute;
     top: 42px;
@@ -27,47 +27,47 @@
     font-size: 10px;
 }
 
-#content {
+#Sender #content {
     position: absolute;
     left: 20px;
     right: 20px;
     top: 70px;
 }
 
-#content .padding {
+#Sender #content .padding {
     height: 355px;
     width: 100%;
 }
 
-#content #control {
+#Sender #content #control {
     border-top: 1px solid #e3e9ff;
 }
 
-#content #control .box {
+#Sender #content #control .box {
     margin: 0 auto;
     width: 50%;
     text-align: center;
 }
 
-#content #control .box .items {
+#Sender #content #control .box .items {
     display: flex;
     margin-top: 20px;
 }
 
-#content #control .box .items .item {
+#Sender #content #control .box .items .item {
     flex: 1;
 }
 
-#content #control .box .items .item .icon {
+#Sender #content #control .box .items .item .icon {
     text-align: center;
 }
 
-#content #control .box .items .item .icon > * {
+#Sender #content #control .box .items .item .icon > * {
     color: #829bff;
     font-size: 17px;
 }
 
-#content #control .box .items .item select {
+#Sender #content #control .box .items .item select {
     width: 90%;
     margin: 0 5%;
     margin-top: 5px;
@@ -78,11 +78,11 @@
     border-radius: 0;
 }
 
-#content #control .box .items .item select:focus {
+#Sender #content #control .box .items .item select:focus {
     outline: none;
 }
 
-#content #control .box button {
+#Sender #content #control .box button {
     height: 40px;
     width: 170px;
     border-radius: 40px;

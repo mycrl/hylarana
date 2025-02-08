@@ -1,5 +1,6 @@
-import { computed } from "vue";
-import Settings from "./settings";
+import { useSyncExternalStore } from "react";
+import events from "./events";
+import { Settings } from "./settings";
 
 const Chinase = {
     DeviceName: "设备名称",
@@ -110,12 +111,23 @@ const English = {
     Multicast: "Multicast",
 };
 
-export const LanguageMapping = {
-    chinase: Chinase,
-    english: English,
+export type Language = typeof English;
+export const Languages = { Chinase, English };
+export const LanguageOptions = {
+    Chinase: "简体中文",
+    English: "English",
 };
 
-export default computed(() => {
-    const lang: keyof typeof LanguageMapping = Settings.value.system.language;
-    return LanguageMapping[lang];
-});
+export function languageChange() {
+    events.emit("language.change");
+}
+
+export default function () {
+    return useSyncExternalStore(
+        (callback) => {
+            const sequence = events.on("language.change", () => callback());
+            return () => events.remove(sequence);
+        },
+        () => Languages[Settings.SystemLanguage as keyof typeof Languages]
+    );
+}

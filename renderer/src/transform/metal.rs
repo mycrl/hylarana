@@ -8,7 +8,7 @@ use common::{
 
 use wgpu::{
     hal::{api::Metal, Api, CopyExtent},
-    CommandEncoder, Device, Extent3d, ImageCopyTexture, Origin3d, Texture, TextureAspect,
+    CommandEncoder, Device, Extent3d, TexelCopyTextureInfo, Origin3d, Texture, TextureAspect,
     TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
 
@@ -78,7 +78,7 @@ impl Transformer {
         let size = self.texture.size();
 
         encoder.copy_texture_to_texture(
-            ImageCopyTexture {
+            TexelCopyTextureInfo {
                 texture: &unsafe {
                     self.device.create_texture_from_hal::<Metal>(
                         <Metal as Api>::Device::texture_from_raw(
@@ -109,7 +109,7 @@ impl Transformer {
                 origin: Origin3d::default(),
                 aspect: TextureAspect::All,
             },
-            ImageCopyTexture {
+            TexelCopyTextureInfo {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: Origin3d::default(),

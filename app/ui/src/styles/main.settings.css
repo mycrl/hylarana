@@ -4,7 +4,7 @@
     height: 100%;
 }
 
-#content {
+#Settings #content {
     position: absolute;
     width: 975px;
     top: 100px;
@@ -13,11 +13,11 @@
     overflow-y: scroll;
 }
 
-#content .module {
+#Settings #content .module {
     margin-bottom: 30px;
 }
 
-#content .module h1 {
+#Settings #content .module h1 {
     font-size: 20px;
     color: #999;
     margin-bottom: 20px;
@@ -26,25 +26,25 @@
     text-transform: uppercase;
 }
 
-#content .module .item {
+#Settings #content .module .item {
     margin-top: 7px;
 }
 
-#content .module .item > * {
+#Settings #content .module .item > * {
     display: block;
 }
 
-#content .module .item sub {
+#Settings #content .module .item sub {
     color: #999;
 }
 
-#content .module .item input,
-#content .module .item select {
+#Settings #content .module .item input,
+#Settings #content .module .item select {
     width: 214px;
     margin: 2px 0;
 }
 
-#apply {
+#Settings #apply {
     height: 35px;
     width: 100px;
     background-color: #3951af;

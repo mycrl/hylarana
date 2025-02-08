@@ -29,7 +29,7 @@ use crate::env::Env;
 pub static DEVICE_TYPE: DeviceType = DeviceType::Windows;
 
 #[cfg(target_os = "macos")]
-pub static DEVICE_TYPE: DeviceType = DeviceType::Macos;
+pub static DEVICE_TYPE: DeviceType = DeviceType::Apple;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ServiceInfo {
