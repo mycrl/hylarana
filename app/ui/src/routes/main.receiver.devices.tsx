@@ -1,10 +1,10 @@
 import "../styles/main.receiver.devices.css";
-import { DeviceInfo } from "../types";
+import { Device } from "../devices";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import createLocalesStore from "../locales";
+import { createLocalesStore } from "../locales";
 
-export default function ({ devices }: { devices: DeviceInfo[] }) {
+export default function ({ devices }: { devices: Device[] }) {
     const Locales = createLocalesStore();
 
     return (
@@ -12,7 +12,7 @@ export default function ({ devices }: { devices: DeviceInfo[] }) {
             <div id='ReceiverDevices'>
                 <div className='header'>
                     <p>{Locales.Devices}</p>
-                    <span>All devices that are casting the screen.</span>
+                    <span>{Locales.DevicesReceiverHelp}</span>
                 </div>
                 <div className='items'>
                     {devices.map((it) => (

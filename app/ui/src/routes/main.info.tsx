@@ -1,6 +1,6 @@
 import "../styles/main.info.css";
-import createLocalesStore from "../locales";
-import createSettingsStore from "../settings";
+import { createLocalesStore } from "../locales";
+import { createSettingsStore, VideoEncoders } from "../settings";
 
 export default function () {
     const Settings = createSettingsStore();
@@ -16,8 +16,8 @@ export default function () {
                 <sub>/</sub>
                 <span>{Locales.Video}:</span>
                 <p>
-                    {Settings.VideoSizeWidth}x{Settings.VideoSizeHeight}/{Settings.VideoFrameRate}/
-                    {Settings.VideoBitRate}
+                    {VideoEncoders[Settings.CodecEncoder]}/{Settings.VideoSizeWidth}x
+                    {Settings.VideoSizeHeight}/{Settings.VideoFrameRate}/{Settings.VideoBitRate}
                 </p>
                 <sub>/</sub>
                 <span>{Locales.Audio}:</span>

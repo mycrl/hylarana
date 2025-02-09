@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import events from "./events";
 import { ONCE } from "./utils";
+import { MessageRouter, Methods } from "./message";
+import { Languages } from "./locales";
 
 export const VideoEncoders = {
     x264: "X264",
@@ -15,8 +17,27 @@ export const VideoDecoders = {
     videotoolbox: "VideoToolbox - Apple",
 };
 
-export const DefaultSettings = {
-    SystemDeviceName: Date.now().toString(),
+export interface SettingsType {
+    SystemDeviceName: string;
+    SystemLanguage: keyof typeof Languages;
+    SystemSenderBroadcast: boolean;
+    NetworkInterface: string;
+    NetworkMulticast: string;
+    NetworkServer: string | null;
+    NetworkMtu: number;
+    CodecEncoder: keyof typeof VideoEncoders;
+    CodecDecoder: keyof typeof VideoDecoders;
+    VideoSizeWidth: number;
+    VideoSizeHeight: number;
+    VideoFrameRate: number;
+    VideoBitRate: number;
+    VideoKeyFrameInterval: number;
+    AudioSampleRate: number;
+    AudioBitRate: number;
+}
+
+export const DefaultSettings: SettingsType = {
+    SystemDeviceName: "",
     SystemLanguage: "English",
     SystemSenderBroadcast: false,
     NetworkInterface: "0.0.0.0",
@@ -34,14 +55,18 @@ export const DefaultSettings = {
     AudioBitRate: 64000,
 };
 
-export type SettingsType = typeof DefaultSettings;
-
-export const Settings: SettingsType = ONCE("settings", () => {
+export const Settings = ONCE("settings", () => {
     if (!localStorage.Settings) {
         localStorage.Settings = JSON.stringify(DefaultSettings);
     }
 
-    return JSON.parse(localStorage.Settings);
+    let settings: SettingsType = JSON.parse(localStorage.Settings);
+    MessageRouter.call(Methods.GetName).then((name) => {
+        settings.SystemDeviceName = name;
+        setSettings(settings);
+    });
+
+    return settings;
 });
 
 export function setSettings(value: SettingsType) {
@@ -53,7 +78,7 @@ export function setSettings(value: SettingsType) {
     events.emit("settings.change");
 }
 
-export default function () {
+export function createSettingsStore() {
     return useSyncExternalStore(
         (callback) => {
             const sequence = events.on("settings.change", () => callback());

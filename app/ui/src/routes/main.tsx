@@ -8,14 +8,13 @@ import "../styles/main.css";
 
 export default function () {
     const [type, setType] = useState<Type>("sender");
-    const [devices, setDevices] = useState([]);
 
     return (
         <>
             <div id='Main'>
                 <MainHeader defaultType='sender' onChange={setType} />
-                {type == "sender" && <MainSender devices={devices} />}
-                {type == "receiver" && <MainReceiver devices={devices} />}
+                {type == "sender" && <MainSender />}
+                {type == "receiver" && <MainReceiver />}
                 {type == "settings" && <MainSettings />}
                 {type != "settings" && <MainInfo />}
             </div>

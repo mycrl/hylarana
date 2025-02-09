@@ -17,20 +17,19 @@ const Command = (cmd, options = {}) =>
         (
             resolve,
             reject,
-            ps = child_process.exec(
+            ps = child_process.spawn(
                 process.platform == "win32"
                     ? "$ProgressPreference = 'SilentlyContinue';" + cmd
                     : cmd,
                 {
                     shell: process.platform == "win32" ? "powershell.exe" : "bash",
+                    stdio: "inherit",
+                    stderr: "inherit",
                     cwd: __dirname,
                     ...options,
                 }
             )
         ) => {
-            ps.stdout.pipe(process.stdout);
-            ps.stderr.pipe(process.stderr);
-
             ps.on("error", reject);
             ps.on("close", (code) => {
                 code == 0 ? resolve() : reject(code || 0);

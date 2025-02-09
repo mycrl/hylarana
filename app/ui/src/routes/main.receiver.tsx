@@ -1,11 +1,12 @@
 import "../styles/main.receiver.css";
-import { DeviceInfo } from "../types";
 import Devices from "./main.receiver.devices";
 import Switch from "../components/switch";
-import createLocalesStore from "../locales";
+import { createLocalesStore } from "../locales";
+import { useState } from "react";
 
-export default function ({ devices }: { devices: DeviceInfo[] }) {
+export default function () {
     const Locales = createLocalesStore();
+    const [devices, _] = useState([]);
 
     return (
         <>

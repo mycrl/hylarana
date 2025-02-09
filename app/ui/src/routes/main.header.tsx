@@ -1,7 +1,7 @@
 import "../styles/main.header.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear, faAngleLeft } from "@fortawesome/free-solid-svg-icons";
-import createLocalesStore from "../locales";
+import { createLocalesStore } from "../locales";
 import { useState } from "react";
 
 export type Type = "settings" | "sender" | "receiver";

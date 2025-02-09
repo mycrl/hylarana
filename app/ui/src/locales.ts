@@ -50,10 +50,12 @@ const Chinase = {
     BackToHome: "返回",
     Devices: "设备列表",
     DevicesHelp: "查找到的所有可以投屏的设备",
+    DevicesReceiverHelp: "查找到的所有正在投屏的设备",
     DevicesSearchHelp: "正在查找可用设备...",
     Direct: "直连",
     Relay: "转发",
     Multicast: "多播",
+    SenderStart: "开始投屏",
 };
 
 const English = {
@@ -105,10 +107,12 @@ const English = {
     BackToHome: "Back to Home",
     Devices: "devices",
     DevicesHelp: "all devices that can be screen cast are found.",
+    DevicesReceiverHelp: "All devices that are casting the screen.",
     DevicesSearchHelp: "Searching for available devices...",
     Direct: "Direct",
     Relay: "Relay",
     Multicast: "Multicast",
+    SenderStart: "Start",
 };
 
 export type Language = typeof English;
@@ -122,7 +126,7 @@ export function languageChange() {
     events.emit("language.change");
 }
 
-export default function () {
+export function createLocalesStore() {
     return useSyncExternalStore(
         (callback) => {
             const sequence = events.on("language.change", () => callback());

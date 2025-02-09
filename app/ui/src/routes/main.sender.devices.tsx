@@ -1,10 +1,10 @@
 import "../styles/main.sender.devices.css";
-import { DeviceInfo } from "../types";
+import { Device } from "../devices";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import createLocalesStore from "../locales";
+import { createLocalesStore } from "../locales";
 
-export default function ({ devices }: { devices: DeviceInfo[] }) {
+export default function ({ devices }: { devices: Device[] }) {
     const Locales = createLocalesStore();
 
     return (

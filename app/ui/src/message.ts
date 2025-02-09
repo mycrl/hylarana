@@ -1,3 +1,4 @@
+import { Device, Source, SourceType } from "./devices";
 import { ONCE } from "./utils";
 
 declare global {
@@ -30,41 +31,43 @@ interface Response<T> {
     content: ResponseContent<T>;
 }
 
-const transport: {
-    sequence: number;
-    requests: {
-        [key: number]: (response: unknown) => void;
-    };
-    listeners: {
-        [key: string]: (request: unknown) => void;
-    };
-} = ONCE("message-transport", () => {
-    // window.MessageTransport.on((message) => {
-    //     try {
-    //         const payload: Payload<unknown> = JSON.parse(message);
-    //         console.log("message transport recv payload = ", payload);
-
-    //         if (payload.ty == "Request") {
-    //             const { method } = payload.content as Request<unknown>;
-    //             if (window.__MESSAGE_TRANSPORT!.listeners[method]) {
-    //                 window.__MESSAGE_TRANSPORT!.listeners[method](payload.content);
-    //             }
-    //         } else {
-    //             const { sequence, content } = payload.content as Response<unknown>;
-    //             if (window.__MESSAGE_TRANSPORT!.requests[sequence]) {
-    //                 window.__MESSAGE_TRANSPORT!.requests[sequence](content);
-    //             }
-    //         }
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    // });
-
-    return {
+const transport = ONCE("message-transport", () => {
+    let transport: {
+        sequence: number;
+        requests: {
+            [key: number]: (response: unknown) => void;
+        };
+        listeners: {
+            [key: string]: (request: unknown) => void;
+        };
+    } = {
         sequence: 0,
         requests: {},
         listeners: {},
     };
+
+    window.MessageTransport.on((message) => {
+        try {
+            const payload: Payload<unknown> = JSON.parse(message);
+            console.log("message transport recv payload = ", payload);
+
+            if (payload.ty == "Request") {
+                const { method } = payload.content as Request<unknown>;
+                if (transport.listeners[method]) {
+                    transport.listeners[method](payload.content);
+                }
+            } else {
+                const { sequence, content } = payload.content as Response<unknown>;
+                if (transport.requests[sequence]) {
+                    transport.requests[sequence](content);
+                }
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    });
+
+    return transport;
 });
 
 function sendMessage<T>(payload: T) {
@@ -74,7 +77,10 @@ function sendMessage<T>(payload: T) {
 }
 
 export class MessageRouter {
-    static on<Q, S>(method: string, handle: (request: Q) => Promise<S> | S) {
+    static on<K extends keyof OnTypes, Q extends OnTypes[K][0], S extends OnTypes[K][1]>(
+        method: string,
+        handle: (request: Q) => Promise<S> | S
+    ) {
         transport.listeners[method] = async (request: unknown) => {
             const { sequence, content } = request as Request<Q>;
 
@@ -103,11 +109,16 @@ export class MessageRouter {
         };
     }
 
-    static call<Q, S>(method: string, req?: Q): Promise<S> {
+    static call<K extends keyof CallTypes, Q extends CallTypes[K][0], S extends CallTypes[K][1]>(
+        method: K,
+        req?: Q
+    ): Promise<S> {
         return new Promise((resolve, reject) => {
             const sequence = transport.sequence;
             if (transport.sequence == 65535) {
                 transport.sequence = 0;
+            } else {
+                transport.sequence += 1;
             }
 
             const timeout = setTimeout(() => {
@@ -141,4 +152,25 @@ export class MessageRouter {
             });
         });
     }
+}
+
+export enum Methods {
+    GetName = "GetName",
+    SetName = "SetName",
+    GetDevices = "GetDevices",
+    DevicesChangeNotify = "DevicesChangeNotify",
+    ReadyNotify = "ReadyNotify",
+    GetCaptureSources = "GetCaptureSources",
+}
+
+interface CallTypes {
+    [Methods.GetName]: [void, string];
+    [Methods.SetName]: [string, void];
+    [Methods.GetDevices]: [void, Device[]];
+    [Methods.GetCaptureSources]: [SourceType, Source[]];
+}
+
+interface OnTypes {
+    [Methods.DevicesChangeNotify]: [void, void];
+    [Methods.ReadyNotify]: [void, void];
 }
