@@ -2,17 +2,18 @@ import "../styles/main.receiver.devices.css";
 import { Device } from "../devices";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import { createLocalesStore } from "../locales";
+import { localesAtom } from "../locales";
+import { useAtom } from "jotai";
 
 export default function ({ devices }: { devices: Device[] }) {
-    const Locales = createLocalesStore();
+    const [locales] = useAtom(localesAtom);
 
     return (
         <>
             <div id='ReceiverDevices'>
                 <div className='header'>
-                    <p>{Locales.Devices}</p>
-                    <span>{Locales.DevicesReceiverHelp}</span>
+                    <p>{locales.Devices}</p>
+                    <span>{locales.DevicesReceiverHelp}</span>
                 </div>
                 <div className='items'>
                     {devices.map((it) => (
@@ -34,19 +35,19 @@ export default function ({ devices }: { devices: Device[] }) {
                             </div>
                             <div className='description'>
                                 <div className='item'>
-                                    <p>{Locales.Video} -</p>
+                                    <p>{locales.Video} -</p>
                                     <span>
-                                        {Locales.Codec}: H264 / {Locales.VideoSize}: 1280x720 /
-                                        {Locales.VideoFrameRate}: 30 / {Locales.BitRate}: 10000000 /
-                                        {Locales.VideoFormat}: NV12
+                                        {locales.Codec}: H264 / {locales.VideoSize}: 1280x720 /
+                                        {locales.VideoFrameRate}: 30 / {locales.BitRate}: 10000000 /
+                                        {locales.VideoFormat}: NV12
                                     </span>
                                 </div>
                                 <div className='item'>
-                                    <p>{Locales.Audio} -</p>
+                                    <p>{locales.Audio} -</p>
                                     <span>
-                                        {Locales.Codec}: OPUS / {Locales.AudioChannel}:
-                                        {Locales.AudioStereo} / {Locales.AudioSampleRate}: 48000 /
-                                        {Locales.AudioSampleBit}: 16 / {Locales.BitRate}: 64000
+                                        {locales.Codec}: OPUS / {locales.AudioChannel}:
+                                        {locales.AudioStereo} / {locales.AudioSampleRate}: 48000 /
+                                        {locales.AudioSampleBit}: 16 / {locales.BitRate}: 64000
                                     </span>
                                 </div>
                             </div>
@@ -55,7 +56,7 @@ export default function ({ devices }: { devices: Device[] }) {
                             </div>
                         </div>
                     ))}
-                    <span id='tips'>{Locales.DevicesSearchHelp}</span>
+                    <span id='tips'>{locales.DevicesSearchHelp}</span>
                 </div>
             </div>
         </>

@@ -4,12 +4,13 @@ import Switch from "../components/switch";
 import Devices from "./main.sender.devices";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faVolumeLow, faDisplay, faNetworkWired } from "@fortawesome/free-solid-svg-icons";
-import { createLocalesStore, Language } from "../locales";
-import { Settings, setSettings } from "../settings";
-import { createDevicesStore, createDisplaysStore, createAudiosStore } from "../devices";
+import { localesAtom, Language } from "../locales";
+import { settingsAtom } from "../settings";
+import { DisplaysAtom, AudiosAtom, DevicesAtom } from "../devices";
+import { useAtom } from "jotai";
 
 function Displays() {
-    const sources = createDisplaysStore();
+    const [sources] = useAtom(DisplaysAtom);
 
     return (
         <>
@@ -30,7 +31,7 @@ function Displays() {
 }
 
 function Audios() {
-    const sources = createAudiosStore();
+    const [sources] = useAtom(AudiosAtom);
 
     return (
         <>
@@ -50,7 +51,9 @@ function Audios() {
     );
 }
 
-function Transport({ Locales }: { Locales: Language }) {
+function Transport({ locales }: { locales: Language }) {
+    const [settings] = useAtom(settingsAtom);
+
     return (
         <>
             <div className='item'>
@@ -58,9 +61,9 @@ function Transport({ Locales }: { Locales: Language }) {
                     <FontAwesomeIcon icon={faNetworkWired} />
                 </div>
                 <select className='click'>
-                    <option>{Locales.Direct}</option>
-                    <option>{Locales.Relay}</option>
-                    <option>{Locales.Multicast}</option>
+                    <option>{locales.Direct}</option>
+                    <option>{locales.Relay}</option>
+                    {settings.NetworkServer && <option>{locales.Multicast}</option>}
                 </select>
             </div>
         </>
@@ -68,27 +71,27 @@ function Transport({ Locales }: { Locales: Language }) {
 }
 
 export default function () {
-    const Locales = createLocalesStore();
-    const devices = createDevicesStore();
+    const [locales] = useAtom(localesAtom);
+    const [settings] = useAtom(settingsAtom);
+    const [devices] = useAtom(DevicesAtom);
 
-    const [broadcast, setBroadcast] = useState(Settings.SystemSenderBroadcast);
+    const [broadcast, setBroadcast] = useState(settings.SystemSenderBroadcast);
 
     return (
         <>
             <div id='Sender'>
                 <div id='switch'>
                     <div className='body'>
-                        <span>{Locales.Broadcast}</span>
+                        <span>{locales.Broadcast}</span>
                         <Switch
-                            defaultValue={Settings.SystemSenderBroadcast}
+                            defaultValue={settings.SystemSenderBroadcast}
                             onChange={(it) => {
-                                Settings.SystemSenderBroadcast = it;
-                                setSettings(Settings);
+                                settings.SystemSenderBroadcast = it;
                                 setBroadcast(it);
                             }}
                         />
                     </div>
-                    <p>{Locales.BroadcastHelp}</p>
+                    <p>{locales.BroadcastHelp}</p>
                 </div>
                 <div id='content'>
                     {!broadcast ? <Devices devices={devices} /> : <div className='padding'></div>}
@@ -98,9 +101,9 @@ export default function () {
                             <div className='items'>
                                 <Audios />
                                 <Displays />
-                                <Transport Locales={Locales} />
+                                <Transport locales={locales} />
                             </div>
-                            <button className='click'>{Locales.SenderStart}</button>
+                            <button className='click'>{locales.SenderStart}</button>
                         </div>
                     </div>
                 </div>

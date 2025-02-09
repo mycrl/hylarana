@@ -1,28 +1,29 @@
 import "../styles/main.info.css";
-import { createLocalesStore } from "../locales";
-import { createSettingsStore, VideoEncoders } from "../settings";
+import { localesAtom } from "../locales";
+import { settingsAtom, VideoEncoders } from "../settings";
+import { useAtom } from "jotai";
 
 export default function () {
-    const Settings = createSettingsStore();
-    const Locales = createLocalesStore();
+    const [settings] = useAtom(settingsAtom);
+    const [locales] = useAtom(localesAtom);
 
     return (
         <>
             <div id='Info'>
-                <span>{Locales.Network}:</span>
+                <span>{locales.Network}:</span>
                 <p>
-                    {Locales.Direct}-{Settings.NetworkInterface}
+                    {locales.Direct}-{settings.NetworkInterface}
                 </p>
                 <sub>/</sub>
-                <span>{Locales.Video}:</span>
+                <span>{locales.Video}:</span>
                 <p>
-                    {VideoEncoders[Settings.CodecEncoder]}/{Settings.VideoSizeWidth}x
-                    {Settings.VideoSizeHeight}/{Settings.VideoFrameRate}/{Settings.VideoBitRate}
+                    {VideoEncoders[settings.CodecEncoder]}/{settings.VideoSizeWidth}x
+                    {settings.VideoSizeHeight}/{settings.VideoFrameRate}/{settings.VideoBitRate}
                 </p>
                 <sub>/</sub>
-                <span>{Locales.Audio}:</span>
+                <span>{locales.Audio}:</span>
                 <p>
-                    {Locales.AudioStereo}/{Settings.AudioSampleRate}/{Settings.AudioBitRate}
+                    {locales.AudioStereo}/{settings.AudioSampleRate}/{settings.AudioBitRate}
                 </p>
 
                 <div className='timer'>00:00:00</div>

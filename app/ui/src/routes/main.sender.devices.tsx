@@ -2,17 +2,18 @@ import "../styles/main.sender.devices.css";
 import { Device } from "../devices";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import { createLocalesStore } from "../locales";
+import { localesAtom } from "../locales";
+import { useAtom } from "jotai";
 
 export default function ({ devices }: { devices: Device[] }) {
-    const Locales = createLocalesStore();
+    const [locales] = useAtom(localesAtom);
 
     return (
         <>
             <div id='SenderDevices'>
                 <div className='header'>
-                    <p>{Locales.Devices}</p>
-                    <span>{Locales.DevicesHelp}</span>
+                    <p>{locales.Devices}</p>
+                    <span>{locales.DevicesHelp}</span>
                 </div>
                 <div className='items'>
                     {devices.map((it) => (
@@ -34,7 +35,7 @@ export default function ({ devices }: { devices: Device[] }) {
                             </div>
                         </div>
                     ))}
-                    <span id='tips'>{Locales.DevicesSearchHelp}</span>
+                    <span id='tips'>{locales.DevicesSearchHelp}</span>
                 </div>
             </div>
         </>

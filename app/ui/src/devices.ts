@@ -1,7 +1,5 @@
-import { useSyncExternalStore } from "react";
+import { atom, useSetAtom } from "jotai";
 import { MessageRouter, Methods } from "./message";
-import { ONCE } from "./utils";
-import events from "./events";
 
 export enum DeviceType {
     Windows = "Windows",
@@ -31,82 +29,28 @@ export interface Source {
     name: string;
 }
 
-export const Devices = ONCE("devices", () => {
-    let devices: Device[] = [];
+export const DevicesAtom = atom<Device[]>([]);
 
+MessageRouter.call(Methods.GetDevices).then((list) => {
+    useSetAtom(DevicesAtom)(() => list);
+});
+
+MessageRouter.on(Methods.DevicesChangeNotify, async () => {
     MessageRouter.call(Methods.GetDevices).then((list) => {
-        {
-            devices = list;
-        }
-
-        events.emit("devices.change");
+        useSetAtom(DevicesAtom)(() => list);
     });
-
-    MessageRouter.on(Methods.DevicesChangeNotify, async () => {
-        {
-            devices = await MessageRouter.call(Methods.GetDevices);
-        }
-
-        events.emit("devices.change");
-    });
-
-    return devices;
 });
 
-export function createDevicesStore() {
-    return useSyncExternalStore(
-        (callback) => {
-            const sequence = events.on("devices.change", () => callback());
-            return () => events.remove(sequence);
-        },
-        () => Devices
-    );
-}
+export const DisplaysAtom = atom<Source[]>([]);
 
-export const Displays = ONCE("displays", () => {
-    let sources: Source[] = [];
-
-    MessageRouter.call(Methods.GetCaptureSources, SourceType.Screen).then((list) => {
-        {
-            sources = list;
-        }
-
-        events.emit("displays.change");
-    });
-
-    return sources;
+MessageRouter.call(Methods.GetCaptureSources, SourceType.Screen).then((list) => {
+    useSetAtom(DisplaysAtom)(() => list);
 });
 
-export function createDisplaysStore() {
-    return useSyncExternalStore(
-        (callback) => {
-            const sequence = events.on("displays.change", () => callback());
-            return () => events.remove(sequence);
-        },
-        () => Displays
-    );
-}
+export const AudiosAtom = atom<Source[]>([]);
 
-export const Audios = ONCE("audios", () => {
-    let sources: Source[] = [];
-
+{
     MessageRouter.call(Methods.GetCaptureSources, SourceType.Audio).then((list) => {
-        {
-            sources = list;
-        }
-
-        events.emit("audios.change");
+        useSetAtom(AudiosAtom)(() => list);
     });
-
-    return sources;
-});
-
-export function createAudiosStore() {
-    return useSyncExternalStore(
-        (callback) => {
-            const sequence = events.on("audios.change", () => callback());
-            return () => events.remove(sequence);
-        },
-        () => Audios
-    );
 }

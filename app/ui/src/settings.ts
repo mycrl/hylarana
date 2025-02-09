@@ -1,8 +1,7 @@
-import { useSyncExternalStore } from "react";
-import events from "./events";
-import { ONCE } from "./utils";
+import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import { MessageRouter, Methods } from "./message";
-import { Languages } from "./locales";
+import { LanguageOptions } from "./locales";
+import { useSetAtom } from "jotai";
 
 export const VideoEncoders = {
     x264: "X264",
@@ -19,7 +18,7 @@ export const VideoDecoders = {
 
 export interface SettingsType {
     SystemDeviceName: string;
-    SystemLanguage: keyof typeof Languages;
+    SystemLanguage: keyof typeof LanguageOptions;
     SystemSenderBroadcast: boolean;
     NetworkInterface: string;
     NetworkMulticast: string;
@@ -55,35 +54,20 @@ export const DefaultSettings: SettingsType = {
     AudioBitRate: 64000,
 };
 
-export const Settings = ONCE("settings", () => {
-    if (!localStorage.Settings) {
-        localStorage.Settings = JSON.stringify(DefaultSettings);
-    }
-
-    let settings: SettingsType = JSON.parse(localStorage.Settings);
-    MessageRouter.call(Methods.GetName).then((name) => {
-        settings.SystemDeviceName = name;
-        setSettings(settings);
-    });
-
-    return settings;
-});
-
-export function setSettings(value: SettingsType) {
+export const settingsAtom = atomWithStorage(
+    "settings",
+    DefaultSettings,
+    createJSONStorage(() => localStorage),
     {
-        localStorage.Settings = JSON.stringify(value);
+        getOnInit: true,
     }
+);
 
-    Object.assign(Settings, value);
-    events.emit("settings.change");
-}
-
-export function createSettingsStore() {
-    return useSyncExternalStore(
-        (callback) => {
-            const sequence = events.on("settings.change", () => callback());
-            return () => events.remove(sequence);
-        },
-        () => Settings
-    );
+{
+    MessageRouter.call(Methods.GetName).then((SystemDeviceName) => {
+        useSetAtom(settingsAtom)((prev) => ({
+            ...prev,
+            SystemDeviceName,
+        }));
+    });
 }

@@ -1,6 +1,10 @@
-import { useSyncExternalStore } from "react";
-import events from "./events";
-import { Settings } from "./settings";
+import { atom, createStore, useSetAtom } from "jotai";
+import { settingsAtom } from "./settings";
+
+export const LanguageOptions = {
+    Chinase: "简体中文",
+    English: "English",
+};
 
 const Chinase = {
     DeviceName: "设备名称",
@@ -116,22 +120,11 @@ const English = {
 };
 
 export type Language = typeof English;
+
 export const Languages = { Chinase, English };
-export const LanguageOptions = {
-    Chinase: "简体中文",
-    English: "English",
-};
 
-export function languageChange() {
-    events.emit("language.change");
-}
+export const localesAtom = atom(Languages[createStore().get(settingsAtom).SystemLanguage]);
 
-export function createLocalesStore() {
-    return useSyncExternalStore(
-        (callback) => {
-            const sequence = events.on("language.change", () => callback());
-            return () => events.remove(sequence);
-        },
-        () => Languages[Settings.SystemLanguage as keyof typeof Languages]
-    );
+export function setLanguage(lang: keyof typeof Languages) {
+    useSetAtom(localesAtom)(() => Languages[lang]);
 }

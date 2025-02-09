@@ -1,5 +1,4 @@
 import { Device, Source, SourceType } from "./devices";
-import { ONCE } from "./utils";
 
 declare global {
     interface Window {
@@ -31,43 +30,39 @@ interface Response<T> {
     content: ResponseContent<T>;
 }
 
-const transport = ONCE("message-transport", () => {
-    let transport: {
-        sequence: number;
-        requests: {
-            [key: number]: (response: unknown) => void;
-        };
-        listeners: {
-            [key: string]: (request: unknown) => void;
-        };
-    } = {
-        sequence: 0,
-        requests: {},
-        listeners: {},
+let transport: {
+    sequence: number;
+    requests: {
+        [key: number]: (response: unknown) => void;
     };
+    listeners: {
+        [key: string]: (request: unknown) => void;
+    };
+} = {
+    sequence: 0,
+    requests: {},
+    listeners: {},
+};
 
-    window.MessageTransport.on((message) => {
-        try {
-            const payload: Payload<unknown> = JSON.parse(message);
-            console.log("message transport recv payload = ", payload);
+window.MessageTransport.on((message) => {
+    try {
+        const payload: Payload<unknown> = JSON.parse(message);
+        console.log("message transport recv payload = ", payload);
 
-            if (payload.ty == "Request") {
-                const { method } = payload.content as Request<unknown>;
-                if (transport.listeners[method]) {
-                    transport.listeners[method](payload.content);
-                }
-            } else {
-                const { sequence, content } = payload.content as Response<unknown>;
-                if (transport.requests[sequence]) {
-                    transport.requests[sequence](content);
-                }
+        if (payload.ty == "Request") {
+            const { method } = payload.content as Request<unknown>;
+            if (transport.listeners[method]) {
+                transport.listeners[method](payload.content);
             }
-        } catch (e) {
-            console.log(e);
+        } else {
+            const { sequence, content } = payload.content as Response<unknown>;
+            if (transport.requests[sequence]) {
+                transport.requests[sequence](content);
+            }
         }
-    });
-
-    return transport;
+    } catch (e) {
+        console.log(e);
+    }
 });
 
 function sendMessage<T>(payload: T) {

@@ -1,11 +1,12 @@
 import "../styles/main.receiver.css";
 import Devices from "./main.receiver.devices";
 import Switch from "../components/switch";
-import { createLocalesStore } from "../locales";
+import { localesAtom } from "../locales";
 import { useState } from "react";
+import { useAtom } from "jotai";
 
 export default function () {
-    const Locales = createLocalesStore();
+    const [locales] = useAtom(localesAtom);
     const [devices, _] = useState([]);
 
     return (
@@ -13,10 +14,10 @@ export default function () {
             <div id='Receiver'>
                 <div id='switch'>
                     <div className='body'>
-                        <span>{Locales.AutoAllow}</span>
+                        <span>{locales.AutoAllow}</span>
                         <Switch defaultValue={false} />
                     </div>
-                    <p>{Locales.AutoAllowHelp}</p>
+                    <p>{locales.AutoAllowHelp}</p>
                 </div>
                 <div className='devices'>
                     <Devices devices={devices} />
