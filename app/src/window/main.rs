@@ -52,6 +52,43 @@ impl WindowHandler for MainWindow {
                         let (tx, mut rx) = unbounded_channel();
                         let message_router = Arc::new(MessageRouter::new(tx)?);
 
+                        {
+                            message_router.on(
+                                "GetName",
+                                |env, _: ()| async move {
+                                    Ok(env.read().await.settings.name.clone())
+                                },
+                                self.env.clone(),
+                            );
+
+                            message_router.on(
+                                "SetName",
+                                |env, name: String| async move {
+                                    env.write().await.update_name(name)?;
+                                    Ok(())
+                                },
+                                self.env.clone(),
+                            );
+
+                            message_router.on(
+                                "GetDevices",
+                                |devices_manager, _: ()| async move {
+                                    Ok(devices_manager.get_devices().await)
+                                },
+                                self.devices_manager.clone(),
+                            );
+
+                            message_router.on(
+                                "GetCaptureSources",
+                                |_, kind| async move {
+                                    Ok(RUNTIME
+                                        .spawn_blocking(move || Capture::get_sources(kind))
+                                        .await??)
+                                },
+                                (),
+                            );
+                        }
+
                         let page = self.webview.create_page(
                             {
                                 &std::env::var(Env::ENV_WEBVIEW_MAIN_PAGE_URL)
@@ -100,43 +137,6 @@ impl WindowHandler for MainWindow {
                                     }
                                 }
                             });
-                        }
-
-                        {
-                            message_router.on(
-                                "GetName",
-                                |env, _: ()| async move {
-                                    Ok(env.read().await.settings.name.clone())
-                                },
-                                self.env.clone(),
-                            );
-
-                            message_router.on(
-                                "SetName",
-                                |env, name: String| async move {
-                                    env.write().await.update_name(name)?;
-                                    Ok(())
-                                },
-                                self.env.clone(),
-                            );
-
-                            message_router.on(
-                                "GetDevices",
-                                |devices_manager, _: ()| async move {
-                                    Ok(devices_manager.get_devices().await)
-                                },
-                                self.devices_manager.clone(),
-                            );
-
-                            message_router.on(
-                                "GetCaptureSources",
-                                |_, kind| async move {
-                                    Ok(RUNTIME
-                                        .spawn_blocking(move || Capture::get_sources(kind))
-                                        .await??)
-                                },
-                                (),
-                            );
                         }
 
                         if std::env::var(Env::ENV_ENABLE_WEBVIEW_DEVTOOLS).is_ok() {

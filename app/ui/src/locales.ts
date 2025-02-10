@@ -1,5 +1,5 @@
-import { atom, createStore, useSetAtom } from "jotai";
-import { settingsAtom } from "./settings";
+import { atom, getDefaultStore } from "jotai";
+import { atomWithStorage } from "jotai/utils";
 
 export const LanguageOptions = {
     Chinase: "简体中文",
@@ -123,8 +123,36 @@ export type Language = typeof English;
 
 export const Languages = { Chinase, English };
 
-export const localesAtom = atom(Languages[createStore().get(settingsAtom).SystemLanguage]);
+if (!localStorage.language) {
+    localStorage.language = "English";
+}
 
-export function setLanguage(lang: keyof typeof Languages) {
-    useSetAtom(localesAtom)(() => Languages[lang]);
+export const languageAtom = atomWithStorage<keyof typeof Languages>(
+    "language",
+    "English",
+    {
+        getItem(key) {
+            return localStorage[key];
+        },
+        setItem(key, value) {
+            localStorage[key] = value;
+        },
+        removeItem(key) {
+            localStorage.removeItem(key);
+        },
+    },
+    {
+        getOnInit: true,
+    }
+);
+
+const store = getDefaultStore();
+
+export const localesAtom = atom(Languages[store.get(languageAtom)]);
+
+{
+    store.sub(languageAtom, () => {
+        const value = store.get(languageAtom);
+        store.set(localesAtom, Languages[value]);
+    });
 }

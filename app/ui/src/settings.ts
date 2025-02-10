@@ -1,7 +1,6 @@
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
-import { MessageRouter, Methods } from "./message";
-import { LanguageOptions } from "./locales";
-import { useSetAtom } from "jotai";
+import { Route, Methods } from "./message";
+import { atom, getDefaultStore } from "jotai";
 
 export const VideoEncoders = {
     x264: "X264",
@@ -17,9 +16,6 @@ export const VideoDecoders = {
 };
 
 export interface SettingsType {
-    SystemDeviceName: string;
-    SystemLanguage: keyof typeof LanguageOptions;
-    SystemSenderBroadcast: boolean;
     NetworkInterface: string;
     NetworkMulticast: string;
     NetworkServer: string | null;
@@ -36,9 +32,6 @@ export interface SettingsType {
 }
 
 export const DefaultSettings: SettingsType = {
-    SystemDeviceName: "",
-    SystemLanguage: "English",
-    SystemSenderBroadcast: false,
     NetworkInterface: "0.0.0.0",
     NetworkMulticast: "239.0.0.1",
     NetworkServer: null,
@@ -63,11 +56,40 @@ export const settingsAtom = atomWithStorage(
     }
 );
 
+export const deviceNameAtom = atom("");
+
 {
-    MessageRouter.call(Methods.GetName).then((SystemDeviceName) => {
-        useSetAtom(settingsAtom)((prev) => ({
-            ...prev,
-            SystemDeviceName,
-        }));
+    const store = getDefaultStore();
+
+    Route.call(Methods.GetName).then((name) => {
+        store.set(deviceNameAtom, name);
+
+        store.sub(settingsAtom, () => {
+            const value = store.get(deviceNameAtom);
+            if (value != name) {
+                Route.call(Methods.SetName, value).then(() => {
+                    name = value;
+                });
+            }
+        });
     });
 }
+
+export const broadcastAtom = atomWithStorage<boolean>(
+    "broadcast",
+    false,
+    {
+        getItem(key) {
+            return localStorage[key] == "true";
+        },
+        setItem(key, value) {
+            localStorage[key] = value;
+        },
+        removeItem(key) {
+            localStorage.removeItem(key);
+        },
+    },
+    {
+        getOnInit: true,
+    }
+);

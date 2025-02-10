@@ -6,10 +6,75 @@ import {
     VideoEncoders,
     DefaultSettings,
     SettingsType,
+    deviceNameAtom,
 } from "../settings";
-import { localesAtom, LanguageOptions, Languages, setLanguage } from "../locales";
-import { MessageRouter, Methods } from "../message";
-import { useAtom, useSetAtom } from "jotai";
+import { languageAtom, localesAtom, LanguageOptions } from "../locales";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+
+class SubmitEvent extends EventTarget {
+    emit() {
+        this.dispatchEvent(new CustomEvent("submit"));
+    }
+
+    on(listener: () => void) {
+        this.addEventListener("submit", listener);
+    }
+}
+
+type RefHandle<T> = {
+    value: T;
+    get: () => T;
+    set: (value: T) => void;
+};
+
+type Ref<T> = {
+    [P in keyof T]: RefHandle<T[P]>;
+};
+
+function createSettingsRef(): Ref<SettingsType> {
+    const settings = useAtomValue(settingsAtom);
+
+    let ref = {} as Ref<SettingsType>;
+    for (const k in DefaultSettings) {
+        const property = k as keyof SettingsType;
+
+        Object.assign(ref, {
+            [property]: {
+                value: settings[property],
+                get() {
+                    return this.value;
+                },
+                set(value: SettingsType[typeof property]) {
+                    this.value = value;
+                },
+            },
+        });
+    }
+
+    return ref;
+}
+
+function freezeSettingsRef(ref: Ref<SettingsType>): SettingsType {
+    let values = {} as any;
+
+    for (const k in ref) {
+        values[k] = ref[k as keyof SettingsType].value;
+    }
+
+    return values;
+}
+
+function createRefHandle<T>(value: T) {
+    return {
+        value,
+        get() {
+            return this.value;
+        },
+        set(value: T) {
+            this.value = value;
+        },
+    };
+}
 
 function Input<T extends string | number | null>({
     ref,
@@ -83,8 +148,15 @@ function Select<T extends string | number>({
     );
 }
 
-function System({ settings, disabled }: { settings: Ref<SettingsType>; disabled: boolean }) {
-    const [locales] = useAtom(localesAtom);
+function System({ event, disabled }: { event: SubmitEvent; disabled: boolean }) {
+    const locales = useAtomValue(localesAtom);
+    const [language, setLanguage] = useAtom(languageAtom);
+    const [deviceName, setDeviceName] = useAtom(deviceNameAtom);
+
+    const name = createRefHandle(deviceName);
+    event.on(() => {
+        setDeviceName(name.value);
+    });
 
     return (
         <>
@@ -92,18 +164,23 @@ function System({ settings, disabled }: { settings: Ref<SettingsType>; disabled:
                 <h1>{locales.System}</h1>
                 <div className='item'>
                     <p>{locales.DeviceName}:</p>
-                    <Input ref={settings.SystemDeviceName} disabled={disabled} />
+                    <Input ref={name} disabled={disabled} />
                 </div>
                 <div className='item'>
                     <p>{locales.Language}:</p>
-                    <Select
-                        ref={settings.SystemLanguage as any}
-                        options={LanguageOptions}
+                    <select
+                        value={language}
                         disabled={disabled}
-                        onChange={(lang) => {
-                            setLanguage(lang as keyof typeof Languages);
+                        onChange={({ target }) => {
+                            setLanguage(target.value as keyof typeof LanguageOptions);
                         }}
-                    />
+                    >
+                        {Object.entries(LanguageOptions).map(([k, v]) => (
+                            <option key={k} value={k}>
+                                {v}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
         </>
@@ -111,7 +188,7 @@ function System({ settings, disabled }: { settings: Ref<SettingsType>; disabled:
 }
 
 function Network({ settings, disabled }: { settings: Ref<SettingsType>; disabled: boolean }) {
-    const [locales] = useAtom(localesAtom);
+    const locales = useAtomValue(localesAtom);
 
     return (
         <>
@@ -143,7 +220,7 @@ function Network({ settings, disabled }: { settings: Ref<SettingsType>; disabled
 }
 
 function Codec({ settings, disabled }: { settings: Ref<SettingsType>; disabled: boolean }) {
-    const [locales] = useAtom(localesAtom);
+    const locales = useAtomValue(localesAtom);
 
     return (
         <>
@@ -173,7 +250,7 @@ function Codec({ settings, disabled }: { settings: Ref<SettingsType>; disabled: 
 }
 
 function Video({ settings, disabled }: { settings: Ref<SettingsType>; disabled: boolean }) {
-    const [locales] = useAtom(localesAtom);
+    const locales = useAtomValue(localesAtom);
 
     return (
         <>
@@ -209,7 +286,7 @@ function Video({ settings, disabled }: { settings: Ref<SettingsType>; disabled: 
 }
 
 function Audio({ settings, disabled }: { settings: Ref<SettingsType>; disabled: boolean }) {
-    const [locales] = useAtom(localesAtom);
+    const locales = useAtomValue(localesAtom);
 
     return (
         <>
@@ -230,74 +307,33 @@ function Audio({ settings, disabled }: { settings: Ref<SettingsType>; disabled: 
     );
 }
 
-type RefHandle<T> = {
-    value: T;
-    get: () => T;
-    set: (value: T) => void;
-};
-
-type Ref<T> = {
-    [P in keyof T]: RefHandle<T[P]>;
-};
-
-function createSettingsRef(): Ref<SettingsType> {
-    const [settings] = useAtom(settingsAtom);
-
-    let ref = {} as Ref<SettingsType>;
-    for (const k in DefaultSettings) {
-        const property = k as keyof SettingsType;
-
-        Object.assign(ref, {
-            [property]: {
-                value: settings[property],
-                get() {
-                    return this.value;
-                },
-                set(value: SettingsType[typeof property]) {
-                    this.value = value;
-                },
-            },
-        });
-    }
-
-    return ref;
-}
-
-function freezeSettingsRef(ref: Ref<SettingsType>): SettingsType {
-    let values = {} as any;
-
-    for (const k in ref) {
-        values[k] = ref[k as keyof SettingsType].value;
-    }
-
-    return values;
-}
-
 export default function () {
+    const submitEvent = new SubmitEvent();
     const settings = createSettingsRef();
-    const [locales] = useAtom(localesAtom);
+    const locales = useAtomValue(localesAtom);
     const setSettings = useSetAtom(settingsAtom);
     const [disabled, setDisabled] = useState(false);
-
-    function submit() {
-        MessageRouter.call(Methods.SetName, settings.SystemDeviceName.value).then(() => {
-            setSettings(() => freezeSettingsRef(settings));
-            setDisabled(true);
-        });
-    }
 
     return (
         <>
             <div id='settings'>
                 <div id='content'>
-                    <System settings={settings} disabled={disabled} />
+                    <System event={submitEvent} disabled={disabled} />
                     <Network settings={settings} disabled={disabled} />
                     <Codec settings={settings} disabled={disabled} />
                     <Video settings={settings} disabled={disabled} />
                     <Audio settings={settings} disabled={disabled} />
                 </div>
                 {!disabled && (
-                    <button id='apply' className='click' onClick={submit}>
+                    <button
+                        id='apply'
+                        className='click'
+                        onClick={() => {
+                            setSettings(() => freezeSettingsRef(settings));
+                            submitEvent.emit();
+                            setDisabled(true);
+                        }}
+                    >
                         {locales.Apply}
                     </button>
                 )}

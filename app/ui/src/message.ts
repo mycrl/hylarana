@@ -1,4 +1,4 @@
-import { Device, Source, SourceType } from "./devices";
+import { Device, SenderOptions, Source, SourceType } from "./hylarana";
 
 declare global {
     interface Window {
@@ -44,34 +44,38 @@ let transport: {
     listeners: {},
 };
 
-window.MessageTransport.on((message) => {
-    try {
-        const payload: Payload<unknown> = JSON.parse(message);
-        console.log("message transport recv payload = ", payload);
+if (window.MessageTransport) {
+    window.MessageTransport.on((message) => {
+        try {
+            const payload: Payload<unknown> = JSON.parse(message);
+            console.log("message transport recv payload = ", payload);
 
-        if (payload.ty == "Request") {
-            const { method } = payload.content as Request<unknown>;
-            if (transport.listeners[method]) {
-                transport.listeners[method](payload.content);
+            if (payload.ty == "Request") {
+                const { method } = payload.content as Request<unknown>;
+                if (transport.listeners[method]) {
+                    transport.listeners[method](payload.content);
+                }
+            } else {
+                const { sequence, content } = payload.content as Response<unknown>;
+                if (transport.requests[sequence]) {
+                    transport.requests[sequence](content);
+                }
             }
-        } else {
-            const { sequence, content } = payload.content as Response<unknown>;
-            if (transport.requests[sequence]) {
-                transport.requests[sequence](content);
-            }
+        } catch (e) {
+            console.log(e);
         }
-    } catch (e) {
-        console.log(e);
-    }
-});
+    });
+}
 
 function sendMessage<T>(payload: T) {
     console.log("message transport send payload = ", payload);
 
-    window.MessageTransport.send(JSON.stringify(payload));
+    if (window.MessageTransport) {
+        window.MessageTransport.send(JSON.stringify(payload));
+    }
 }
 
-export class MessageRouter {
+export class Route {
     static on<K extends keyof OnTypes, Q extends OnTypes[K][0], S extends OnTypes[K][1]>(
         method: string,
         handle: (request: Q) => Promise<S> | S
@@ -156,6 +160,7 @@ export enum Methods {
     DevicesChangeNotify = "DevicesChangeNotify",
     ReadyNotify = "ReadyNotify",
     GetCaptureSources = "GetCaptureSources",
+    CreateSender = "CreateSender",
 }
 
 interface CallTypes {
@@ -163,6 +168,7 @@ interface CallTypes {
     [Methods.SetName]: [string, void];
     [Methods.GetDevices]: [void, Device[]];
     [Methods.GetCaptureSources]: [SourceType, Source[]];
+    [Methods.CreateSender]: [[Array<string>, SenderOptions], void];
 }
 
 interface OnTypes {

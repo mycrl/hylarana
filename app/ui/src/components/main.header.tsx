@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear, faAngleLeft } from "@fortawesome/free-solid-svg-icons";
 import { localesAtom } from "../locales";
 import { useState } from "react";
-import { useAtom } from "jotai";
+import { useAtomValue } from "jotai";
 
 export type Type = "settings" | "sender" | "receiver";
 
@@ -14,7 +14,7 @@ export default function ({
     defaultType?: Type;
     onChange: (type: Type) => void;
 }) {
-    const [locales] = useAtom(localesAtom);
+    const locales = useAtomValue(localesAtom);
     const [type, setType] = useState(defaultType || "sender");
 
     function change(ty: Type) {

@@ -46,7 +46,7 @@
 }
 
 #SenderDevices .items .device .logo {
-    border-radius: 5px;
+    border-radius: 5px 0 0 5px;
     height: 52px;
     width: 52px;
     background-color: #829bff;
@@ -75,4 +75,8 @@
 
 #SenderDevices .items .device .info span {
     color: #555;
+}
+
+#SenderDevices .items #selected {
+    border: 1px solid #0d8d1d;
 }

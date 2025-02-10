@@ -1,11 +1,11 @@
 import "../styles/main.info.css";
 import { localesAtom } from "../locales";
 import { settingsAtom, VideoEncoders } from "../settings";
-import { useAtom } from "jotai";
+import { useAtomValue } from "jotai";
 
 export default function () {
-    const [settings] = useAtom(settingsAtom);
-    const [locales] = useAtom(localesAtom);
+    const settings = useAtomValue(settingsAtom);
+    const locales = useAtomValue(localesAtom);
 
     return (
         <>

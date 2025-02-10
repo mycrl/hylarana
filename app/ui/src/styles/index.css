@@ -8,6 +8,7 @@
     margin: 0;
     font-size: 12px;
     font-family: inter;
+    user-select: none;
 }
 
 .click:hover {
@@ -16,10 +17,6 @@
 
 .transition {
     transition: 0.3s;
-}
-
-html {
-    background-color: #555;
 }
 
 input,
