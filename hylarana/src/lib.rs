@@ -76,15 +76,18 @@ pub fn shutdown() -> Result<(), HylaranaError> {
 }
 
 /// Audio and video streaming events observer.
-pub trait AVFrameObserver: Sync + Send {
+pub trait MediaStreamObserver: Sync + Send {
     /// Callback when the sender is closed. This may be because the external
     /// side actively calls the close, or the audio and video packets cannot be
     /// sent (the network is disconnected), etc.
     fn close(&self) {}
 }
 
+// impl empty type for default
+impl MediaStreamObserver for () {}
+
 /// Streaming sink for audio and video frames.
-pub trait AVFrameSink: Sync + Send {
+pub trait MediaStreamSink: Sync + Send {
     /// Callback occurs when the video frame is updated. The video frame format
     /// is fixed to NV12. Be careful not to call blocking methods inside the
     /// callback, which will seriously slow down the encoding and decoding
@@ -108,32 +111,42 @@ pub trait AVFrameSink: Sync + Send {
     }
 }
 
-/// Abstraction of audio and video streams.
-pub trait AVFrameStream: AVFrameSink + AVFrameObserver {}
+// impl empty type for default
+impl MediaStreamSink for () {}
 
 /// Creates a sender that can specify the audio source or video source to be
 /// captured.
-pub fn create_sender<T: AVFrameStream + 'static>(
+pub fn create_sender<S, O>(
     options: &HylaranaSenderOptions,
-    sink: T,
-) -> Result<HylaranaSender<T>, HylaranaSenderError> {
+    sink: S,
+    observer: O,
+) -> Result<HylaranaSender<S, O>, HylaranaSenderError>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     log::info!("create sender: options={:?}", options);
 
-    HylaranaSender::new(options, sink)
+    HylaranaSender::new(options, sink, observer)
 }
 
 /// To create a receiver, you need to specify the sender's ID to associate
 /// with it.
-pub fn create_receiver<T: AVFrameStream + 'static>(
+pub fn create_receiver<S, O>(
     description: &MediaStreamDescription,
     options: &HylaranaReceiverOptions,
-    sink: T,
-) -> Result<HylaranaReceiver<T>, HylaranaReceiverError> {
+    sink: S,
+    observer: O,
+) -> Result<HylaranaReceiver<S, O>, HylaranaReceiverError>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     log::info!(
         "create receiver: description={:?}, options={:?}",
         description,
         options
     );
 
-    HylaranaReceiver::new(description, options, sink)
+    HylaranaReceiver::new(description, options, sink, observer)
 }

@@ -8,7 +8,7 @@ use common::{
 
 use wgpu::{
     hal::{api::Metal, Api, CopyExtent},
-    CommandEncoder, Device, Extent3d, TexelCopyTextureInfo, Origin3d, Texture, TextureAspect,
+    CommandEncoder, Device, Extent3d, Origin3d, TexelCopyTextureInfo, Texture, TextureAspect,
     TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
 

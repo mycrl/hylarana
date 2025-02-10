@@ -6,7 +6,7 @@ use std::{
 use anyhow::Result;
 use clap::Parser;
 use hylarana::{
-    create_receiver, create_sender, shutdown, startup, AVFrameObserver, AVFrameStreamPlayer,
+    create_receiver, create_sender, shutdown, startup, AVFrameStreamPlayer,
     AVFrameStreamPlayerOptions, AudioOptions, Capture, DiscoveryObserver, DiscoveryService,
     HylaranaReceiver, HylaranaReceiverOptions, HylaranaSender, HylaranaSenderMediaOptions,
     HylaranaSenderOptions, HylaranaSenderTrackOptions, MediaStreamDescription, Size, SourceType,
@@ -42,17 +42,9 @@ enum Events {
     CreateReceiver(Vec<Ipv4Addr>, MediaStreamDescription),
 }
 
-struct ViewObserver;
-
-impl AVFrameObserver for ViewObserver {
-    fn close(&self) {
-        println!("view is closed");
-    }
-}
-
 #[allow(unused)]
 struct Sender {
-    sender: HylaranaSender<AVFrameStreamPlayer<'static, ViewObserver>>,
+    sender: HylaranaSender<(), ()>,
     discovery: DiscoveryService,
 }
 
@@ -95,10 +87,7 @@ impl Sender {
             },
         };
 
-        let sender = create_sender(
-            &options,
-            AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::<Window>::Quiet, ViewObserver)?,
-        )?;
+        let sender = create_sender(&options, (), ())?;
 
         // Register the current sender's information with the LAN discovery service so
         // that other receivers can know that the sender has been created and can access
@@ -110,7 +99,7 @@ impl Sender {
 }
 
 #[allow(unused)]
-struct Receiver(HylaranaReceiver<AVFrameStreamPlayer<'static, ViewObserver>>);
+struct Receiver(HylaranaReceiver<AVFrameStreamPlayer<'static>, ()>);
 
 impl Receiver {
     fn new(
@@ -131,18 +120,16 @@ impl Receiver {
         let receiver = create_receiver(
             &description,
             &options,
-            AVFrameStreamPlayer::new(
-                AVFrameStreamPlayerOptions::All(
-                    VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
-                        size: window.size(),
-                        window,
-                    })
-                    .set_backend(configure.backend)
-                    .from_receiver(&description, &options)
-                    .build(),
-                ),
-                ViewObserver,
-            )?,
+            AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::All(
+                VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
+                    size: window.size(),
+                    window,
+                })
+                .set_backend(configure.backend)
+                .from_receiver(&description, &options)
+                .build(),
+            ))?,
+            (),
         )?;
 
         Ok(Self(receiver))

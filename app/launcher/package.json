@@ -1,0 +1,27 @@
+{
+    "name": "hylarana-launcher",
+    "version": "0.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc && electron ./"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/mycrl/hylarana.git"
+    },
+    "author": "mycrl (lepidodendraceae@gmail.com)",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/mycrl/hylarana/issues"
+    },
+    "homepage": "https://github.com/mycrl/hylarana#readme",
+    "dependencies": {
+        "electron": "^34.1.1",
+        "@faker-js/faker": "^9.4.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.7.3"
+    }
+}

@@ -1,8 +1,7 @@
 use std::{slice::from_raw_parts, str::FromStr};
 
 use crate::{
-    sender::HylaranaSenderOptions, AVFrameObserver, AVFrameSink, AVFrameStream,
-    HylaranaReceiverOptions, MediaStreamDescription,
+    sender::HylaranaSenderOptions, HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink,
 };
 
 #[cfg(target_os = "windows")]
@@ -33,6 +32,7 @@ use renderer::{
 
 use parking_lot::Mutex;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -82,7 +82,7 @@ pub enum AVFrameStreamPlayerOptions<T> {
 }
 
 /// Back-end implementation of graphics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub enum VideoRenderBackend {
     /// Backend implemented using D3D11, which is supported on an older device
     /// and platform and has better performance performance and memory
@@ -219,25 +219,17 @@ impl<T> VideoRenderOptionsBuilder<T> {
 /// This player is used to quickly and easily create a player that implements
 /// AVFrameStream, you only need to focus on the stream observer, the rest of
 /// the player will be automatically hosted.
-pub struct AVFrameStreamPlayer<'a, O> {
+pub struct AVFrameStreamPlayer<'a> {
     video: Option<Mutex<VideoRender<'a>>>,
     audio: Option<AudioRender>,
-    observer: O,
 }
 
-impl<'a, O> AVFrameStreamPlayer<'a, O>
-where
-    O: AVFrameObserver,
-{
-    pub fn new<T>(
-        options: AVFrameStreamPlayerOptions<T>,
-        observer: O,
-    ) -> Result<Self, AVFrameStreamPlayerError>
+impl<'a> AVFrameStreamPlayer<'a> {
+    pub fn new<T>(options: AVFrameStreamPlayerOptions<T>) -> Result<Self, AVFrameStreamPlayerError>
     where
         T: Into<SurfaceTarget<'a>>,
     {
         Ok(Self {
-            observer,
             audio: match options {
                 AVFrameStreamPlayerOptions::All(_) | AVFrameStreamPlayerOptions::OnlyAudio => {
                     Some(AudioRender::new()?)
@@ -255,21 +247,7 @@ where
     }
 }
 
-impl<'a, O> AVFrameStream for AVFrameStreamPlayer<'a, O> where O: AVFrameObserver {}
-
-impl<'a, O> AVFrameObserver for AVFrameStreamPlayer<'a, O>
-where
-    O: AVFrameObserver,
-{
-    fn close(&self) {
-        self.observer.close();
-    }
-}
-
-impl<'a, O> AVFrameSink for AVFrameStreamPlayer<'a, O>
-where
-    O: AVFrameObserver,
-{
+impl<'a> MediaStreamSink for AVFrameStreamPlayer<'a> {
     fn audio(&self, frame: &AudioFrame) -> bool {
         if let Some(player) = &self.audio {
             if let Err(e) = player.send(frame) {

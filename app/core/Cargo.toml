@@ -1,0 +1,19 @@
+[package]
+name = "hylarana-app-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+hylarana = { path = "../../hylarana" }
+common = { path = "../../common", package = "hylarana-common" }
+winit = "0.30.5"
+simple_logger = "5"
+log = "0.4.25"
+tokio = { version = "1", features = ["full"] }
+raw-window-handle = "0.6.2"
+serde = "1.0.217"
+serde_json = "1.0.138"
+tokio-tungstenite = "0.26"
+futures-util = "0.3.31"
+clap = { version = "4", features = ["derive"] }

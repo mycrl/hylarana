@@ -1,4 +1,4 @@
-use crate::{AVFrameStream, MediaStreamDescription};
+use crate::{MediaStreamDescription, MediaStreamObserver, MediaStreamSink};
 
 use std::{
     sync::{atomic::AtomicBool, Arc},
@@ -7,6 +7,7 @@ use std::{
 
 use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings};
 use common::{atomic::EasyAtomic, codec::VideoDecoderType};
+use serde::{Deserialize, Serialize};
 use transport::{StreamKind, StreamMultiReceiverAdapter, TransportReceiver};
 
 use thiserror::Error;
@@ -28,18 +29,24 @@ pub enum HylaranaReceiverError {
 }
 
 /// Receiver configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HylaranaReceiverOptions {
     pub video_decoder: VideoDecoderType,
 }
 
-fn create_video_decoder<T: AVFrameStream + 'static>(
+fn create_video_decoder<S, O>(
     transport: &TransportReceiver<StreamMultiReceiverAdapter>,
     status: Arc<AtomicBool>,
-    sink: &Arc<T>,
     settings: VideoDecoderSettings,
-) -> Result<(), HylaranaReceiverError> {
+    sink: &Arc<S>,
+    observer: &Arc<O>,
+) -> Result<(), HylaranaReceiverError>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     let sink_ = Arc::downgrade(sink);
+    let observer_ = Arc::downgrade(observer);
     let adapter = transport.get_adapter();
     let mut codec = VideoDecoder::new(settings)?;
 
@@ -72,10 +79,10 @@ fn create_video_decoder<T: AVFrameStream + 'static>(
             }
 
             log::warn!("video decoder thread is closed!");
-            if let Some(sink) = sink_.upgrade() {
+            if let Some(observer) = observer_.upgrade() {
                 if !status.get() {
                     status.update(true);
-                    sink.close();
+                    observer.close();
                 }
             }
 
@@ -88,12 +95,18 @@ fn create_video_decoder<T: AVFrameStream + 'static>(
     Ok(())
 }
 
-fn create_audio_decoder<T: AVFrameStream + 'static>(
+fn create_audio_decoder<S, O>(
     transport: &TransportReceiver<StreamMultiReceiverAdapter>,
     status: Arc<AtomicBool>,
-    sink: &Arc<T>,
-) -> Result<(), HylaranaReceiverError> {
+    sink: &Arc<S>,
+    observer: &Arc<O>,
+) -> Result<(), HylaranaReceiverError>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     let sink_ = Arc::downgrade(sink);
+    let observer_ = Arc::downgrade(observer);
     let adapter = transport.get_adapter();
     let mut codec = AudioDecoder::new()?;
 
@@ -126,10 +139,10 @@ fn create_audio_decoder<T: AVFrameStream + 'static>(
             }
 
             log::warn!("audio decoder thread is closed!");
-            if let Some(sink) = sink_.upgrade() {
+            if let Some(observer) = observer_.upgrade() {
                 if !status.get() {
                     status.update(true);
-                    sink.close();
+                    observer.close();
                 }
             }
 
@@ -143,44 +156,58 @@ fn create_audio_decoder<T: AVFrameStream + 'static>(
 }
 
 /// Screen casting receiver.
-pub struct HylaranaReceiver<T: AVFrameStream + 'static> {
+pub struct HylaranaReceiver<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     description: MediaStreamDescription,
     #[allow(unused)]
     transport: TransportReceiver<StreamMultiReceiverAdapter>,
     status: Arc<AtomicBool>,
-    sink: Arc<T>,
+    #[allow(unused)]
+    sink: Arc<S>,
+    observer: Arc<O>,
 }
 
-impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
+impl<S, O> HylaranaReceiver<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     /// Create a receiving end. The receiving end is much simpler to implement.
     /// You only need to decode the data in the queue and call it back to the
     /// sink.
     pub(crate) fn new(
         description: &MediaStreamDescription,
         options: &HylaranaReceiverOptions,
-        sink: T,
+        sink: S,
+        observer: O,
     ) -> Result<Self, HylaranaReceiverError> {
         log::info!("create receiver");
 
         let transport = transport::create_split_receiver(&description.id, description.transport)?;
         let status = Arc::new(AtomicBool::new(false));
+        let observer = Arc::new(observer);
         let sink = Arc::new(sink);
 
-        create_audio_decoder(&transport, status.clone(), &sink)?;
+        create_audio_decoder(&transport, status.clone(), &sink, &observer)?;
         create_video_decoder(
             &transport,
             status.clone(),
-            &sink,
             VideoDecoderSettings {
                 codec: options.video_decoder,
                 #[cfg(target_os = "windows")]
                 direct3d: Some(get_direct3d()),
             },
+            &sink,
+            &observer,
         )?;
 
         Ok(Self {
             description: description.clone(),
             transport,
+            observer,
             status,
             sink,
         })
@@ -192,13 +219,17 @@ impl<T: AVFrameStream + 'static> HylaranaReceiver<T> {
     }
 }
 
-impl<T: AVFrameStream + 'static> Drop for HylaranaReceiver<T> {
+impl<S, O> Drop for HylaranaReceiver<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     fn drop(&mut self) {
         log::info!("receiver drop");
 
         if !self.status.get() {
             self.status.update(true);
-            self.sink.close();
+            self.observer.close();
         }
     }
 }

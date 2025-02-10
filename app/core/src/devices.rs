@@ -23,8 +23,6 @@ use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream,
 };
 
-use crate::env::Env;
-
 #[cfg(target_os = "windows")]
 pub static DEVICE_TYPE: DeviceType = DeviceType::Windows;
 
@@ -147,14 +145,15 @@ impl Device {
 #[derive(Default)]
 struct Devices {
     table: RwLock<HashMap<String, Device>>,
-    names: RwLock<HashMap<Ipv4Addr, String>>,
+    /// addr name mapping
+    anm: RwLock<HashMap<Ipv4Addr, String>>,
 }
 
 impl Devices {
     async fn set(&self, name: &str, device: Device) {
-        let mut names = self.names.write().await;
+        let mut anm = self.anm.write().await;
         for it in &device.addrs {
-            names.insert(*it, name.to_string());
+            anm.insert(*it, name.to_string());
         }
 
         self.table.write().await.insert(name.to_string(), device);
@@ -162,15 +161,15 @@ impl Devices {
 
     async fn remove(&self, name: &str) {
         if let Some(it) = self.table.write().await.remove(name) {
-            let mut names = self.names.write().await;
+            let mut anm = self.anm.write().await;
             for it in it.addrs {
-                names.remove(&it);
+                anm.remove(&it);
             }
         }
     }
 
     async fn remove_from_addr(&self, addr: Ipv4Addr) {
-        if let Some(it) = self.names.write().await.remove(&addr) {
+        if let Some(it) = self.anm.write().await.remove(&addr) {
             self.remove(&it).await;
         }
     }
@@ -180,7 +179,7 @@ impl Devices {
         addr: Ipv4Addr,
         description: MediaStreamDescription,
     ) {
-        if let Some(it) = self.names.read().await.get(&addr) {
+        if let Some(it) = self.anm.read().await.get(&addr) {
             if let Some(device) = self.table.read().await.get(it) {
                 device.update_description(description).await;
             }
@@ -189,26 +188,32 @@ impl Devices {
 }
 
 struct DiscoveryServiceObserver {
+    description: Arc<RwLock<Option<MediaStreamDescription>>>,
     tx: Arc<watch::Sender<()>>,
-    env: Arc<RwLock<Env>>,
     devices: Arc<Devices>,
     runtime: Arc<Handle>,
+    name: String,
 }
 
 impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
     fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, info: ServiceInfo) {
-        if name == &self.env.blocking_read().settings.name {
+        if name == &self.name {
             return;
         }
 
         let name = name.to_string();
-        let devices = self.devices.clone();
         let notify = self.tx.clone();
+        let devices = self.devices.clone();
+        let description = self.description.clone();
         self.runtime.spawn(async move {
             match Device::new(info.kind, addrs, info.port).await {
-                Ok((it, disconnection_notify)) => {
+                Ok((mut device, disconnection_notify)) => {
                     {
-                        devices.set(&name, it).await;
+                        if let Some(description) = description.read().await.as_ref() {
+                            device.send_description(description).await;
+                        }
+
+                        devices.set(&name, device).await;
 
                         if let Err(e) = notify.send(()) {
                             log::error!("devices send change notify error={:?}", e);
@@ -229,23 +234,6 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
             }
         });
     }
-
-    fn remove(&self, name: &str) {
-        if name == &self.env.blocking_read().settings.name {
-            return;
-        }
-
-        let name = name.to_string();
-        let devices = self.devices.clone();
-        let tx = self.tx.clone();
-        self.runtime.spawn(async move {
-            devices.remove(&name).await;
-
-            if let Err(e) = tx.send(()) {
-                log::error!("devices send change notify error={:?}", e);
-            }
-        });
-    }
 }
 
 pub struct DevicesManager {
@@ -253,10 +241,11 @@ pub struct DevicesManager {
     devices: Arc<Devices>,
     #[allow(dead_code)]
     discoverys: (DiscoveryService, DiscoveryService),
+    description: Arc<RwLock<Option<MediaStreamDescription>>>,
 }
 
 impl DevicesManager {
-    pub async fn new(env: Arc<RwLock<Env>>) -> Result<Self> {
+    pub async fn new(name: String) -> Result<Self> {
         let devices: Arc<Devices> = Arc::new(Devices::default());
 
         let listener = TcpListener::bind("0.0.0.0:0").await?;
@@ -303,9 +292,10 @@ impl DevicesManager {
             }
         });
 
+        let description: Arc<RwLock<Option<MediaStreamDescription>>> = Default::default();
         let discoverys = (
             DiscoveryService::register(
-                &env.read().await.settings.name,
+                &name,
                 &ServiceInfo {
                     port: local_addr.port(),
                     kind: DEVICE_TYPE,
@@ -313,8 +303,9 @@ impl DevicesManager {
             )?,
             DiscoveryService::query(DiscoveryServiceObserver {
                 runtime: Arc::new(Handle::current()),
+                description: description.clone(),
                 devices: devices.clone(),
-                env: env.clone(),
+                name,
                 tx,
             })?,
         );
@@ -323,14 +314,32 @@ impl DevicesManager {
             rx,
             devices,
             discoverys,
+            description,
         })
     }
 
-    pub async fn send_description(&self, names: Vec<String>, description: MediaStreamDescription) {
+    pub async fn set_description(
+        &self,
+        name_list: Vec<String>,
+        description: MediaStreamDescription,
+    ) {
         let mut devices = self.devices.table.write().await;
-        for name in names {
-            if let Some(it) = devices.get_mut(&name) {
-                it.send_description(&description).await;
+
+        if name_list.is_empty() {
+            self.description.write().await.replace(description.clone());
+        } else {
+            self.description.write().await.take();
+        }
+
+        if name_list.is_empty() {
+            for (_, device) in devices.iter_mut() {
+                device.send_description(&description).await;
+            }
+        } else {
+            for name in name_list {
+                if let Some(device) = devices.get_mut(&name) {
+                    device.send_description(&description).await;
+                }
             }
         }
     }

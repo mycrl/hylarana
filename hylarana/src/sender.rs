@@ -1,5 +1,6 @@
 use crate::{
-    AVFrameStream, MediaAudioStreamDescription, MediaStreamDescription, MediaVideoStreamDescription,
+    MediaAudioStreamDescription, MediaStreamDescription, MediaStreamObserver, MediaStreamSink,
+    MediaVideoStreamDescription,
 };
 
 #[cfg(target_os = "windows")]
@@ -28,6 +29,7 @@ use codec::{
     VideoEncoderSettings,
 };
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use transport::{
     copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
@@ -47,7 +49,7 @@ pub enum HylaranaSenderError {
 }
 
 /// Description of video coding.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VideoOptions {
     pub codec: VideoEncoderType,
     pub frame_rate: u8,
@@ -58,38 +60,39 @@ pub struct VideoOptions {
 }
 
 /// Description of the audio encoding.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct AudioOptions {
     pub sample_rate: u64,
     pub bit_rate: u64,
 }
 
 /// Options of the media track.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HylaranaSenderTrackOptions<T> {
     pub source: Source,
     pub options: T,
 }
 
 /// Options of the media stream.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HylaranaSenderMediaOptions {
     pub video: Option<HylaranaSenderTrackOptions<VideoOptions>>,
     pub audio: Option<HylaranaSenderTrackOptions<AudioOptions>>,
 }
 
 /// Sender configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HylaranaSenderOptions {
     pub media: HylaranaSenderMediaOptions,
     pub transport: TransportOptions,
 }
 
-struct VideoSender<T: AVFrameStream + 'static> {
+struct VideoSender<S, O> {
     adapter: Arc<StreamSenderAdapter>,
     status: Arc<AtomicBool>,
     encoder: VideoEncoder,
-    sink: Weak<T>,
+    sink: Weak<S>,
+    observer: Weak<O>,
 }
 
 // Encoding is a relatively complex task. If you add encoding tasks to the
@@ -98,17 +101,23 @@ struct VideoSender<T: AVFrameStream + 'static> {
 // Here, the tasks are separated, and the encoding tasks are separated into
 // independent threads. The encoding thread is notified of task updates through
 // the optional lock.
-impl<T: AVFrameStream + 'static> VideoSender<T> {
+impl<S, O> VideoSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     fn new(
         status: Arc<AtomicBool>,
         transport: &TransportSender,
         settings: VideoEncoderSettings,
-        sink: &Arc<T>,
+        sink: &Arc<S>,
+        observer: &Arc<O>,
     ) -> Result<Self, HylaranaSenderError> {
         Ok(Self {
-            encoder: VideoEncoder::new(settings)?,
             adapter: transport.get_adapter(),
             sink: Arc::downgrade(sink),
+            observer: Arc::downgrade(observer),
+            encoder: VideoEncoder::new(settings)?,
             status,
         })
     }
@@ -157,17 +166,21 @@ impl<T: AVFrameStream + 'static> VideoSender<T> {
     }
 }
 
-impl<T: AVFrameStream + 'static> FrameArrived for VideoSender<T> {
+impl<S, O> FrameArrived for VideoSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     type Frame = VideoFrame;
 
     fn sink(&mut self, frame: &Self::Frame) -> bool {
         if self.process(frame) {
             true
         } else {
-            if let Some(sink) = self.sink.upgrade() {
+            if let Some(observer) = self.observer.upgrade() {
                 if !self.status.get() {
                     self.status.update(true);
-                    sink.close();
+                    observer.close();
                 }
             }
 
@@ -176,13 +189,14 @@ impl<T: AVFrameStream + 'static> FrameArrived for VideoSender<T> {
     }
 }
 
-struct AudioSender<T: AVFrameStream + 'static> {
+struct AudioSender<S, O> {
     adapter: Arc<StreamSenderAdapter>,
     status: Arc<AtomicBool>,
     encoder: AudioEncoder,
     chunk_count: usize,
     buffer: BytesMut,
-    sink: Weak<T>,
+    sink: Weak<S>,
+    observer: Weak<O>,
 }
 
 // Encoding is a relatively complex task. If you add encoding tasks to the
@@ -191,12 +205,17 @@ struct AudioSender<T: AVFrameStream + 'static> {
 // Here, the tasks are separated, and the encoding tasks are separated into
 // independent threads. The encoding thread is notified of task updates through
 // the optional lock.
-impl<T: AVFrameStream + 'static> AudioSender<T> {
+impl<S, O> AudioSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     fn new(
         status: Arc<AtomicBool>,
         transport: &TransportSender,
         settings: AudioEncoderSettings,
-        sink: &Arc<T>,
+        sink: &Arc<S>,
+        observer: &Arc<O>,
     ) -> Result<Self, HylaranaSenderError> {
         let adapter = transport.get_adapter();
 
@@ -215,6 +234,7 @@ impl<T: AVFrameStream + 'static> AudioSender<T> {
             chunk_count: settings.sample_rate as usize / 1000 * 100 * 2,
             encoder: AudioEncoder::new(settings)?,
             buffer: BytesMut::with_capacity(48000 * 2),
+            observer: Arc::downgrade(observer),
             sink: Arc::downgrade(sink),
             adapter,
             status,
@@ -282,17 +302,21 @@ impl<T: AVFrameStream + 'static> AudioSender<T> {
     }
 }
 
-impl<T: AVFrameStream + 'static> FrameArrived for AudioSender<T> {
+impl<S, O> FrameArrived for AudioSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     type Frame = AudioFrame;
 
     fn sink(&mut self, frame: &Self::Frame) -> bool {
         if self.process(frame) {
             true
         } else {
-            if let Some(sink) = self.sink.upgrade() {
+            if let Some(observer) = self.observer.upgrade() {
                 if !self.status.get() {
                     self.status.update(true);
-                    sink.close();
+                    observer.close();
                 }
             }
 
@@ -302,28 +326,40 @@ impl<T: AVFrameStream + 'static> FrameArrived for AudioSender<T> {
 }
 
 /// Screen casting sender.
-pub struct HylaranaSender<T: AVFrameStream + 'static> {
+pub struct HylaranaSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     description: MediaStreamDescription,
     #[allow(unused)]
     transport: TransportSender,
     status: Arc<AtomicBool>,
     capture: Capture,
-    sink: Arc<T>,
+    #[allow(unused)]
+    sink: Arc<S>,
+    observer: Arc<O>,
 }
 
-impl<T: AVFrameStream + 'static> HylaranaSender<T> {
+impl<S, O> HylaranaSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     // Create a sender. The capture of the sender is started following the sender,
     // but both video capture and audio capture can be empty, which means you can
     // create a sender that captures nothing.
     pub(crate) fn new(
         options: &HylaranaSenderOptions,
-        sink: T,
+        sink: S,
+        observer: O,
     ) -> Result<Self, HylaranaSenderError> {
         log::info!("create sender");
 
         let mut capture_options = CaptureOptions::default();
         let transport = transport::create_sender(options.transport)?;
         let status = Arc::new(AtomicBool::new(false));
+        let observer = Arc::new(observer);
         let sink = Arc::new(sink);
 
         if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.audio {
@@ -336,6 +372,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
                         bit_rate: options.bit_rate,
                     },
                     &sink,
+                    &observer,
                 )?,
                 description: AudioCaptureSourceDescription {
                     sample_rate: options.sample_rate as u32,
@@ -371,6 +408,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
                         direct3d: Some(get_direct3d()),
                     },
                     &sink,
+                    &observer,
                 )?,
             });
         }
@@ -408,6 +446,7 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
             capture: Capture::start(capture_options)?,
             description,
             transport,
+            observer,
             status,
             sink,
         })
@@ -420,7 +459,11 @@ impl<T: AVFrameStream + 'static> HylaranaSender<T> {
     }
 }
 
-impl<T: AVFrameStream + 'static> Drop for HylaranaSender<T> {
+impl<S, O> Drop for HylaranaSender<S, O>
+where
+    S: MediaStreamSink + 'static,
+    O: MediaStreamObserver + 'static,
+{
     fn drop(&mut self) {
         log::info!("sender drop");
 
@@ -436,7 +479,7 @@ impl<T: AVFrameStream + 'static> Drop for HylaranaSender<T> {
                 log::warn!("hylarana sender capture close error={:?}", e);
             }
 
-            self.sink.close();
+            self.observer.close();
         }
     }
 }
