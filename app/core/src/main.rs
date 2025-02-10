@@ -19,7 +19,11 @@ use tokio::{
 };
 
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy}, window::{Fullscreen, Window, WindowAttributes}
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
+    window::{Window, WindowAttributes},
 };
 
 use self::{devices::DevicesManager, message::Route};
@@ -220,8 +224,6 @@ impl App {
 
 impl ApplicationHandler<Events> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        startup().unwrap();
-
         {
             let window = Arc::new(
                 event_loop
@@ -232,12 +234,14 @@ impl ApplicationHandler<Events> for App {
                     )
                     .unwrap(),
             );
-    
+
             let opt = self.window.clone();
             self.handle.spawn(async move {
                 opt.write().await.replace(window);
             });
         }
+
+        startup().unwrap();
     }
 
     fn window_event(

@@ -5,6 +5,8 @@ declare global {
         MessageTransport: {
             send: (message: string) => void;
             on: (handle: (message: string) => void) => void;
+            getName: () => Promise<string>;
+            setName: (name: string) => Promise<void>;
         };
     }
 }
@@ -154,8 +156,6 @@ export class Route {
 }
 
 export enum Methods {
-    GetName = "GetName",
-    SetName = "SetName",
     GetDevices = "GetDevices",
     DevicesChangeNotify = "DevicesChangeNotify",
     ReadyNotify = "ReadyNotify",
@@ -164,8 +164,6 @@ export enum Methods {
 }
 
 interface CallTypes {
-    [Methods.GetName]: [void, string];
-    [Methods.SetName]: [string, void];
     [Methods.GetDevices]: [void, Device[]];
     [Methods.GetCaptureSources]: [SourceType, Source[]];
     [Methods.CreateSender]: [[Array<string>, SenderOptions], void];

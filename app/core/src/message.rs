@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use tokio::{
-    io::{stdin, stdout, AsyncReadExt, AsyncWriteExt},
+    io::{stdin, stdout, AsyncReadExt, AsyncWriteExt, Stdout},
     sync::{
         mpsc::{unbounded_channel, UnboundedSender},
         oneshot::{channel, Sender},
@@ -26,7 +26,7 @@ static LINE_START: &str = "::MESSAGE_TRANSPORTS-";
 
 pub struct Route {
     sequence: AtomicU64,
-    stdout_tx: UnboundedSender<String>,
+    stdout: Mutex<Stdout>,
     // request sender table
     rst: Mutex<HashMap<u64, Sender<Value>>>,
     // on receiver table
@@ -34,17 +34,28 @@ pub struct Route {
 }
 
 impl Route {
-    pub async fn new() -> Arc<Self> {
-        let (stdin_tx, mut stdin_rx) = unbounded_channel::<String>();
-        let (stdout_tx, mut stdout_rx) = unbounded_channel::<String>();
+    async fn send(&self, message: String) {
+        if self
+            .stdout
+            .lock()
+            .await
+            .write_all(format!("{}{}\n", LINE_START, message).as_bytes())
+            .await
+            .is_err()
+        {
+            log::error!("failed to send message to stdout!");
+        }
+    }
 
+    pub async fn new() -> Arc<Self> {
         let this = Arc::new(Self {
             ort: RwLock::new(HashMap::with_capacity(100)),
             rst: Mutex::new(HashMap::with_capacity(100)),
             sequence: AtomicU64::new(0),
-            stdout_tx,
+            stdout: Mutex::new(stdout()),
         });
 
+        let this_ = Arc::downgrade(&this);
         tokio::spawn(async move {
             let mut buf = vec![0u8; 4096];
 
@@ -53,68 +64,39 @@ impl Route {
                     if line.starts_with(LINE_START) {
                         let (_, message) = line.split_at(LINE_START.len());
 
-                        if stdin_tx.send(message.to_string()).is_err() {
-                            log::error!("stdin channel is closed!");
+                        if let Some(this) = this_.upgrade() {
+                            let _ = async {
+                                match serde_json::from_str(&message)? {
+                                    Payload::Request {
+                                        method,
+                                        sequence,
+                                        content,
+                                    } => {
+                                        if let Some(sender) = this.ort.read().await.get(&method) {
+                                            let (tx, rx) = channel();
+                                            sender.send((tx, content))?;
 
+                                            this.send(serde_json::to_string(&Payload::Response {
+                                                content: ResponseContent::from(rx.await?),
+                                                sequence,
+                                            })?)
+                                            .await;
+                                        }
+                                    }
+                                    Payload::Response { sequence, content } => {
+                                        if let Some(tx) = this.rst.lock().await.remove(&sequence) {
+                                            let _ = tx.send(content);
+                                        }
+                                    }
+                                }
+
+                                Ok::<(), anyhow::Error>(())
+                            }
+                            .await;
+                        } else {
                             break;
                         }
                     }
-                }
-            }
-        });
-
-        tokio::spawn(async move {
-            let mut stdout = stdout();
-
-            while let Some(message) = stdout_rx.recv().await {
-                if stdout
-                    .write_all(format!("{}{}", LINE_START, message).as_bytes())
-                    .await
-                    .is_err()
-                {
-                    log::error!("failed to send message to stdout!");
-
-                    break;
-                }
-            }
-        });
-
-        let this_ = Arc::downgrade(&this);
-        tokio::spawn(async move {
-            while let Some(message) = stdin_rx.recv().await {
-                if let Some(this) = this_.upgrade() {
-                    let _ = async {
-                        let respone: Payload<Value> = serde_json::from_str(&message)?;
-                        match respone {
-                            Payload::Request {
-                                method,
-                                sequence,
-                                content,
-                            } => {
-                                if let Some(sender) = this.ort.read().await.get(&method) {
-                                    let (tx, rx) = channel();
-                                    sender.send((tx, content))?;
-
-                                    this.stdout_tx.send(serde_json::to_string(
-                                        &Payload::Response {
-                                            content: ResponseContent::from(rx.await?),
-                                            sequence,
-                                        },
-                                    )?)?;
-                                }
-                            }
-                            Payload::Response { sequence, content } => {
-                                if let Some(tx) = this.rst.lock().await.remove(&sequence) {
-                                    let _ = tx.send(content);
-                                }
-                            }
-                        }
-
-                        Ok::<(), anyhow::Error>(())
-                    }
-                    .await;
-                } else {
-                    break;
                 }
             }
         });
@@ -128,12 +110,12 @@ impl Route {
         S: DeserializeOwned,
     {
         let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
-        self.stdout_tx
-            .send(serde_json::to_string(&Payload::Request {
-                method: method.to_string(),
-                sequence,
-                content,
-            })?)?;
+        self.send(serde_json::to_string(&Payload::Request {
+            method: method.to_string(),
+            sequence,
+            content,
+        })?)
+        .await;
 
         let (tx, rx) = channel();
         self.rst.lock().await.insert(sequence, tx);

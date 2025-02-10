@@ -33,7 +33,7 @@ const window = new BrowserWindow({
     height: 600,
     webPreferences: {
         devTools: process.env.DEVTOOLS == "1",
-        preload: "../preload.js",
+        preload: pathJoin(__dirname, "../preload.js"),
     },
 });
 
@@ -56,6 +56,7 @@ function reloadCoreProcess() {
     core.stderr?.pipe(process.stderr);
     core.stdout?.on("data", (message: string) => {
         if (message.startsWith(LINE_START)) {
+            console.log("==========================", message);
             window.webContents.send("MessageTransport", message.slice(LINE_START.length));
         } else {
             process.stdout.write(message);
@@ -63,24 +64,24 @@ function reloadCoreProcess() {
     });
 }
 
-// const tray = new Tray("../../logo.ico");
+const tray = new Tray("../../logo.png");
 
-// tray.setToolTip("hylarana - cross platform screencast");
-// tray.setContextMenu(
-//     Menu.buildFromTemplate([
-//         {
-//             label: "退出",
-//             type: "normal",
-//             click: () => {
-//                 app.exit();
-//             },
-//         },
-//     ])
-// );
+tray.setToolTip("hylarana - cross platform screencast");
+tray.setContextMenu(
+    Menu.buildFromTemplate([
+        {
+            label: "退出",
+            type: "normal",
+            click: () => {
+                app.exit();
+            },
+        },
+    ])
+);
 
-// tray.on("click", () => {
-//     window.show();
-// });
+tray.on("click", () => {
+    window.show();
+});
 
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
@@ -95,11 +96,11 @@ app.on("window-all-closed", () => {
         window.loadFile("./ui/dist/index.html");
     }
 
-    // reloadCoreProcess();
+    reloadCoreProcess();
 }
 
 ipcMain.on("MessageTransport", (_, message: string) => {
-    core?.stdin?.write(message);
+    core?.stdin?.write(`${LINE_START}${message}`);
 });
 
 ipcMain.handle("GetName", async () => {

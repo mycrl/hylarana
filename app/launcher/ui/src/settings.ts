@@ -1,5 +1,4 @@
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
-import { Route, Methods } from "./message";
 import { atom, getDefaultStore } from "jotai";
 
 export const VideoEncoders = {
@@ -61,13 +60,13 @@ export const deviceNameAtom = atom("");
 {
     const store = getDefaultStore();
 
-    Route.call(Methods.GetName).then((name) => {
+    window.MessageTransport.getName().then((name) => {
         store.set(deviceNameAtom, name);
 
         store.sub(settingsAtom, () => {
             const value = store.get(deviceNameAtom);
             if (value != name) {
-                Route.call(Methods.SetName, value).then(() => {
+                window.MessageTransport.setName(value).then(() => {
                     name = value;
                 });
             }
