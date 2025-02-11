@@ -15,6 +15,6 @@ bytes = "1.5"
 jni = "0.21"
 num_cpus = "1.16"
 serde_json = "1.0"
-common = { path = "../../../../../../common", package = "hylarana-common" }
+common = { path = "../../../../../../common", package = "hylarana-common", features = ["serde-short"]}
 transport = { path = "../../../../../../transport", package = "hylarana-transport" }
 discovery = { path = "../../../../../../discovery", package = "hylarana-discovery" }

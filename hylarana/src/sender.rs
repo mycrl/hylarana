@@ -29,12 +29,14 @@ use codec::{
     VideoEncoderSettings,
 };
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use transport::{
     copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
     TransportSender,
 };
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Error)]
 pub enum HylaranaSenderError {
@@ -49,7 +51,8 @@ pub enum HylaranaSenderError {
 }
 
 /// Description of video coding.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct VideoOptions {
     pub codec: VideoEncoderType,
     pub frame_rate: u8,
@@ -60,28 +63,32 @@ pub struct VideoOptions {
 }
 
 /// Description of the audio encoding.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct AudioOptions {
     pub sample_rate: u64,
     pub bit_rate: u64,
 }
 
 /// Options of the media track.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct HylaranaSenderTrackOptions<T> {
     pub source: Source,
     pub options: T,
 }
 
 /// Options of the media stream.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct HylaranaSenderMediaOptions {
     pub video: Option<HylaranaSenderTrackOptions<VideoOptions>>,
     pub audio: Option<HylaranaSenderTrackOptions<AudioOptions>>,
 }
 
 /// Sender configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct HylaranaSenderOptions {
     pub media: HylaranaSenderMediaOptions,
     pub transport: TransportOptions,

@@ -43,3 +43,7 @@ core-metal = { version = "0.3.0",  package = "objc2-metal" }
 core-audo-types = { version = "0.3.0", package = "objc2-core-audio-types"}
 objc2 = "0.6"
 metal = "0.31"
+
+[features]
+serde = []
+serde-short = ["serde"]

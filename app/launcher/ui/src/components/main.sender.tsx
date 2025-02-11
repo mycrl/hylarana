@@ -5,12 +5,18 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faVolumeLow, faDisplay, faNetworkWired } from "@fortawesome/free-solid-svg-icons";
 import { localesAtom } from "../locales";
 import { settingsAtom, broadcastAtom } from "../settings";
-import { DisplaysAtom, AudiosAtom, Device, createSender, TransportStrategy } from "../hylarana";
+import { displaysAtom, audiosAtom, createSender, TransportStrategy, Source } from "../hylarana";
 import { useAtom, useAtomValue } from "jotai";
 import { useRef, useState } from "react";
 
-function Displays() {
-    const sources = useAtomValue(DisplaysAtom);
+function Displays({
+    displays,
+    onChange,
+}: {
+    displays: Source[];
+    onChange: (index: number) => void;
+}) {
+    const [index, setIndex] = useState(0);
 
     return (
         <>
@@ -18,9 +24,17 @@ function Displays() {
                 <div className='icon'>
                     <FontAwesomeIcon icon={faDisplay} />
                 </div>
-                <select className='click'>
-                    {sources.map((it) => (
-                        <option key={it.id} value={it.index}>
+                <select
+                    className='click'
+                    value={index}
+                    onChange={({ target }) => {
+                        const value = Number(target.value);
+                        setIndex(value);
+                        onChange(value);
+                    }}
+                >
+                    {displays.map((it, index) => (
+                        <option key={it.id} value={index}>
                             {it.name}
                         </option>
                     ))}
@@ -30,8 +44,8 @@ function Displays() {
     );
 }
 
-function Audios() {
-    const sources = useAtomValue(AudiosAtom);
+function Audios({ audios, onChange }: { audios: Source[]; onChange: (index: number) => void }) {
+    const [index, setIndex] = useState(0);
 
     return (
         <>
@@ -39,9 +53,17 @@ function Audios() {
                 <div className='icon'>
                     <FontAwesomeIcon icon={faVolumeLow} />
                 </div>
-                <select className='click'>
-                    {sources.map((it) => (
-                        <option key={it.id} value={it.index}>
+                <select
+                    className='click'
+                    value={index}
+                    onChange={({ target }) => {
+                        const value = Number(target.value);
+                        setIndex(value);
+                        onChange(value);
+                    }}
+                >
+                    {audios.map((it, index) => (
+                        <option key={it.id} value={index}>
                             {it.name}
                         </option>
                     ))}
@@ -88,37 +110,50 @@ export default function () {
     const [broadcast, setBroadcast] = useAtom(broadcastAtom);
     const [transport, setTransport] = useState(TransportStrategy.Direct);
 
-    const devices = useRef<Device[]>([]);
     const settings = useAtomValue(settingsAtom);
+    const displays = useAtomValue(displaysAtom);
+    const audios = useAtomValue(audiosAtom);
+
+    const names = useRef<string[]>([]);
+    const display = useRef<number>(0);
+    const audio = useRef<number>(0);
+
     function start() {
-        createSender(
-            devices.current.map((it) => it.addrs[0]),
-            {
-                transport: {
-                    mtu: settings.NetworkMtu,
-                    strategy: {
-                        strategy: transport,
-                        address: {
+        createSender(names.current, {
+            transport: {
+                mtu: settings.NetworkMtu,
+                strategy: {
+                    [transport]:
+                        ({
                             [TransportStrategy.Relay]: settings.NetworkServer,
                             [TransportStrategy.Direct]: settings.NetworkInterface,
                             [TransportStrategy.Multicast]: settings.NetworkMulticast,
-                        }[transport] as string,
-                    },
-                },
+                        }[transport] as string) +
+                        ":" +
+                        settings.NetworkPort,
+                } as any,
+            },
+            media: {
                 video: {
-                    size: {
+                    source: displays[display.current],
+                    options: {
+                        codec: settings.CodecEncoder,
+                        frame_rate: settings.VideoFrameRate,
                         width: settings.VideoSizeWidth,
                         height: settings.VideoSizeHeight,
+                        bit_rate: settings.VideoBitRate,
+                        key_frame_interval: settings.VideoKeyFrameInterval,
                     },
-                    fps: settings.VideoFrameRate,
-                    bitRate: settings.VideoBitRate,
                 },
                 audio: {
-                    sampleRate: settings.AudioSampleRate,
-                    bitRate: settings.AudioBitRate,
+                    source: audios[audio.current],
+                    options: {
+                        sample_rate: settings.AudioSampleRate,
+                        bit_rate: settings.AudioBitRate,
+                    },
                 },
-            }
-        );
+            },
+        });
     }
 
     return (
@@ -135,7 +170,7 @@ export default function () {
                     {!broadcast ? (
                         <Devices
                             onChange={(it) => {
-                                devices.current = it;
+                                names.current = it;
                             }}
                         />
                     ) : (
@@ -145,8 +180,18 @@ export default function () {
                     <div id='control'>
                         <div className='box'>
                             <div className='items'>
-                                <Audios />
-                                <Displays />
+                                <Audios
+                                    audios={audios}
+                                    onChange={(it) => {
+                                        audio.current = it;
+                                    }}
+                                />
+                                <Displays
+                                    displays={displays}
+                                    onChange={(it) => {
+                                        display.current = it;
+                                    }}
+                                />
                                 <Transport value={transport} onChange={setTransport} />
                             </div>
                             <button className='click' onClick={start}>

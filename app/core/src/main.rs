@@ -212,6 +212,8 @@ impl App {
             }
         });
 
+        let _ = router.call::<(), ()>("ReadyNotify", ()).await;
+
         Ok(Self {
             handle: Handle::current(),
             receiver,

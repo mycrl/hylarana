@@ -25,6 +25,7 @@ const Chinase = {
     NetworkMulticastHelp: "用于多播的IP地址，默认为239.0.0.1。",
     NetworkServer: "服务器",
     NetworkServerHelp: "转发服务器的地址，例如192.168.1.100:8080。",
+    NetworkPort: "绑定端口",
     NetworkMtu: "最大传输单元",
     NetworkMtuHelp:
         "最大传输单元（英语：Maximum Transmission Unit，缩写MTU）是指数据链路层上面所能通过的最大数据包大小（以字节为单位）",
@@ -60,6 +61,9 @@ const Chinase = {
     Relay: "转发",
     Multicast: "多播",
     SenderStart: "开始投屏",
+    RendererBackend: "渲染器后端",
+    RendererBackendHelp:
+        "Direct3D11：使用D3D11实现的后端，在较老的设备和平台上受支持，具有更好的性能表现和内存占用，但仅限于Windows。\r\nWebGPU：使用WebGPU实现的跨平台图形后端，在许多常见的平台或设备上均受支持。",
 };
 
 const English = {
@@ -79,6 +83,7 @@ const English = {
     NetworkInterfaceHelp: "Bound NIC interfaces, 0.0.0.0 means all NICs are bound.",
     NetworkMulticast: "multicast",
     NetworkMulticastHelp: "The IP address used for multicast, the default is 239.0.0.1.",
+    NetworkPort: "port",
     NetworkServer: "server",
     NetworkServerHelp: "The address of the forwarding server, such as 192.168.1.100:8080.",
     NetworkMtu: "mtu",
@@ -117,6 +122,9 @@ const English = {
     Relay: "Relay",
     Multicast: "Multicast",
     SenderStart: "Start",
+    RendererBackend: "renderer backend",
+    RendererBackendHelp:
+        "Direct3D11: Backend implemented using D3D11, which is supported on an older device and platform and has better performance performance and memory footprint, but only on windows. \r\nWebGPU: Cross-platform graphics backends implemented using WebGPUs are supported on a number of common platforms or devices.",
 };
 
 export type Language = typeof English;

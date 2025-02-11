@@ -1,23 +1,12 @@
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import { atom, getDefaultStore } from "jotai";
-
-export const VideoEncoders = {
-    x264: "X264",
-    qsv: "Intel QSV - Windows",
-    videotoolbox: "VideoToolbox - Apple",
-};
-
-export const VideoDecoders = {
-    h264: "H264",
-    d3d11va: "D3D11VA - Windows",
-    qsv: "Intel QSV - Windows",
-    videotoolbox: "VideoToolbox - Apple",
-};
+import { Backend, VideoDecoders, VideoEncoders } from "./hylarana";
 
 export interface SettingsType {
     NetworkInterface: string;
     NetworkMulticast: string;
     NetworkServer: string | null;
+    NetworkPort: number;
     NetworkMtu: number;
     CodecEncoder: keyof typeof VideoEncoders;
     CodecDecoder: keyof typeof VideoDecoders;
@@ -28,15 +17,17 @@ export interface SettingsType {
     VideoKeyFrameInterval: number;
     AudioSampleRate: number;
     AudioBitRate: number;
+    RendererBackend: Backend;
 }
 
 export const DefaultSettings: SettingsType = {
     NetworkInterface: "0.0.0.0",
     NetworkMulticast: "239.0.0.1",
     NetworkServer: null,
+    NetworkPort: 8080,
     NetworkMtu: 1500,
-    CodecEncoder: "x264",
-    CodecDecoder: "h264",
+    CodecEncoder: "X264",
+    CodecDecoder: "H264",
     VideoSizeWidth: 1280,
     VideoSizeHeight: 720,
     VideoFrameRate: 24,
@@ -44,6 +35,7 @@ export const DefaultSettings: SettingsType = {
     VideoKeyFrameInterval: 24,
     AudioSampleRate: 48000,
     AudioBitRate: 64000,
+    RendererBackend: Backend.WebGPU,
 };
 
 export const settingsAtom = atomWithStorage(

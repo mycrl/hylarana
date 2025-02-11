@@ -36,6 +36,7 @@
 
 #settings #content .module .item sub {
     color: #999;
+    white-space: break-spaces;
 }
 
 #settings #content .module .item input,

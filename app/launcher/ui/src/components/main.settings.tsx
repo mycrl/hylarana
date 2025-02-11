@@ -1,15 +1,9 @@
 import "../styles/main.settings.css";
 import { useState } from "react";
-import {
-    settingsAtom,
-    VideoDecoders,
-    VideoEncoders,
-    DefaultSettings,
-    SettingsType,
-    deviceNameAtom,
-} from "../settings";
+import { settingsAtom, DefaultSettings, SettingsType, deviceNameAtom } from "../settings";
 import { languageAtom, localesAtom, LanguageOptions } from "../locales";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { Backend, VideoDecoders, VideoEncoders } from "../hylarana";
 
 class SubmitEvent extends EventTarget {
     emit() {
@@ -148,7 +142,15 @@ function Select<T extends string | number>({
     );
 }
 
-function System({ event, disabled }: { event: SubmitEvent; disabled: boolean }) {
+function System({
+    event,
+    settings,
+    disabled,
+}: {
+    event: SubmitEvent;
+    settings: Ref<SettingsType>;
+    disabled: boolean;
+}) {
     const locales = useAtomValue(localesAtom);
     const [language, setLanguage] = useAtom(languageAtom);
     const [deviceName, setDeviceName] = useAtom(deviceNameAtom);
@@ -182,6 +184,15 @@ function System({ event, disabled }: { event: SubmitEvent; disabled: boolean }) 
                         ))}
                     </select>
                 </div>
+                <div className='item'>
+                    <p>{locales.RendererBackend}:</p>
+                    <sub>{locales.RendererBackendHelp}</sub>
+                    <Select
+                        ref={settings.RendererBackend as any}
+                        options={Backend}
+                        disabled={disabled}
+                    />
+                </div>
             </div>
         </>
     );
@@ -208,6 +219,10 @@ function Network({ settings, disabled }: { settings: Ref<SettingsType>; disabled
                     <p>{locales.NetworkServer}:</p>
                     <sub>{locales.NetworkServerHelp}</sub>
                     <Input ref={settings.NetworkServer} disabled={disabled} />
+                </div>
+                <div className='item'>
+                    <p>{locales.NetworkPort}:</p>
+                    <Input ref={settings.NetworkPort} disabled={disabled} />
                 </div>
                 <div className='item'>
                     <p>{locales.NetworkMtu}:</p>
@@ -311,14 +326,15 @@ export default function () {
     const submitEvent = new SubmitEvent();
     const settings = createSettingsRef();
     const locales = useAtomValue(localesAtom);
-    const setSettings = useSetAtom(settingsAtom);
     const [disabled, setDisabled] = useState(false);
+
+    const setSettings = useSetAtom(settingsAtom);
 
     return (
         <>
             <div id='settings'>
                 <div id='content'>
-                    <System event={submitEvent} disabled={disabled} />
+                    <System event={submitEvent} settings={settings} disabled={disabled} />
                     <Network settings={settings} disabled={disabled} />
                     <Codec settings={settings} disabled={disabled} />
                     <Video settings={settings} disabled={disabled} />

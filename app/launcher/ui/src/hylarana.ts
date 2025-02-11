@@ -29,37 +29,42 @@ export enum VideoFormat {
     I420 = "I420",
 }
 
+export type TransportStrategyStruct = {
+    [key in TransportStrategy]: string;
+};
+
+export interface Transport {
+    strategy: TransportStrategyStruct;
+    mtu: number;
+}
+
 export interface SenderOptions {
-    transport: {
-        mtu: number;
-        strategy: {
-            strategy: TransportStrategy;
-            address: string;
-        };
-    };
-    video: {
-        size: {
-            width: number;
-            height: number;
-        };
-        fps: number;
-        bitRate: number;
-    };
-    audio: {
-        sampleRate: number;
-        bitRate: number;
+    transport: Transport;
+    media: {
+        video: {
+            source: Source;
+            options: {
+                codec: keyof typeof VideoEncoders;
+                frame_rate: number;
+                width: number;
+                height: number;
+                bit_rate: number;
+                key_frame_interval: number;
+            };
+        } | null;
+        audio: {
+            source: Source;
+            options: {
+                sample_rate: number;
+                bit_rate: number;
+            };
+        } | null;
     };
 }
 
-export interface MediaStreamDescription extends SenderOptions {
+export interface MediaStreamDescription {
     id: string;
-    transport: {
-        mtu: number;
-        strategy: {
-            strategy: TransportStrategy;
-            address: string;
-        };
-    };
+    transport: Transport;
     video: {
         format: VideoFormat;
         size: {
@@ -73,42 +78,6 @@ export interface MediaStreamDescription extends SenderOptions {
         sampleRate: number;
         channels: number;
         bitRate: number;
-    };
-}
-
-function intoMediaStreamDescription(value: any): MediaStreamDescription {
-    let strategy = TransportStrategy.Direct;
-    {
-        if (value.t.s.t == "r") {
-            strategy = TransportStrategy.Relay;
-        } else if (value.t.s.t == "m") {
-            strategy = TransportStrategy.Multicast;
-        }
-    }
-
-    return {
-        id: value.i,
-        transport: {
-            mtu: value.t.m,
-            strategy: {
-                address: value.t.s.v,
-                strategy,
-            },
-        },
-        video: {
-            format: value.v.f,
-            size: {
-                width: value.v.s.w,
-                height: value.v.s.h,
-            },
-            fps: value.v.fps,
-            bitRate: value.v.br,
-        },
-        audio: {
-            sampleRate: value.a.sr,
-            channels: value.a.cs,
-            bitRate: value.a.br,
-        },
     };
 }
 
@@ -140,21 +109,21 @@ export interface Source {
     name: string;
 }
 
+export interface ReceiverOptions {
+    video_decoder: keyof typeof VideoDecoders;
+}
+
+export enum Backend {
+    Direct3D11 = "Direct3D11",
+    WebGPU = "WebGPU",
+}
+
 const devicesChangeObserver = new Observable<Device[]>((subscriber) => {
     console.log("init devices change notify observer");
 
     function notify() {
         Route.call(Methods.GetDevices).then((data) => {
-            subscriber.next(
-                data.map((it) => {
-                    return {
-                        ...it,
-                        description: it.description
-                            ? intoMediaStreamDescription(it.description)
-                            : null,
-                    };
-                })
-            );
+            subscriber.next(data);
         });
     }
 
@@ -172,13 +141,13 @@ const devicesChangeObserver = new Observable<Device[]>((subscriber) => {
     };
 });
 
-export const DevicesAtom = atomWithObservable<Device[]>(() => devicesChangeObserver);
+export const devicesAtom = atomWithObservable<Device[]>(() => devicesChangeObserver);
 
-export const DisplaysAtom = atom(() => {
+export const displaysAtom = atom(() => {
     return Route.call(Methods.GetCaptureSources, SourceType.Screen);
 });
 
-export const AudiosAtom = atom(() => {
+export const audiosAtom = atom(() => {
     return Route.call(Methods.GetCaptureSources, SourceType.Audio);
 });
 

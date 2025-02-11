@@ -7,10 +7,11 @@ use std::{
 
 use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings};
 use common::{atomic::EasyAtomic, codec::VideoDecoderType};
-use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use transport::{StreamKind, StreamMultiReceiverAdapter, TransportReceiver};
 
-use thiserror::Error;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "windows")]
 use common::win32::MediaThreadClass;
@@ -29,7 +30,8 @@ pub enum HylaranaReceiverError {
 }
 
 /// Receiver configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct HylaranaReceiverOptions {
     pub video_decoder: VideoDecoderType,
 }

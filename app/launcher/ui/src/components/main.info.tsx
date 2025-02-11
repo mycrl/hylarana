@@ -1,7 +1,8 @@
 import "../styles/main.info.css";
 import { localesAtom } from "../locales";
-import { settingsAtom, VideoEncoders } from "../settings";
+import { settingsAtom } from "../settings";
 import { useAtomValue } from "jotai";
+import { VideoEncoders } from "../hylarana";
 
 export default function () {
     const settings = useAtomValue(settingsAtom);

@@ -32,7 +32,6 @@ const window = new BrowserWindow({
     width: 1000,
     height: 600,
     webPreferences: {
-        devTools: process.env.DEVTOOLS == "1",
         preload: pathJoin(__dirname, "../preload.js"),
     },
 });
@@ -56,7 +55,6 @@ function reloadCoreProcess() {
     core.stderr?.pipe(process.stderr);
     core.stdout?.on("data", (message: string) => {
         if (message.startsWith(LINE_START)) {
-            console.log("==========================", message);
             window.webContents.send("MessageTransport", message.slice(LINE_START.length));
         } else {
             process.stdout.write(message);
@@ -64,7 +62,7 @@ function reloadCoreProcess() {
     });
 }
 
-const tray = new Tray("../../logo.png");
+const tray = new Tray("./assets/logoTemplate.png");
 
 tray.setToolTip("hylarana - cross platform screencast");
 tray.setContextMenu(

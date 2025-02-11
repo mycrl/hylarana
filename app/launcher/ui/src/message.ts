@@ -1,4 +1,11 @@
-import { Device, SenderOptions, Source, SourceType } from "./hylarana";
+import {
+    Backend,
+    Device,
+    MediaStreamDescription,
+    SenderOptions,
+    Source,
+    SourceType,
+} from "./hylarana";
 
 declare global {
     interface Window {
@@ -161,12 +168,18 @@ export enum Methods {
     ReadyNotify = "ReadyNotify",
     GetCaptureSources = "GetCaptureSources",
     CreateSender = "CreateSender",
+    CloseSender = "CloseSender",
+    CreateReceiver = "CreateReceiver",
+    CloseReceiver = "CloseReceiver",
 }
 
 interface CallTypes {
     [Methods.GetDevices]: [void, Device[]];
     [Methods.GetCaptureSources]: [SourceType, Source[]];
     [Methods.CreateSender]: [[Array<string>, SenderOptions], void];
+    [Methods.CloseSender]: [void, void];
+    [Methods.CreateReceiver]: [[SenderOptions, Backend, MediaStreamDescription], void];
+    [Methods.CloseReceiver]: [void, void];
 }
 
 interface OnTypes {

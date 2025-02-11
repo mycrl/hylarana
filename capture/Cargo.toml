@@ -25,3 +25,6 @@ windows = { version = "0.58", features = ["Win32_Media", "Win32_Media_MediaFound
 screencapturekit = "0.3.2"
 core-foundation = "0.10"
 core-media = { version = "0.3", package = "core-media-rs" }
+
+[features]
+serde = []

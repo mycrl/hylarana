@@ -1,5 +1,5 @@
 import "../styles/main.sender.devices.css";
-import { DevicesAtom, Device } from "../hylarana";
+import { devicesAtom, Device } from "../hylarana";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
 import { localesAtom } from "../locales";
@@ -58,9 +58,9 @@ function DeviceNode({
     );
 }
 
-export default function ({ onChange }: { onChange?: (values: Device[]) => void }) {
+export default function ({ onChange }: { onChange?: (values: string[]) => void }) {
     const locales = useAtomValue(localesAtom);
-    const devices = useAtomValue(DevicesAtom);
+    const devices = useAtomValue(devicesAtom);
     const indexs = useRef(new Set<number>([]));
 
     return (
@@ -81,7 +81,7 @@ export default function ({ onChange }: { onChange?: (values: Device[]) => void }
                                 key={i}
                                 onChange={() => {
                                     if (onChange) {
-                                        onChange([...indexs.current].map((i) => devices[i]));
+                                        onChange([...indexs.current].map((i) => devices[i].name));
                                     }
                                 }}
                             />

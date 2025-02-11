@@ -13,19 +13,23 @@ pub mod macos;
 use std::net::SocketAddr;
 
 use frame::VideoFormat;
+
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Size {
-    #[serde(rename = "w")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "w"))]
     pub width: u32,
-    #[serde(rename = "h")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "h"))]
     pub height: u32,
 }
 
 /// Transport layer strategies.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(tag = "t", content = "v")]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "serde-short", serde(tag = "t", content = "v"))]
 pub enum TransportStrategy {
     /// In straight-through mode, the sender creates an SRT server and the
     /// receiver connects directly to the sender via the SRT protocol.
@@ -43,13 +47,13 @@ pub enum TransportStrategy {
     /// ```text
     /// example: 192.168.1.100:8080
     /// ```
-    #[serde(rename = "d")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "d"))]
     Direct(SocketAddr),
     /// Forwarding mode, where the sender and receiver pass data through a relay
     /// server.
     ///
     /// The network address is the address of the transit server.
-    #[serde(rename = "r")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "r"))]
     Relay(SocketAddr),
     /// UDP multicast mode, where the sender sends multicast packets into the
     /// current network and the receiver processes the multicast packets.
@@ -60,49 +64,54 @@ pub enum TransportStrategy {
     /// ```text
     /// example: 239.0.0.1:8080
     /// ```
-    #[serde(rename = "m")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "m"))]
     Multicast(SocketAddr),
 }
 
 /// Transport configuration.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct TransportOptions {
-    #[serde(rename = "s")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "s"))]
     pub strategy: TransportStrategy,
     /// see: [Maximum_transmission_unit](https://en.wikipedia.org/wiki/Maximum_transmission_unit)
-    #[serde(rename = "m")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "m"))]
     pub mtu: usize,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct MediaVideoStreamDescription {
-    #[serde(rename = "f")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "f"))]
     pub format: VideoFormat,
-    #[serde(rename = "s")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "s"))]
     pub size: Size,
+    #[cfg_attr(feature = "serde-short", serde(rename = "p"))]
     pub fps: u8,
-    #[serde(rename = "br")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "b"))]
     pub bit_rate: u64,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct MediaAudioStreamDescription {
-    #[serde(rename = "sr")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "s"))]
     pub sample_rate: u64,
-    #[serde(rename = "cs")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "c"))]
     pub channels: u8,
-    #[serde(rename = "br")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "b"))]
     pub bit_rate: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct MediaStreamDescription {
-    #[serde(rename = "i")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "i"))]
     pub id: String,
-    #[serde(rename = "t")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "t"))]
     pub transport: TransportOptions,
-    #[serde(rename = "v")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "v"))]
     pub video: Option<MediaVideoStreamDescription>,
-    #[serde(rename = "a")]
+    #[cfg_attr(feature = "serde-short", serde(rename = "a"))]
     pub audio: Option<MediaAudioStreamDescription>,
 }
