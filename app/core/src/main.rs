@@ -2,6 +2,7 @@ mod devices;
 mod message;
 
 use std::{
+    io::{stderr, Stderr, Write},
     sync::{Arc, LazyLock},
     thread,
 };
@@ -310,7 +311,13 @@ impl ApplicationHandler<Events> for App {
     }
 }
 
-struct Logger;
+struct Logger(Stderr);
+
+impl Default for Logger {
+    fn default() -> Self {
+        Self(stderr())
+    }
+}
 
 impl log::Log for Logger {
     fn flush(&self) {}
@@ -320,13 +327,16 @@ impl log::Log for Logger {
     }
 
     fn log(&self, record: &log::Record) {
-        eprintln!("{} - {}", record.level(), record.args());
+        self.0
+            .lock()
+            .write_all(format!("{} - {}\n", record.level(), record.args()).as_bytes())
+            .unwrap();
     }
 }
 
 fn main() -> Result<()> {
     log::set_max_level(log::LevelFilter::Info);
-    log::set_boxed_logger(Box::new(Logger))?;
+    log::set_boxed_logger(Box::new(Logger::default()))?;
 
     let event_loop = EventLoop::<Events>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);

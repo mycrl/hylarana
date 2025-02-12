@@ -26,14 +26,14 @@ pub trait MessageTransport: Send + Sync {
 
 pub struct Stdio {
     stdin: Stdin,
-    stdout: Mutex<Stdout>,
+    stdout: Stdout,
 }
 
 impl Default for Stdio {
     fn default() -> Self {
         Self {
             stdin: stdin(),
-            stdout: Mutex::new(stdout()),
+            stdout: stdout(),
         }
     }
 }
