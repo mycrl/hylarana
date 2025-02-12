@@ -1,104 +1,136 @@
 use std::{
     collections::HashMap,
-    future::Future,
+    io::{stdin, stdout, BufRead, Stdin, Stdout, Write},
     str,
     sync::{
         atomic::{AtomicU64, Ordering},
+        mpsc::{channel, Sender},
         Arc,
     },
+    thread,
     time::Duration,
 };
 
 use anyhow::{anyhow, Result};
+use parking_lot::{Mutex, RwLock};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use tokio::{
-    io::{stdin, stdout, AsyncReadExt, AsyncWriteExt, Stdout},
-    sync::{
-        mpsc::{unbounded_channel, UnboundedSender},
-        oneshot::{channel, Sender},
-        Mutex, RwLock,
-    },
-    time::timeout,
-};
+use tokio::{sync::oneshot, time::timeout};
 
-static LINE_START: &str = "::MESSAGE_TRANSPORTS-";
+pub trait MessageTransport: Send + Sync {
+    type Error;
 
-pub struct Route {
-    sequence: AtomicU64,
-    stdout: Mutex<Stdout>,
-    // request sender table
-    rst: Mutex<HashMap<u64, Sender<Value>>>,
-    // on receiver table
-    ort: RwLock<HashMap<String, UnboundedSender<(Sender<Result<Value>>, Value)>>>,
+    fn send(&self, message: &str) -> Result<(), Self::Error>;
+    fn read(&self, message: &mut String) -> Result<(), Self::Error>;
 }
 
-impl Route {
-    async fn send(&self, message: String) {
-        if self
-            .stdout
-            .lock()
-            .await
-            .write_all(format!("{}{}\n", LINE_START, message).as_bytes())
-            .await
-            .is_err()
-        {
-            log::error!("failed to send message to stdout!");
+pub struct Stdio {
+    stdin: Stdin,
+    stdout: Mutex<Stdout>,
+}
+
+impl Default for Stdio {
+    fn default() -> Self {
+        Self {
+            stdin: stdin(),
+            stdout: Mutex::new(stdout()),
         }
     }
+}
 
-    pub async fn new() -> Arc<Self> {
+impl MessageTransport for Stdio {
+    type Error = anyhow::Error;
+
+    fn read(&self, message: &mut String) -> Result<(), Self::Error> {
+        self.stdin.lock().read_line(message)?;
+
+        log::info!("stdio message transport recv message={}", message.trim());
+
+        Ok(())
+    }
+
+    fn send(&self, message: &str) -> Result<(), Self::Error> {
+        log::info!("stdio message transport send message={}", message);
+
+        let mut stdout = self.stdout.lock();
+        stdout.write(message.as_bytes())?;
+        stdout.write("\n".as_bytes())?;
+        stdout.flush()?;
+
+        Ok(())
+    }
+}
+
+pub struct Route<M> {
+    transport: M,
+    sequence: AtomicU64,
+    // request sender table
+    rst: Mutex<HashMap<u64, oneshot::Sender<Value>>>,
+    // on receiver table
+    ort: RwLock<HashMap<String, Sender<(Sender<Result<Value>>, Value)>>>,
+}
+
+impl<M> Route<M>
+where
+    M: MessageTransport<Error = anyhow::Error> + 'static,
+{
+    fn handle(&self, message: &str) -> Result<()> {
+        match serde_json::from_str(message)? {
+            Payload::Request {
+                method,
+                sequence,
+                content,
+            } => {
+                if let Some(sender) = self.ort.read().get(&method) {
+                    let (tx, rx) = channel();
+                    sender.send((tx, content))?;
+
+                    if let Err(e) =
+                        self.transport
+                            .send(&serde_json::to_string(&Payload::Response {
+                                content: ResponseContent::from(rx.recv()?),
+                                sequence,
+                            })?)
+                    {
+                        log::error!("failed to send message to stdout, error={}", e);
+                    }
+                }
+            }
+            Payload::Response { sequence, content } => {
+                if let Some(tx) = self.rst.lock().remove(&sequence) {
+                    let _ = tx.send(content);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn new(transport: M) -> Arc<Self> {
         let this = Arc::new(Self {
             ort: RwLock::new(HashMap::with_capacity(100)),
             rst: Mutex::new(HashMap::with_capacity(100)),
             sequence: AtomicU64::new(0),
-            stdout: Mutex::new(stdout()),
+            transport,
         });
 
         let this_ = Arc::downgrade(&this);
-        tokio::spawn(async move {
-            let mut buf = vec![0u8; 4096];
+        thread::spawn(move || {
+            let mut message = String::with_capacity(4096);
 
-            while let Ok(size) = stdin().read(&mut buf).await {
-                if let Ok(line) = std::str::from_utf8(&buf[..size]) {
-                    if line.starts_with(LINE_START) {
-                        let (_, message) = line.split_at(LINE_START.len());
+            while let Some(this) = this_.upgrade() {
+                message.clear();
 
-                        if let Some(this) = this_.upgrade() {
-                            let _ = async {
-                                match serde_json::from_str(&message)? {
-                                    Payload::Request {
-                                        method,
-                                        sequence,
-                                        content,
-                                    } => {
-                                        if let Some(sender) = this.ort.read().await.get(&method) {
-                                            let (tx, rx) = channel();
-                                            sender.send((tx, content))?;
-
-                                            this.send(serde_json::to_string(&Payload::Response {
-                                                content: ResponseContent::from(rx.await?),
-                                                sequence,
-                                            })?)
-                                            .await;
-                                        }
-                                    }
-                                    Payload::Response { sequence, content } => {
-                                        if let Some(tx) = this.rst.lock().await.remove(&sequence) {
-                                            let _ = tx.send(content);
-                                        }
-                                    }
-                                }
-
-                                Ok::<(), anyhow::Error>(())
-                            }
-                            .await;
-                        } else {
-                            break;
-                        }
+                if this.transport.read(&mut message).is_ok() {
+                    if let Err(e) = this.handle(&message) {
+                        log::error!("message router handle message error={}", e)
                     }
+                } else {
+                    break;
                 }
             }
+
+            log::error!("stdin reader thread is closed");
         });
 
         this
@@ -110,19 +142,19 @@ impl Route {
         S: DeserializeOwned,
     {
         let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
-        self.send(serde_json::to_string(&Payload::Request {
-            method: method.to_string(),
-            sequence,
-            content,
-        })?)
-        .await;
+        self.transport
+            .send(&serde_json::to_string(&Payload::Request {
+                method: method.to_string(),
+                sequence,
+                content,
+            })?)?;
 
-        let (tx, rx) = channel();
-        self.rst.lock().await.insert(sequence, tx);
+        let (tx, rx) = oneshot::channel();
+        self.rst.lock().insert(sequence, tx);
 
         let response = match timeout(Duration::from_secs(5), rx).await {
             Err(_) | Ok(Err(_)) => {
-                drop(self.rst.lock().await.remove(&sequence));
+                drop(self.rst.lock().remove(&sequence));
 
                 return Err(anyhow!("request timeout"));
             }
@@ -133,26 +165,26 @@ impl Route {
         response.into()
     }
 
-    pub async fn on<T, Q, S, F, C>(&self, method: &str, handle: T, ctx: C)
+    pub fn on<T, Q, S, C>(&self, method: &str, handle: T, ctx: C)
     where
-        T: Fn(C, Q) -> F + Send + Sync + 'static,
+        T: Fn(C, Q) -> Result<S> + Send + 'static,
         Q: DeserializeOwned + Send,
         S: Serialize,
-        F: Future<Output = Result<S>> + Send,
-        C: Clone + Sync + Send + 'static,
+        C: Clone + Send + 'static,
     {
-        let (tx, mut rx) = unbounded_channel();
-        self.ort.write().await.insert(method.to_string(), tx);
+        let (tx, rx) = channel();
+        self.ort.write().insert(method.to_string(), tx);
 
-        tokio::spawn(async move {
-            while let Some((callback, request)) = rx.recv().await {
-                let func = async {
-                    Ok::<_, anyhow::Error>(serde_json::to_value(
-                        handle(ctx.clone(), serde_json::from_value(request)?).await?,
-                    )?)
+        thread::spawn(move || {
+            while let Ok((callback, request)) = rx.recv() {
+                let func = || {
+                    Ok::<_, anyhow::Error>(serde_json::to_value(handle(
+                        ctx.clone(),
+                        serde_json::from_value(request)?,
+                    )?)?)
                 };
 
-                let _ = callback.send(func.await);
+                let _ = callback.send(func());
             }
         });
     }

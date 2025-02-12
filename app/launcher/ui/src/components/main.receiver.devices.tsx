@@ -2,8 +2,8 @@ import "../styles/main.receiver.devices.css";
 import { Device } from "../hylarana";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import { localesAtom } from "../locales";
 import { useAtomValue } from "jotai";
+import { localesAtom } from "../state";
 
 export default function ({ devices }: { devices: Device[] }) {
     const locales = useAtomValue(localesAtom);

@@ -1,13 +1,11 @@
 import "../styles/main.sender.css";
-import Switch from "./switch";
 import Devices from "./main.sender.devices";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faVolumeLow, faDisplay, faNetworkWired } from "@fortawesome/free-solid-svg-icons";
-import { localesAtom } from "../locales";
-import { settingsAtom, broadcastAtom } from "../settings";
-import { displaysAtom, audiosAtom, createSender, TransportStrategy, Source } from "../hylarana";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtomValue } from "jotai";
 import { useRef, useState } from "react";
+import { closeSender, createSender, Source, Status, TransportStrategy } from "../hylarana";
+import { audiosAtom, displaysAtom, localesAtom, settingsAtom, statusAtom } from "../state";
 
 function Displays({
     displays,
@@ -107,7 +105,7 @@ function Transport({
 
 export default function () {
     const locales = useAtomValue(localesAtom);
-    const [broadcast, setBroadcast] = useAtom(broadcastAtom);
+    const status = useAtomValue(statusAtom);
     const [transport, setTransport] = useState(TransportStrategy.Direct);
 
     const settings = useAtomValue(settingsAtom);
@@ -118,8 +116,8 @@ export default function () {
     const display = useRef<number>(0);
     const audio = useRef<number>(0);
 
-    function start() {
-        createSender(names.current, {
+    async function start() {
+        await createSender(names.current, {
             transport: {
                 mtu: settings.NetworkMtu,
                 strategy: {
@@ -156,26 +154,24 @@ export default function () {
         });
     }
 
+    async function stop() {
+        await closeSender();
+    }
+
     return (
         <>
             <div id='Sender'>
-                <div id='switch'>
-                    <div className='body'>
-                        <span>{locales.Broadcast}</span>
-                        <Switch defaultValue={broadcast} onChange={setBroadcast} />
-                    </div>
-                    <p>{locales.BroadcastHelp}</p>
-                </div>
                 <div id='content'>
-                    {!broadcast ? (
-                        <Devices
-                            onChange={(it) => {
-                                names.current = it;
-                            }}
-                        />
+                    <Devices
+                        onChange={(it) => {
+                            names.current = it;
+                        }}
+                    />
+                    {/* {!broadcast ? (
+                        
                     ) : (
                         <div className='padding'></div>
-                    )}
+                    )} */}
 
                     <div id='control'>
                         <div className='box'>
@@ -194,8 +190,24 @@ export default function () {
                                 />
                                 <Transport value={transport} onChange={setTransport} />
                             </div>
-                            <button className='click' onClick={start}>
-                                {locales.SenderStart}
+                            <button
+                                className='click'
+                                onClick={() => {
+                                    status == Status.Idle ? start() : stop();
+                                }}
+                                disabled={status == Status.Receiving}
+                                style={{
+                                    backgroundColor:
+                                        status == Status.Sending
+                                            ? "#f00222"
+                                            : status == Status.Receiving
+                                            ? "#ddd"
+                                            : undefined,
+                                }}
+                            >
+                                {status == Status.Sending
+                                    ? locales.SenderStop
+                                    : locales.SenderStart}
                             </button>
                         </div>
                     </div>

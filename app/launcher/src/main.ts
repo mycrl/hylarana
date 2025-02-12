@@ -4,8 +4,6 @@ import { accessSync, readFileSync, writeFileSync } from "node:fs";
 import { join as pathJoin } from "node:path";
 import { faker } from "@faker-js/faker";
 
-const LINE_START: string = "::MESSAGE_TRANSPORTS-";
-
 const appUserPath = app.getPath("userData");
 const settingsPath = pathJoin(appUserPath, "./settings");
 
@@ -55,12 +53,7 @@ function reloadCoreProcess() {
     }
 
     core.stdout?.on("data", (buffer: Buffer) => {
-        const message = buffer.toString("utf8");
-        if (message.startsWith(LINE_START)) {
-            window.webContents.send("MessageTransport", message.slice(LINE_START.length));
-        } else {
-            process.stdout.write(message);
-        }
+        window.webContents.send("MessageTransport", buffer.toString("utf8"));
     });
 }
 
@@ -100,7 +93,7 @@ app.on("window-all-closed", () => {
 }
 
 ipcMain.on("MessageTransport", (_, message: string) => {
-    core?.stdin?.write(`${LINE_START}${message}`);
+    core?.stdin?.write(message + "\n");
 });
 
 ipcMain.handle("GetName", async () => {

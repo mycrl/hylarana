@@ -1,9 +1,10 @@
 import "../styles/main.settings.css";
 import { useState } from "react";
-import { settingsAtom, DefaultSettings, SettingsType, deviceNameAtom } from "../settings";
-import { languageAtom, localesAtom, LanguageOptions } from "../locales";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Backend, VideoDecoders, VideoEncoders } from "../hylarana";
+import { DefaultSettings, SettingsType } from "../settings";
+import { deviceNameAtom, languageAtom, localesAtom, settingsAtom } from "../state";
+import { LanguageOptions } from "../locales";
 
 class SubmitEvent extends EventTarget {
     emit() {

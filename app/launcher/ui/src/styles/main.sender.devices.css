@@ -5,12 +5,20 @@
 #SenderDevices .header p {
     color: #829bff;
     text-transform: uppercase;
+    position: relative;
 }
 
 #SenderDevices .header span {
     color: #999;
     display: block;
     margin-bottom: 2px;
+}
+
+#SenderDevices .header sub {
+    position: absolute;
+    right: 0;
+    top: 17px;
+    color: #999;
 }
 
 #SenderDevices .items {

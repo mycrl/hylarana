@@ -5,6 +5,7 @@ import {
     SenderOptions,
     Source,
     SourceType,
+    Status,
 } from "./hylarana";
 
 declare global {
@@ -171,6 +172,9 @@ export enum Methods {
     CloseSender = "CloseSender",
     CreateReceiver = "CreateReceiver",
     CloseReceiver = "CloseReceiver",
+    GetStatus = "GetStatus",
+    SenderClosedNotify = "SenderClosedNotify",
+    ReceiverClosedNotify = "ReceiverClosedNotify",
 }
 
 interface CallTypes {
@@ -180,9 +184,12 @@ interface CallTypes {
     [Methods.CloseSender]: [void, void];
     [Methods.CreateReceiver]: [[SenderOptions, Backend, MediaStreamDescription], void];
     [Methods.CloseReceiver]: [void, void];
+    [Methods.GetStatus]: [void, Status];
 }
 
 interface OnTypes {
     [Methods.DevicesChangeNotify]: [void, void];
     [Methods.ReadyNotify]: [void, void];
+    [Methods.SenderClosedNotify]: [void, void];
+    [Methods.ReceiverClosedNotify]: [void, void];
 }

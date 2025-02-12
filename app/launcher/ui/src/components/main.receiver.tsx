@@ -1,9 +1,9 @@
 import "../styles/main.receiver.css";
 import Devices from "./main.receiver.devices";
 import Switch from "./switch";
-import { localesAtom } from "../locales";
 import { useState } from "react";
 import { useAtomValue } from "jotai";
+import { localesAtom } from "../state";
 
 export default function () {
     const locales = useAtomValue(localesAtom);

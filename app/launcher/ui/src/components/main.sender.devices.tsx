@@ -1,10 +1,10 @@
 import "../styles/main.sender.devices.css";
-import { devicesAtom, Device } from "../hylarana";
+import { Device } from "../hylarana";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import { localesAtom } from "../locales";
 import { useAtomValue } from "jotai";
 import { RefObject, useRef, useState } from "react";
+import { devicesAtom, localesAtom } from "../state";
 
 function DeviceNode({
     device,
@@ -69,6 +69,7 @@ export default function ({ onChange }: { onChange?: (values: string[]) => void }
                 <div className='header'>
                     <p>{locales.Devices}</p>
                     <span>{locales.DevicesHelp}</span>
+                    <sub>{locales.BroadcastHelp}</sub>
                 </div>
                 <div className='items'>
                     {devices

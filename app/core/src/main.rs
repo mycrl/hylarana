@@ -1,7 +1,10 @@
 mod devices;
 mod message;
 
-use std::sync::Arc;
+use std::{
+    sync::{Arc, LazyLock},
+    thread,
+};
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -13,11 +16,10 @@ use hylarana::{
     VideoRenderSurfaceOptions,
 };
 
-use tokio::{
-    runtime::Handle,
-    sync::{Mutex, RwLock},
-};
-
+use message::Stdio;
+use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
+use tokio::runtime::Runtime;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
@@ -27,6 +29,17 @@ use winit::{
 };
 
 use self::{devices::DevicesManager, message::Route};
+
+static RUNTIME: LazyLock<Runtime> =
+    LazyLock::new(|| Runtime::new().expect("failed to create tokio runtime, this is a bug"));
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
+enum Status {
+    Sending,
+    Receiving,
+    #[default]
+    Idle,
+}
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -61,161 +74,178 @@ type ISender = HylaranaSender<(), HylaranaObserver>;
 type IReceiver = HylaranaReceiver<AVFrameStreamPlayer<'static>, HylaranaObserver>;
 
 struct App {
-    handle: Handle,
-    router: Arc<Route>,
+    router: Arc<Route<Stdio>>,
     window: Arc<RwLock<Option<Arc<Window>>>>,
     sender: Arc<Mutex<Option<ISender>>>,
     receiver: Arc<Mutex<Option<IReceiver>>>,
 }
 
 impl App {
-    async fn new(events: Arc<EventLoopProxy<Events>>) -> Result<Self> {
+    fn new(events: Arc<EventLoopProxy<Events>>) -> Result<Self> {
         let args = Args::parse();
-        let router = Route::new().await;
-        let devices_manager = Arc::new(DevicesManager::new(args.name.clone()).await?);
+        let router = Route::new(Stdio::default());
+        let devices_manager = Arc::new(DevicesManager::new(args.name.clone())?);
 
         let sender: Arc<Mutex<Option<ISender>>> = Default::default();
         let receiver: Arc<Mutex<Option<IReceiver>>> = Default::default();
         let window: Arc<RwLock<Option<Arc<Window>>>> = Default::default();
         {
-            router
-                .on(
-                    "GetDevices",
-                    |devices_manager, _: ()| async move { Ok(devices_manager.get_devices().await) },
-                    devices_manager.clone(),
-                )
-                .await;
+            router.on(
+                "GetDevices",
+                |devices_manager, _: ()| Ok(devices_manager.get_devices()),
+                devices_manager.clone(),
+            );
 
-            router
-                .on(
-                    "GetCaptureSources",
-                    |_, kind| async move {
-                        Ok(Handle::current()
-                            .spawn_blocking(move || Capture::get_sources(kind))
-                            .await??)
-                    },
-                    (),
-                )
-                .await;
+            router.on(
+                "GetCaptureSources",
+                |_, kind| Ok(Capture::get_sources(kind)?),
+                (),
+            );
 
-            router
-                .on(
-                    "CreateSender",
-                    |(events, sender, devices_manager), (name_list, options): (Vec<String>, HylaranaSenderOptions)| async move {
-                        let mut sender = sender.lock().await;
-                        if sender.is_none() {
-                            sender.replace({
-                                let sender = create_sender(&options, (),HylaranaObserver {
+            router.on(
+                "CreateSender",
+                |(events, sender, receiver, devices_manager),
+                 (name_list, options): (Vec<String>, HylaranaSenderOptions)| {
+                    let mut sender = sender.lock();
+                    if sender.is_none() && receiver.lock().is_none() {
+                        sender.replace({
+                            let sender = create_sender(
+                                &options,
+                                (),
+                                HylaranaObserver {
                                     is_sender: true,
                                     events,
-                                })?;
-
-                                devices_manager.set_description(name_list, sender.get_description().clone()).await;
-                                sender
-                            });
-
-                            Ok(())
-                        } else {
-                            Err(anyhow!("sender has been created"))
-                        }
-                    },
-                    (events.clone(), sender.clone(), devices_manager.clone()),
-                )
-                .await;
-
-            router
-                .on(
-                    "CloseSender",
-                    |events, _: ()| async move {
-                        events.send_event(Events::CloseSender)?;
-
-                        Ok(())
-                    },
-                    events.clone(),
-                )
-                .await;
-
-            router
-                .on(
-                    "CreateReceiver",
-                    |(events, window, receiver),
-                     (options, backend, description): (
-                        HylaranaReceiverOptions,
-                        VideoRenderBackend,
-                        MediaStreamDescription,
-                    )| async move {
-                        let window = if let Some(it) = window.read().await.as_ref() {
-                            it.clone()
-                        } else {
-                            return Err(anyhow!("window not created"));
-                        };
-
-                        let mut receiver = receiver.lock().await;
-                        if !receiver.is_none() {
-                            return Err(anyhow!("receiver has been created"));
-                        }
-
-                        receiver.replace({
-                            create_receiver(
-                                &description,
-                                &options,
-                                AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::All(
-                                    VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
-                                        size: {
-                                            let size = window.inner_size();
-                                            Size {
-                                                width: size.width,
-                                                height: size.height,
-                                            }
-                                        },
-                                        window: window.clone(),
-                                    })
-                                    .set_backend(backend)
-                                    .from_receiver(&description, &options)
-                                    .build(),
-                                ))?,
-                                HylaranaObserver {
-                                    is_sender: false,
-                                    events,
                                 },
-                            )?
+                            )?;
+
+                            devices_manager
+                                .set_description(name_list, sender.get_description().clone())?;
+                            sender
                         });
 
                         Ok(())
-                    },
-                    (events.clone(), window.clone(), receiver.clone()),
-                )
-                .await;
+                    } else {
+                        Err(anyhow!("sender has been created"))
+                    }
+                },
+                (
+                    events.clone(),
+                    sender.clone(),
+                    receiver.clone(),
+                    devices_manager.clone(),
+                ),
+            );
 
-            router
-                .on(
-                    "CloseReceiver",
-                    |events, _: ()| async move {
-                        events.send_event(Events::CloseReceiver)?;
+            router.on(
+                "CloseSender",
+                |events, _: ()| {
+                    events.send_event(Events::CloseSender)?;
+
+                    Ok(())
+                },
+                events.clone(),
+            );
+
+            router.on(
+                "CreateReceiver",
+                |(events, window, sender, receiver),
+                 (options, backend, description): (
+                    HylaranaReceiverOptions,
+                    VideoRenderBackend,
+                    MediaStreamDescription,
+                )| {
+                    let window = if let Some(it) = window.read().as_ref() {
+                        it.clone()
+                    } else {
+                        return Err(anyhow!("window not created"));
+                    };
+
+                    let mut receiver = receiver.lock();
+                    if receiver.is_none() && sender.lock().is_none() {
+                        receiver.replace(create_receiver(
+                            &description,
+                            &options,
+                            AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::All(
+                                VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
+                                    size: {
+                                        let size = window.inner_size();
+                                        Size {
+                                            width: size.width,
+                                            height: size.height,
+                                        }
+                                    },
+                                    window: window.clone(),
+                                })
+                                .set_backend(backend)
+                                .from_receiver(&description, &options)
+                                .build(),
+                            ))?,
+                            HylaranaObserver {
+                                is_sender: false,
+                                events,
+                            },
+                        )?);
 
                         Ok(())
-                    },
+                    } else {
+                        Err(anyhow!("receiver has been created"))
+                    }
+                },
+                (
                     events.clone(),
-                )
-                .await;
+                    window.clone(),
+                    sender.clone(),
+                    receiver.clone(),
+                ),
+            );
+
+            router.on(
+                "CloseReceiver",
+                |events, _: ()| {
+                    events.send_event(Events::CloseReceiver)?;
+
+                    Ok(())
+                },
+                events.clone(),
+            );
+
+            router.on(
+                "GetStatus",
+                |(sender, receiver), _: ()| {
+                    Ok(if sender.lock().is_some() {
+                        Status::Sending
+                    } else if receiver.lock().is_some() {
+                        Status::Receiving
+                    } else {
+                        Status::Idle
+                    })
+                },
+                (sender.clone(), receiver.clone()),
+            );
         }
 
         let router_ = Arc::downgrade(&router);
         let mut watcher = devices_manager.get_watcher();
-        tokio::spawn(async move {
-            while watcher.change().await {
+        thread::spawn(move || {
+            while watcher.change() {
                 if let Some(router) = router_.upgrade() {
-                    let _ = router.call::<(), ()>("DevicesChangeNotify", ()).await;
+                    RUNTIME.spawn(async move {
+                        let _ = router.call::<(), ()>("DevicesChangeNotify", ()).await;
+                    });
                 } else {
                     break;
                 }
             }
         });
 
-        let _ = router.call::<(), ()>("ReadyNotify", ()).await;
+        {
+            let router_ = router.clone();
+            RUNTIME.spawn(async move {
+                let _ = router_.call::<(), ()>("ReadyNotify", ()).await;
+            });
+        }
 
         Ok(Self {
-            handle: Handle::current(),
             receiver,
             sender,
             window,
@@ -227,7 +257,7 @@ impl App {
 impl ApplicationHandler<Events> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         {
-            let window = Arc::new(
+            self.window.write().replace(Arc::new(
                 event_loop
                     .create_window(
                         WindowAttributes::default()
@@ -235,12 +265,7 @@ impl ApplicationHandler<Events> for App {
                             .with_visible(false),
                     )
                     .unwrap(),
-            );
-
-            let opt = self.window.clone();
-            self.handle.spawn(async move {
-                opt.write().await.replace(window);
-            });
+            ));
         }
 
         startup().unwrap();
@@ -264,20 +289,22 @@ impl ApplicationHandler<Events> for App {
     fn user_event(&mut self, _: &ActiveEventLoop, event: Events) {
         match event {
             Events::CloseSender => {
-                drop(self.sender.blocking_lock().take());
+                let _ = self.sender.lock().take();
             }
             Events::CloseReceiver => {
-                drop(self.receiver.blocking_lock().take());
+                let _ = self.receiver.lock().take();
             }
             Events::SenderClosed => {
-                let _ = self
-                    .handle
-                    .block_on(self.router.call::<_, ()>("SenderClosedNotify", ()));
+                let router = self.router.clone();
+                RUNTIME.spawn(async move {
+                    let _ = router.call::<_, ()>("SenderClosedNotify", ()).await;
+                });
             }
             Events::ReceiverClosed => {
-                let _ = self
-                    .handle
-                    .block_on(self.router.call::<_, ()>("ReceiverClosedNotify", ()));
+                let router = self.router.clone();
+                RUNTIME.spawn(async move {
+                    let _ = router.call::<_, ()>("ReceiverClosedNotify", ()).await;
+                });
             }
         }
     }
@@ -297,8 +324,7 @@ impl log::Log for Logger {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     log::set_max_level(log::LevelFilter::Info);
     log::set_boxed_logger(Box::new(Logger))?;
 
@@ -306,6 +332,6 @@ async fn main() -> Result<()> {
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let events = Arc::new(event_loop.create_proxy());
-    event_loop.run_app(&mut App::new(events).await?)?;
+    event_loop.run_app(&mut App::new(events)?)?;
     Ok(())
 }

@@ -2,26 +2,26 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
     sync::Arc,
-    time::Duration,
 };
 
 use anyhow::{anyhow, Result};
 use common::MediaStreamDescription;
-use futures_util::{stream::SplitSink, SinkExt, StreamExt};
+use crossbeam::channel::{unbounded, Receiver, Sender};
+use futures_util::{SinkExt, StreamExt};
 use hylarana::{DiscoveryObserver, DiscoveryService};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tokio::{
-    net::{TcpListener, TcpStream},
-    runtime::Handle,
-    sync::{oneshot, watch, RwLock},
-    time::timeout,
+    net::TcpListener,
+    sync::mpsc::{unbounded_channel, UnboundedSender},
 };
 
 use tokio_tungstenite::{
     accept_async, connect_async,
     tungstenite::{client::IntoClientRequest, http::StatusCode, Message},
-    MaybeTlsStream, WebSocketStream,
 };
+
+use crate::RUNTIME;
 
 #[cfg(target_os = "windows")]
 pub static DEVICE_TYPE: DeviceType = DeviceType::Windows;
@@ -51,9 +51,8 @@ pub struct DeviceInfo {
     pub port: u16,
 }
 
-pub struct Device {
-    _hook: Arc<()>,
-    sender: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
+struct Device {
+    tx: UnboundedSender<String>,
     description: Arc<RwLock<Option<MediaStreamDescription>>>,
     addrs: Vec<Ipv4Addr>,
     kind: DeviceType,
@@ -61,14 +60,19 @@ pub struct Device {
 }
 
 impl Device {
-    async fn new(
+    fn new<T>(
         name: String,
         kind: DeviceType,
         addrs: Vec<Ipv4Addr>,
         port: u16,
-    ) -> Result<(Self, oneshot::Receiver<()>)> {
-        let (socket, response) =
-            connect_async(format!("ws://{}:{}", addrs[0], port).into_client_request()?).await?;
+        observer: T,
+    ) -> Result<Self>
+    where
+        T: FnOnce(&str) + Send + 'static,
+    {
+        let (mut socket, response) = RUNTIME.block_on(connect_async(
+            format!("ws://{}:{}", addrs[0], port).into_client_request()?,
+        ))?;
 
         if response.status() != StatusCode::SWITCHING_PROTOCOLS {
             return Err(anyhow!(
@@ -84,101 +88,90 @@ impl Device {
             port
         );
 
-        let _hook: Arc<()> = Default::default();
-        let hook_ = Arc::downgrade(&_hook);
-
-        let (tx, rx) = oneshot::channel();
-        let (sender, mut receiver) = socket.split();
-        tokio::spawn(async move {
-            loop {
-                if hook_.upgrade().is_none() {
-                    break;
-                } else {
-                    if let Ok(it) = timeout(Duration::from_secs(1), receiver.next()).await {
-                        match it {
-                            None | Some(Err(_)) => break,
-                            _ => (),
+        let (tx, mut rx) = unbounded_channel::<String>();
+        RUNTIME.spawn(async move {
+            'a: loop {
+                tokio::select! {
+                    Some(message) = rx.recv() => {
+                        if socket.send(Message::text(message)).await.is_err() {
+                            break 'a;
                         }
+                    },
+                    Some(_) = socket.next() => (),
+                    else => {
+                        break;
                     }
-                }
+                };
             }
 
-            let _ = tx.send(());
+            observer(&name);
 
             log::warn!("remote device disconnection, name={}", name);
         });
 
-        Ok((
-            Self {
-                _hook,
-                description: Default::default(),
-                sender,
-                addrs,
-                port,
-                kind,
-            },
-            rx,
-        ))
+        Ok(Self {
+            description: Default::default(),
+            addrs,
+            port,
+            kind,
+            tx,
+        })
     }
 
-    pub fn get_port(&self) -> u16 {
+    fn get_port(&self) -> u16 {
         self.port
     }
 
-    pub fn get_kind(&self) -> DeviceType {
+    fn get_kind(&self) -> DeviceType {
         self.kind
     }
 
-    pub fn get_addrs(&self) -> Vec<Ipv4Addr> {
+    fn get_addrs(&self) -> Vec<Ipv4Addr> {
         self.addrs.clone()
     }
 
-    pub async fn get_description(&self) -> Option<MediaStreamDescription> {
-        self.description.read().await.clone()
+    fn get_description(&self) -> Option<MediaStreamDescription> {
+        self.description.read().clone()
     }
 
-    async fn send_description(&mut self, description: &MediaStreamDescription) {
+    fn update_description(&self, description: MediaStreamDescription) {
+        self.description.write().replace(description);
+    }
+
+    fn send_description(&mut self, description: &MediaStreamDescription) -> Result<()> {
         log::info!(
             "send description to remote device, description={:?}",
             description
         );
 
-        if let Err(e) = self
-            .sender
-            .send(Message::text(serde_json::to_string(description).unwrap()))
-            .await
-        {
-            log::error!("failed to send description, err={}", e);
-        }
-    }
+        self.tx.send(serde_json::to_string(description)?)?;
 
-    async fn update_description(&self, description: MediaStreamDescription) {
-        self.description.write().await.replace(description);
+        Ok(())
     }
 }
 
 #[derive(Default)]
 struct Devices {
-    table: RwLock<HashMap<String, Device>>,
     /// addr name mapping
     anm: RwLock<HashMap<Ipv4Addr, String>>,
+    table: RwLock<HashMap<String, Device>>,
 }
 
 impl Devices {
-    async fn set(&self, name: &str, device: Device) {
-        let mut anm = self.anm.write().await;
+    fn set(&self, name: &str, device: Device) {
+        let mut anm = self.anm.write();
         for it in &device.addrs {
             anm.insert(*it, name.to_string());
         }
 
-        self.table.write().await.insert(name.to_string(), device);
+        self.table.write().insert(name.to_string(), device);
 
         log::info!("add a new device for devices, name={}", name);
     }
 
-    async fn remove(&self, name: &str) {
-        if let Some(it) = self.table.write().await.remove(name) {
-            let mut anm = self.anm.write().await;
+    fn remove(&self, name: &str) {
+        if let Some(it) = self.table.write().remove(name) {
+            let mut anm = self.anm.write();
             for it in it.addrs {
                 anm.remove(&it);
             }
@@ -187,20 +180,16 @@ impl Devices {
         log::info!("remove a device for devices, name={}", name);
     }
 
-    async fn remove_from_addr(&self, addr: Ipv4Addr) {
-        if let Some(it) = self.anm.write().await.remove(&addr) {
-            self.remove(&it).await;
+    fn remove_from_addr(&self, addr: Ipv4Addr) {
+        if let Some(it) = self.anm.write().remove(&addr) {
+            self.remove(&it);
         }
     }
 
-    async fn update_description_from_addr(
-        &self,
-        addr: Ipv4Addr,
-        description: MediaStreamDescription,
-    ) {
-        if let Some(it) = self.anm.read().await.get(&addr) {
-            if let Some(device) = self.table.read().await.get(it) {
-                device.update_description(description).await;
+    fn update_description_from_addr(&self, addr: Ipv4Addr, description: MediaStreamDescription) {
+        if let Some(it) = self.anm.read().get(&addr) {
+            if let Some(device) = self.table.read().get(it) {
+                device.update_description(description);
             }
         }
     }
@@ -208,16 +197,18 @@ impl Devices {
 
 struct DiscoveryServiceObserver {
     description: Arc<RwLock<Option<MediaStreamDescription>>>,
-    tx: Arc<watch::Sender<()>>,
     devices: Arc<Devices>,
-    runtime: Arc<Handle>,
+    tx: Sender<()>,
     name: String,
 }
 
 impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
     fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, info: ServiceInfo) {
         if name == &self.name {
-            log::warn!("discovery service resolve myself, ignore this, name={}", name);
+            log::warn!(
+                "discovery service resolve myself, ignore this, name={}",
+                name
+            );
 
             return;
         }
@@ -229,43 +220,35 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
             info
         );
 
-        let name = name.to_string();
-        let notify = self.tx.clone();
+        let tx = self.tx.clone();
         let devices = self.devices.clone();
-        let description = self.description.clone();
-        self.runtime.spawn(async move {
-            match Device::new(name.clone(), info.kind, addrs, info.port).await {
-                Ok((mut device, disconnection_notify)) => {
-                    {
-                        if let Some(description) = description.read().await.as_ref() {
-                            device.send_description(description).await;
-                        }
+        match Device::new(name.to_string(), info.kind, addrs, info.port, move |name| {
+            devices.remove(name);
 
-                        devices.set(&name, device).await;
+            if let Err(e) = tx.send(()) {
+                log::error!("devices send change notify error={:?}", e);
+            }
+        }) {
+            Ok(mut device) => {
+                if let Some(description) = self.description.read().as_ref() {
+                    if device.send_description(description).is_ok() {
+                        self.devices.set(&name, device);
 
-                        if let Err(e) = notify.send(()) {
+                        if let Err(e) = self.tx.send(()) {
                             log::error!("devices send change notify error={:?}", e);
                         }
                     }
-
-                    if disconnection_notify.await.is_ok() {
-                        devices.remove(&name).await;
-
-                        if let Err(e) = notify.send(()) {
-                            log::error!("devices send change notify error={:?}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::error!("failed to create device, error={}", e);
                 }
             }
-        });
+            Err(e) => {
+                log::error!("failed to create device, error={}", e);
+            }
+        }
     }
 }
 
 pub struct DevicesManager {
-    rx: watch::Receiver<()>,
+    rx: Receiver<()>,
     devices: Arc<Devices>,
     #[allow(dead_code)]
     discoverys: (DiscoveryService, DiscoveryService),
@@ -273,19 +256,18 @@ pub struct DevicesManager {
 }
 
 impl DevicesManager {
-    pub async fn new(name: String) -> Result<Self> {
+    pub fn new(name: String) -> Result<Self> {
         let devices: Arc<Devices> = Arc::new(Devices::default());
 
-        let listener = TcpListener::bind("0.0.0.0:0").await?;
+        let listener = RUNTIME.block_on(TcpListener::bind("0.0.0.0:0"))?;
         let local_addr = listener.local_addr()?;
 
         log::info!("devices manager server listener addr={}", local_addr);
 
-        let (tx, rx) = watch::channel::<()>(());
-        let tx = Arc::new(tx);
+        let (tx, rx) = unbounded::<()>();
 
         let devices_ = Arc::downgrade(&devices);
-        tokio::spawn(async move {
+        RUNTIME.spawn(async move {
             while let Ok((socket, addr)) = listener.accept().await {
                 let devices_ = devices_.clone();
                 let ip = match addr.ip() {
@@ -293,14 +275,14 @@ impl DevicesManager {
                     _ => unimplemented!(),
                 };
 
-                tokio::spawn(async move {
+                RUNTIME.spawn(async move {
                     match accept_async(socket).await {
                         Ok(mut stream) => {
                             while let Some(Ok(message)) = stream.next().await {
                                 if let Message::Text(text) = message {
                                     if let Some(devices) = devices_.upgrade() {
                                         if let Ok(it) = serde_json::from_str(text.as_str()) {
-                                            devices.update_description_from_addr(ip, it).await;
+                                            devices.update_description_from_addr(ip, it);
                                         }
                                     } else {
                                         break;
@@ -314,7 +296,7 @@ impl DevicesManager {
                     }
 
                     if let Some(devices) = devices_.upgrade() {
-                        devices.remove_from_addr(ip).await;
+                        devices.remove_from_addr(ip);
                     }
                 });
             }
@@ -330,7 +312,6 @@ impl DevicesManager {
                 },
             )?,
             DiscoveryService::query(DiscoveryServiceObserver {
-                runtime: Arc::new(Handle::current()),
                 description: description.clone(),
                 devices: devices.clone(),
                 name,
@@ -346,38 +327,40 @@ impl DevicesManager {
         })
     }
 
-    pub async fn set_description(
+    pub fn set_description(
         &self,
         name_list: Vec<String>,
         description: MediaStreamDescription,
-    ) {
-        let mut devices = self.devices.table.write().await;
+    ) -> Result<()> {
+        let mut devices = self.devices.table.write();
 
         if name_list.is_empty() {
-            self.description.write().await.replace(description.clone());
+            self.description.write().replace(description.clone());
         } else {
-            self.description.write().await.take();
+            let _ = self.description.write().take();
         }
 
         if name_list.is_empty() {
             for (_, device) in devices.iter_mut() {
-                device.send_description(&description).await;
+                device.send_description(&description)?;
             }
         } else {
             for name in name_list {
                 if let Some(device) = devices.get_mut(&name) {
-                    device.send_description(&description).await;
+                    device.send_description(&description)?;
                 }
             }
         }
+
+        Ok(())
     }
 
-    pub async fn get_devices(&self) -> Vec<DeviceInfo> {
+    pub fn get_devices(&self) -> Vec<DeviceInfo> {
         let mut devices = Vec::with_capacity(100);
 
-        for (k, v) in self.devices.table.read().await.iter() {
+        for (k, v) in self.devices.table.read().iter() {
             devices.push(DeviceInfo {
-                description: v.get_description().await,
+                description: v.get_description(),
                 addrs: v.get_addrs(),
                 port: v.get_port(),
                 kind: v.get_kind(),
@@ -393,10 +376,10 @@ impl DevicesManager {
     }
 }
 
-pub struct DevicesWatcher(watch::Receiver<()>);
+pub struct DevicesWatcher(Receiver<()>);
 
 impl DevicesWatcher {
-    pub async fn change(&mut self) -> bool {
-        self.0.changed().await.is_ok()
+    pub fn change(&mut self) -> bool {
+        self.0.recv().is_ok()
     }
 }

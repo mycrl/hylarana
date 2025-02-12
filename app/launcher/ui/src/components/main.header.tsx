@@ -1,9 +1,9 @@
 import "../styles/main.header.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGear, faAngleLeft } from "@fortawesome/free-solid-svg-icons";
-import { localesAtom } from "../locales";
 import { useState } from "react";
 import { useAtomValue } from "jotai";
+import { localesAtom } from "../state";
 
 export type Type = "settings" | "sender" | "receiver";
 

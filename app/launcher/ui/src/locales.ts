@@ -1,6 +1,3 @@
-import { atom, getDefaultStore } from "jotai";
-import { atomWithStorage } from "jotai/utils";
-
 export const LanguageOptions = {
     Chinase: "简体中文",
     English: "English",
@@ -14,8 +11,7 @@ const Chinase = {
     Settings: "设置",
     Sender: "发送",
     Receiver: "接收",
-    Broadcast: "广播",
-    BroadcastHelp: "启用广播会自动发送给所有接收端",
+    BroadcastHelp: "提示: 不选择任何设备则开启广播模式，任何客户端都可以接收",
     AutoAllow: "自动允许",
     AutoAllowHelp: "无需手动确认即可自动接收投屏",
     Network: "网络",
@@ -61,6 +57,7 @@ const Chinase = {
     Relay: "转发",
     Multicast: "多播",
     SenderStart: "开始投屏",
+    SenderStop: "停止投屏",
     RendererBackend: "渲染器后端",
     RendererBackendHelp:
         "Direct3D11：使用D3D11实现的后端，在较老的设备和平台上受支持，具有更好的性能表现和内存占用，但仅限于Windows。\r\nWebGPU：使用WebGPU实现的跨平台图形后端，在许多常见的平台或设备上均受支持。",
@@ -74,8 +71,7 @@ const English = {
     Settings: "Settings",
     Sender: "Sender",
     Receiver: "Receiver",
-    Broadcast: "Broadcast",
-    BroadcastHelp: "enable broadcast is automatically sent to all recipients",
+    BroadcastHelp: "Tip: Not selecting a device enables broadcast mode.",
     AutoAllow: "Auto Allow",
     AutoAllowHelp: "no manual confirmation is required to receive the screen cast automatically",
     Network: "network",
@@ -122,6 +118,7 @@ const English = {
     Relay: "Relay",
     Multicast: "Multicast",
     SenderStart: "Start",
+    SenderStop: "Stop",
     RendererBackend: "renderer backend",
     RendererBackendHelp:
         "Direct3D11: Backend implemented using D3D11, which is supported on an older device and platform and has better performance performance and memory footprint, but only on windows. \r\nWebGPU: Cross-platform graphics backends implemented using WebGPUs are supported on a number of common platforms or devices.",
@@ -133,34 +130,4 @@ export const Languages = { Chinase, English };
 
 if (!localStorage.language) {
     localStorage.language = "English";
-}
-
-export const languageAtom = atomWithStorage<keyof typeof Languages>(
-    "language",
-    "English",
-    {
-        getItem(key) {
-            return localStorage[key];
-        },
-        setItem(key, value) {
-            localStorage[key] = value;
-        },
-        removeItem(key) {
-            localStorage.removeItem(key);
-        },
-    },
-    {
-        getOnInit: true,
-    }
-);
-
-const store = getDefaultStore();
-
-export const localesAtom = atom(Languages[store.get(languageAtom)]);
-
-{
-    store.sub(languageAtom, () => {
-        const value = store.get(languageAtom);
-        store.set(localesAtom, Languages[value]);
-    });
 }

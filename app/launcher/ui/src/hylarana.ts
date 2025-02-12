@@ -1,7 +1,4 @@
-import { atom } from "jotai";
-import { Observable } from "rxjs";
 import { Route, Methods } from "./message";
-import { atomWithObservable } from "jotai/utils";
 
 export const VideoEncoders = {
     X264: "X264",
@@ -118,39 +115,47 @@ export enum Backend {
     WebGPU = "WebGPU",
 }
 
-const devicesChangeObserver = new Observable<Device[]>((subscriber) => {
-    console.log("init devices change notify observer");
+export enum Status {
+    Sending = "Sending",
+    Receiving = "Receiving",
+    Idle = "Idle",
+}
 
-    function notify() {
-        Route.call(Methods.GetDevices).then((data) => {
-            subscriber.next(data);
-        });
-    }
+export const events = new EventTarget();
 
-    notify();
+export async function onDevicesChange(listener: () => void) {
+    return await Route.on(Methods.DevicesChangeNotify, listener);
+}
 
-    let closed = false;
-    Route.on(Methods.DevicesChangeNotify, () => {
-        if (!closed) {
-            notify();
-        }
-    });
-
-    return () => {
-        closed = true;
-    };
-});
-
-export const devicesAtom = atomWithObservable<Device[]>(() => devicesChangeObserver);
-
-export const displaysAtom = atom(() => {
-    return Route.call(Methods.GetCaptureSources, SourceType.Screen);
-});
-
-export const audiosAtom = atom(() => {
-    return Route.call(Methods.GetCaptureSources, SourceType.Audio);
-});
+export async function getDevices() {
+    return await Route.call(Methods.GetDevices);
+}
 
 export async function createSender(addrs: string[], options: SenderOptions) {
-    return await Route.call(Methods.CreateSender, [addrs, options]);
+    await Route.call(Methods.CreateSender, [addrs, options]);
+    events.dispatchEvent(new Event("senderCreated"));
+}
+
+export async function getCaptureSources(type: SourceType) {
+    return await Route.call(Methods.GetCaptureSources, type);
+}
+
+export async function getStatus() {
+    return await Route.call(Methods.GetStatus);
+}
+
+export async function closeSender() {
+    return await Route.call(Methods.CloseSender);
+}
+
+export async function closeReceiver() {
+    return await Route.call(Methods.CloseReceiver);
+}
+
+export async function onSenderClose(listener: () => void) {
+    return await Route.on(Methods.SenderClosedNotify, listener);
+}
+
+export async function onReceiverClose(listener: () => void) {
+    return await Route.on(Methods.ReceiverClosedNotify, listener);
 }

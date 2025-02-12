@@ -1,5 +1,3 @@
-import { atomWithStorage, createJSONStorage } from "jotai/utils";
-import { atom, getDefaultStore } from "jotai";
 import { Backend, VideoDecoders, VideoEncoders } from "./hylarana";
 
 export interface SettingsType {
@@ -37,50 +35,3 @@ export const DefaultSettings: SettingsType = {
     AudioBitRate: 64000,
     RendererBackend: Backend.WebGPU,
 };
-
-export const settingsAtom = atomWithStorage(
-    "settings",
-    DefaultSettings,
-    createJSONStorage(() => localStorage),
-    {
-        getOnInit: true,
-    }
-);
-
-export const deviceNameAtom = atom("");
-
-{
-    const store = getDefaultStore();
-
-    window.MessageTransport.getName().then((name) => {
-        store.set(deviceNameAtom, name);
-
-        store.sub(settingsAtom, () => {
-            const value = store.get(deviceNameAtom);
-            if (value != name) {
-                window.MessageTransport.setName(value).then(() => {
-                    name = value;
-                });
-            }
-        });
-    });
-}
-
-export const broadcastAtom = atomWithStorage<boolean>(
-    "broadcast",
-    false,
-    {
-        getItem(key) {
-            return localStorage[key] == "true";
-        },
-        setItem(key, value) {
-            localStorage[key] = value;
-        },
-        removeItem(key) {
-            localStorage.removeItem(key);
-        },
-    },
-    {
-        getOnInit: true,
-    }
-);
