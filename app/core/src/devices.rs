@@ -231,7 +231,9 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
         }) {
             Ok(mut device) => {
                 if let Some(description) = self.description.read().as_ref() {
-                    if device.send_description(description).is_ok() {
+                    if let Err(e) = device.send_description(description) {
+                        log::error!("failed to send description to remote device, error={}", e);
+                    } else {
                         self.devices.set(&name, device);
 
                         if let Err(e) = self.tx.send(()) {
