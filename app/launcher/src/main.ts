@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, Tray, ipcMain } from "electron";
-import { ChildProcess, execFile } from "node:child_process";
+import { ChildProcess, spawn } from "node:child_process";
 import { accessSync, readFileSync, writeFileSync } from "node:fs";
 import { join as pathJoin } from "node:path";
 import { faker } from "@faker-js/faker";
@@ -39,7 +39,9 @@ const window = new BrowserWindow({
 let core: ChildProcess | null = null;
 
 function reloadCoreProcess() {
-    core = execFile("../../target/build/hylarana-app-core", ["--name", settings.name]);
+    core = spawn("../../target/build/hylarana-app-core", ["--name", settings.name], {
+        stdio: ["pipe", "pipe", "inherit"],
+    });
 
     let isClosed = false;
     for (const event of ["close", "disconnect", "error", "exit"]) {
@@ -52,8 +54,8 @@ function reloadCoreProcess() {
         });
     }
 
-    core.stderr?.pipe(process.stderr);
-    core.stdout?.on("data", (message: string) => {
+    core.stdout?.on("data", (buffer: Buffer) => {
+        const message = buffer.toString("utf8");
         if (message.startsWith(LINE_START)) {
             window.webContents.send("MessageTransport", message.slice(LINE_START.length));
         } else {

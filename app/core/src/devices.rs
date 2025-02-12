@@ -62,6 +62,7 @@ pub struct Device {
 
 impl Device {
     async fn new(
+        name: String,
         kind: DeviceType,
         addrs: Vec<Ipv4Addr>,
         port: u16,
@@ -75,6 +76,13 @@ impl Device {
                 response.status()
             ));
         }
+
+        log::info!(
+            "connection to remote device success, name={}, url = ws://{}:{}",
+            name,
+            addrs[0],
+            port
+        );
 
         let _hook: Arc<()> = Default::default();
         let hook_ = Arc::downgrade(&_hook);
@@ -96,6 +104,8 @@ impl Device {
             }
 
             let _ = tx.send(());
+
+            log::warn!("remote device disconnection, name={}", name);
         });
 
         Ok((
@@ -128,12 +138,17 @@ impl Device {
     }
 
     async fn send_description(&mut self, description: &MediaStreamDescription) {
+        log::info!(
+            "send description to remote device, description={:?}",
+            description
+        );
+
         if let Err(e) = self
             .sender
             .send(Message::text(serde_json::to_string(description).unwrap()))
             .await
         {
-            log::error!("{}", e);
+            log::error!("failed to send description, err={}", e);
         }
     }
 
@@ -157,6 +172,8 @@ impl Devices {
         }
 
         self.table.write().await.insert(name.to_string(), device);
+
+        log::info!("add a new device for devices, name={}", name);
     }
 
     async fn remove(&self, name: &str) {
@@ -166,6 +183,8 @@ impl Devices {
                 anm.remove(&it);
             }
         }
+
+        log::info!("remove a device for devices, name={}", name);
     }
 
     async fn remove_from_addr(&self, addr: Ipv4Addr) {
@@ -198,15 +217,24 @@ struct DiscoveryServiceObserver {
 impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
     fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, info: ServiceInfo) {
         if name == &self.name {
+            log::warn!("discovery service resolve myself, ignore this, name={}", name);
+
             return;
         }
+
+        log::info!(
+            "discovery service resolve, name={}, addrs={:?}, info={:?}",
+            name,
+            addrs,
+            info
+        );
 
         let name = name.to_string();
         let notify = self.tx.clone();
         let devices = self.devices.clone();
         let description = self.description.clone();
         self.runtime.spawn(async move {
-            match Device::new(info.kind, addrs, info.port).await {
+            match Device::new(name.clone(), info.kind, addrs, info.port).await {
                 Ok((mut device, disconnection_notify)) => {
                     {
                         if let Some(description) = description.read().await.as_ref() {
@@ -229,7 +257,7 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
                     }
                 }
                 Err(e) => {
-                    log::error!("{}", e);
+                    log::error!("failed to create device, error={}", e);
                 }
             }
         });
@@ -281,7 +309,7 @@ impl DevicesManager {
                             }
                         }
                         Err(e) => {
-                            log::error!("{}", e);
+                            log::error!("websocket server upgrade error={}", e);
                         }
                     }
 

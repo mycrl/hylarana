@@ -283,9 +283,24 @@ impl ApplicationHandler<Events> for App {
     }
 }
 
+struct Logger;
+
+impl log::Log for Logger {
+    fn flush(&self) {}
+
+    fn enabled(&self, _: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        eprintln!("{} - {}", record.level(), record.args());
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    simple_logger::init_with_level(log::Level::Info)?;
+    log::set_max_level(log::LevelFilter::Info);
+    log::set_boxed_logger(Box::new(Logger))?;
 
     let event_loop = EventLoop::<Events>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);
