@@ -5,7 +5,8 @@
     "main": "index.js",
     "scripts": {
         "build": "tsc",
-        "dev": "tsc && electron ./"
+        "dev": "tsc && electron ./",
+        "predev": "cargo build --package hylarana-app-core"
     },
     "repository": {
         "type": "git",
@@ -18,10 +19,11 @@
     },
     "homepage": "https://github.com/mycrl/hylarana#readme",
     "dependencies": {
-        "electron": "^34.1.1",
-        "@faker-js/faker": "^9.4.0"
+        "@faker-js/faker": "^9.4.0",
+        "electron": "^34.1.1"
     },
     "devDependencies": {
+        "dotenv": "^16.4.7",
         "typescript": "^5.7.3"
     }
 }

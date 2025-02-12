@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
-    sync::Arc,
+    sync::Arc, time::Duration,
 };
 
 use anyhow::{anyhow, Result};
@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tokio::{
     net::TcpListener,
-    sync::mpsc::{unbounded_channel, UnboundedSender},
+    sync::mpsc::{unbounded_channel, UnboundedSender}, time::sleep,
 };
 
 use tokio_tungstenite::{
@@ -90,6 +90,9 @@ impl Device {
 
         let (tx, mut rx) = unbounded_channel::<String>();
         RUNTIME.spawn(async move {
+            let timeout = sleep(Duration::from_secs(1));
+            tokio::pin!(timeout);
+
             'a: loop {
                 tokio::select! {
                     Some(message) = rx.recv() => {
@@ -98,6 +101,7 @@ impl Device {
                         }
                     },
                     Some(_) = socket.next() => (),
+                    _ = &mut timeout => (),
                     else => {
                         break;
                     }

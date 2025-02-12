@@ -5,8 +5,6 @@
     "main": "build.js",
     "private": true,
     "scripts": {
-        "build:debug": "node --no-deprecation ./build.js",
-        "build:release": "node --no-deprecation ./build.js -- --release",
         "fmt": "cargo +nightly fmt"
     },
     "repository": {
