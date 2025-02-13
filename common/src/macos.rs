@@ -107,17 +107,20 @@ impl<'a> From<(CVPixelBufferRef, VideoFormat, Size)> for PixelMomeryBuffer<'a> {
 
         for i in 0..3 {
             this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(&*buffer, i) };
-            this.data[i] = unsafe {
-                std::slice::from_raw_parts(
-                    CVPixelBufferGetBaseAddressOfPlane(&*buffer, i) as *const _,
-                    this.linesize[i]
-                        * if format == VideoFormat::I420 {
-                            size.height / 2
-                        } else {
-                            size.height
-                        } as usize,
-                )
-            };
+            
+            if this.linesize[i] > 0 {
+                this.data[i] = unsafe {
+                    std::slice::from_raw_parts(
+                        CVPixelBufferGetBaseAddressOfPlane(&*buffer, i) as *const _,
+                        this.linesize[i]
+                            * if format == VideoFormat::I420 {
+                                size.height / 2
+                            } else {
+                                size.height
+                            } as usize,
+                    )
+                };
+            }
         }
 
         this
