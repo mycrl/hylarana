@@ -146,14 +146,13 @@ impl Device {
     }
 
     fn update_description(&self, description: MediaStreamDescription) {
+        log::info!("update device description from remote, name={}", self.name);
+
         self.description.write().replace(description);
     }
 
     fn send_description(&mut self, description: &MediaStreamDescription) -> Result<()> {
-        log::info!(
-            "send description to remote device, description={:?}",
-            description
-        );
+        log::info!("send device description to remote, name={:?}", self.name);
 
         self.tx.send(serde_json::to_string(description)?)?;
 
@@ -195,6 +194,8 @@ impl Devices {
         if let Some(it) = self.anm.write().remove(&addr) {
             self.remove(&it);
         }
+
+        log::info!("remove device for address, ip={}", addr);
     }
 
     fn update_description_from_addr(&self, addr: Ipv4Addr, description: MediaStreamDescription) {
@@ -203,6 +204,8 @@ impl Devices {
                 device.update_description(description);
             }
         }
+
+        log::info!("update remote description for address, ip={}", addr);
     }
 }
 
@@ -239,12 +242,20 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
             if let Err(e) = tx.send(()) {
                 log::error!("devices send change notify error={:?}", e);
             }
+
+            log::info!("device is drop, clean device table and send notify events");
         }) {
             Ok(mut device) => {
+                log::info!("new device connected, name={}", name);
+
                 if let Some(description) = self.description.read().as_ref() {
                     if let Err(e) = device.send_description(description) {
                         log::error!("failed to send description to remote device, error={}", e);
                     }
+
+                    log::info!("broadcast mode has been enabled, sending the current sender description to the remote device");
+                } else {
+                    log::info!("the broadcast mode is not enabled and the device is treated as a normal receiving device");
                 }
 
                 self.devices.set(&name, device);
@@ -283,6 +294,8 @@ impl DevicesManager {
         let devices_ = Arc::downgrade(&devices);
         RUNTIME.spawn(async move {
             while let Ok((socket, addr)) = listener.accept().await {
+                log::info!("accept a new tcp socket, address={}", addr);
+
                 let devices_ = devices_.clone();
                 let ip = match addr.ip() {
                     IpAddr::V4(it) => it,
@@ -295,6 +308,8 @@ impl DevicesManager {
                         Ok(mut stream) => {
                             while let Some(Ok(message)) = stream.next().await {
                                 if let Message::Text(text) = message {
+                                    log::info!("recv a new text message, address={}, content={}", addr, text);
+
                                     if let Some(devices) = devices_.upgrade() {
                                         if let Ok(it) = serde_json::from_str(text.as_str()) {
                                             devices.update_description_from_addr(ip, it);
@@ -307,6 +322,8 @@ impl DevicesManager {
                                             }
                                         }
                                     } else {
+                                        log::error!("device ref is droped! close the recv thread, address={}", addr);
+
                                         break;
                                     }
                                 }
@@ -354,9 +371,13 @@ impl DevicesManager {
         name_list: Vec<String>,
         description: MediaStreamDescription,
     ) -> Result<()> {
+        log::info!("set description, names={:?}", name_list);
+
         let mut devices = self.devices.table.write();
 
         if name_list.is_empty() {
+            log::info!("name list is empty, store description");
+
             self.description.write().replace(description.clone());
         } else {
             let _ = self.description.write().take();

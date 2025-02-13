@@ -107,7 +107,7 @@ impl<'a> From<(CVPixelBufferRef, VideoFormat, Size)> for PixelMomeryBuffer<'a> {
 
         for i in 0..3 {
             this.linesize[i] = unsafe { CVPixelBufferGetBytesPerRowOfPlane(&*buffer, i) };
-            
+
             if this.linesize[i] > 0 {
                 this.data[i] = unsafe {
                     std::slice::from_raw_parts(
