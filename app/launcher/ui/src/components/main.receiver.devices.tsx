@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
 import { devicesAtom, localesAtom, settingsAtom } from "../state";
 import { useAtomValue } from "jotai";
-import { createReceiver, Device } from "../hylarana";
+import { createReceiver, Device } from "../core";
 
 export default function () {
     const locales = useAtomValue(localesAtom);

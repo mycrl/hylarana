@@ -121,8 +121,6 @@ export enum Status {
     Idle = "Idle",
 }
 
-export const events = new EventTarget();
-
 export async function onDevicesChange(listener: () => void) {
     return await Route.on(Methods.DevicesChangeNotify, listener);
 }
@@ -132,8 +130,7 @@ export async function getDevices() {
 }
 
 export async function createSender(addrs: string[], options: SenderOptions) {
-    await Route.call(Methods.CreateSender, [addrs, options]);
-    events.dispatchEvent(new Event("senderCreated"));
+    return await Route.call(Methods.CreateSender, [addrs, options]);
 }
 
 export async function getCaptureSources(type: SourceType) {
@@ -160,11 +157,18 @@ export async function onReceiverClose(listener: () => void) {
     return await Route.on(Methods.ReceiverClosedNotify, listener);
 }
 
+export async function onSenderCreated(listener: () => void) {
+    return await Route.on(Methods.SenderCreatedNotify, listener);
+}
+
+export async function onReceiverCreated(listener: () => void) {
+    return await Route.on(Methods.ReceiverCreatedNotify, listener);
+}
+
 export async function createReceiver(
     options: ReceiverOptions,
     backend: Backend,
     description: MediaStreamDescription
 ) {
-    await Route.call(Methods.CreateReceiver, [options, backend, description]);
-    events.dispatchEvent(new Event("receiverCreated"));
+    return await Route.call(Methods.CreateReceiver, [options, backend, description]);
 }

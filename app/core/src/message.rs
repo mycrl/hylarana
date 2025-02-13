@@ -17,6 +17,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use tokio::{sync::oneshot, time::timeout};
 
+use crate::RUNTIME;
+
 pub trait MessageTransport: Send + Sync {
     type Error;
 
@@ -163,6 +165,13 @@ where
 
         let response: ResponseContent<S> = serde_json::from_value(response)?;
         response.into()
+    }
+
+    pub fn send_event(self: &Arc<Self>, event: &'static str) {
+        let this = self.clone();
+        RUNTIME.spawn(async move {
+            let _ = this.call::<_, ()>(event, ()).await;
+        });
     }
 
     pub fn on<T, Q, S, C>(&self, method: &str, handle: T, ctx: C)

@@ -5,7 +5,7 @@ import { useAtomValue } from "jotai";
 import { localesAtom, statusAtom } from "../state";
 import SenderImage from "../assets/sender.svg";
 import ReceiverImage from "../assets/receiver.svg";
-import { closeReceiver, Status } from "../hylarana";
+import { closeReceiver, Status } from "../core";
 
 export default function () {
     const locales = useAtomValue(localesAtom);

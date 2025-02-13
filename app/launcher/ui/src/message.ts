@@ -7,7 +7,7 @@ import {
     Source,
     SourceType,
     Status,
-} from "./hylarana";
+} from "./core";
 
 declare global {
     interface Window {
@@ -176,6 +176,8 @@ export enum Methods {
     GetStatus = "GetStatus",
     SenderClosedNotify = "SenderClosedNotify",
     ReceiverClosedNotify = "ReceiverClosedNotify",
+    SenderCreatedNotify = "SenderCreatedNotify",
+    ReceiverCreatedNotify = "ReceiverCreatedNotify",
 }
 
 interface CallTypes {
@@ -193,4 +195,6 @@ interface OnTypes {
     [Methods.ReadyNotify]: [void, void];
     [Methods.SenderClosedNotify]: [void, void];
     [Methods.ReceiverClosedNotify]: [void, void];
+    [Methods.SenderCreatedNotify]: [void, void];
+    [Methods.ReceiverCreatedNotify]: [void, void];
 }

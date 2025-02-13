@@ -1,4 +1,4 @@
-import { Backend, VideoDecoders, VideoEncoders } from "./hylarana";
+import { Backend, VideoDecoders, VideoEncoders } from "./core";
 
 export interface SettingsType {
     NetworkInterface: string;

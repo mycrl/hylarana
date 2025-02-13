@@ -1,5 +1,5 @@
 import "../styles/main.sender.devices.css";
-import { Device } from "../hylarana";
+import { Device } from "../core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
 import { RefObject, useRef, useState } from "react";

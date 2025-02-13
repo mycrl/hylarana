@@ -1,17 +1,18 @@
-import { atom, getDefaultStore } from "jotai";
-import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import {
     Device,
-    events,
     getCaptureSources,
     getDevices,
     getStatus,
     onDevicesChange,
     onReceiverClose,
+    onReceiverCreated,
     onSenderClose,
+    onSenderCreated,
     SourceType,
     Status,
-} from "./hylarana";
+} from "./core";
+import { atomWithStorage, createJSONStorage } from "jotai/utils";
+import { atom, getDefaultStore } from "jotai";
 import { DefaultSettings } from "./settings";
 import { Languages } from "./locales";
 
@@ -130,11 +131,11 @@ export const statusAtom = atom(Status.Idle);
         store.set(statusAtom, Status.Idle);
     });
 
-    events.addEventListener("senderCreated", () => {
+    onSenderCreated(() => {
         store.set(statusAtom, Status.Sending);
     });
 
-    events.addEventListener("receiverCreated", () => {
+    onReceiverCreated(() => {
         store.set(statusAtom, Status.Receiving);
     });
 }

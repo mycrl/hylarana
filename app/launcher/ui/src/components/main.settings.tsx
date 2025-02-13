@@ -1,7 +1,7 @@
 import "../styles/main.settings.css";
 import { useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { Backend, VideoDecoders, VideoEncoders } from "../hylarana";
+import { Backend, VideoDecoders, VideoEncoders } from "../core";
 import { DefaultSettings, SettingsType } from "../settings";
 import { deviceNameAtom, languageAtom, localesAtom, settingsAtom } from "../state";
 import { LanguageOptions } from "../locales";

@@ -3,7 +3,10 @@ mod message;
 
 use std::{
     io::{stderr, Stderr, Write},
-    sync::{Arc, LazyLock},
+    sync::{
+        mpsc::{channel, Sender},
+        Arc, LazyLock,
+    },
     thread,
 };
 
@@ -18,7 +21,7 @@ use hylarana::{
 };
 
 use message::Stdio;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 use winit::{
@@ -63,8 +66,19 @@ impl MediaStreamObserver for HylaranaObserver {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Events {
+    CreateSender {
+        tx: Sender<Result<()>>,
+        names: Vec<String>,
+        options: HylaranaSenderOptions,
+    },
+    CreateReceiver {
+        tx: Sender<Result<()>>,
+        options: HylaranaReceiverOptions,
+        backend: VideoRenderBackend,
+        description: MediaStreamDescription,
+    },
     CloseSender,
     CloseReceiver,
     SenderClosed,
@@ -75,8 +89,10 @@ type ISender = HylaranaSender<(), HylaranaObserver>;
 type IReceiver = HylaranaReceiver<AVFrameStreamPlayer<'static>, HylaranaObserver>;
 
 struct App {
+    window: Option<Arc<Window>>,
     router: Arc<Route<Stdio>>,
-    window: Arc<RwLock<Option<Arc<Window>>>>,
+    devices_manager: Arc<DevicesManager>,
+    events: Arc<EventLoopProxy<Events>>,
     sender: Arc<Mutex<Option<ISender>>>,
     receiver: Arc<Mutex<Option<IReceiver>>>,
 }
@@ -89,7 +105,6 @@ impl App {
 
         let sender: Arc<Mutex<Option<ISender>>> = Default::default();
         let receiver: Arc<Mutex<Option<IReceiver>>> = Default::default();
-        let window: Arc<RwLock<Option<Arc<Window>>>> = Default::default();
         {
             router.on(
                 "GetDevices",
@@ -105,36 +120,18 @@ impl App {
 
             router.on(
                 "CreateSender",
-                |(events, sender, receiver, devices_manager),
-                 (name_list, options): (Vec<String>, HylaranaSenderOptions)| {
-                    let mut sender = sender.lock();
-                    if sender.is_none() && receiver.lock().is_none() {
-                        sender.replace({
-                            let sender = create_sender(
-                                &options,
-                                (),
-                                HylaranaObserver {
-                                    is_sender: true,
-                                    events,
-                                },
-                            )?;
+                |(events, sender, receiver),
+                 (names, options): (Vec<String>, HylaranaSenderOptions)| {
+                    if sender.lock().is_none() && receiver.lock().is_none() {
+                        let (tx, rx) = channel();
+                        events.send_event(Events::CreateSender { tx, names, options })?;
 
-                            devices_manager
-                                .set_description(name_list, sender.get_description().clone())?;
-                            sender
-                        });
-
-                        Ok(())
+                        Ok(rx.recv()??)
                     } else {
                         Err(anyhow!("sender has been created"))
                     }
                 },
-                (
-                    events.clone(),
-                    sender.clone(),
-                    receiver.clone(),
-                    devices_manager.clone(),
-                ),
+                (events.clone(), sender.clone(), receiver.clone()),
             );
 
             router.on(
@@ -149,57 +146,27 @@ impl App {
 
             router.on(
                 "CreateReceiver",
-                |(events, window, sender, receiver),
+                |(events, sender, receiver),
                  (options, backend, description): (
                     HylaranaReceiverOptions,
                     VideoRenderBackend,
                     MediaStreamDescription,
                 )| {
-                    let window = if let Some(it) = window.read().as_ref() {
-                        it.clone()
-                    } else {
-                        return Err(anyhow!("window not created"));
-                    };
+                    if receiver.lock().is_none() && sender.lock().is_none() {
+                        let (tx, rx) = channel();
+                        events.send_event(Events::CreateReceiver {
+                            tx,
+                            options,
+                            backend,
+                            description,
+                        })?;
 
-                    let mut receiver = receiver.lock();
-                    if receiver.is_none() && sender.lock().is_none() {
-                        window.set_visible(true);
-
-                        receiver.replace(create_receiver(
-                            &description,
-                            &options,
-                            AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::All(
-                                VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
-                                    size: {
-                                        let size = window.inner_size();
-                                        Size {
-                                            width: size.width,
-                                            height: size.height,
-                                        }
-                                    },
-                                    window: window.clone(),
-                                })
-                                .set_backend(backend)
-                                .from_receiver(&description, &options)
-                                .build(),
-                            ))?,
-                            HylaranaObserver {
-                                is_sender: false,
-                                events,
-                            },
-                        )?);
-
-                        Ok(())
+                        Ok(rx.recv()??)
                     } else {
                         Err(anyhow!("receiver has been created"))
                     }
                 },
-                (
-                    events.clone(),
-                    window.clone(),
-                    sender.clone(),
-                    receiver.clone(),
-                ),
+                (events.clone(), sender.clone(), receiver.clone()),
             );
 
             router.on(
@@ -232,27 +199,22 @@ impl App {
         thread::spawn(move || {
             while watcher.change() {
                 if let Some(router) = router_.upgrade() {
-                    RUNTIME.spawn(async move {
-                        let _ = router.call::<(), ()>("DevicesChangeNotify", ()).await;
-                    });
+                    router.send_event("DevicesChangeNotify");
                 } else {
                     break;
                 }
             }
         });
 
-        {
-            let router_ = router.clone();
-            RUNTIME.spawn(async move {
-                let _ = router_.call::<(), ()>("ReadyNotify", ()).await;
-            });
-        }
+        router.send_event("ReadyNotify");
 
         Ok(Self {
+            window: None,
+            devices_manager,
             receiver,
             sender,
-            window,
             router,
+            events,
         })
     }
 }
@@ -260,12 +222,12 @@ impl App {
 impl ApplicationHandler<Events> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         {
-            self.window.write().replace(Arc::new(
+            self.window.replace(Arc::new(
                 event_loop
                     .create_window(
                         WindowAttributes::default()
                             .with_inner_size(PhysicalSize::new(1280, 720))
-                            .with_visible(true),
+                            .with_visible(false),
                     )
                     .unwrap(),
             ));
@@ -291,6 +253,71 @@ impl ApplicationHandler<Events> for App {
 
     fn user_event(&mut self, _: &ActiveEventLoop, event: Events) {
         match event {
+            Events::CreateSender { tx, names, options } => {
+                let func = || {
+                    let sender = create_sender(
+                        &options,
+                        (),
+                        HylaranaObserver {
+                            events: self.events.clone(),
+                            is_sender: true,
+                        },
+                    )?;
+
+                    self.devices_manager
+                        .set_description(names, sender.get_description().clone())?;
+
+                    self.sender.lock().replace(sender);
+                    self.router.send_event("SenderCreatedNotify");
+
+                    Ok::<_, anyhow::Error>(())
+                };
+
+                tx.send(func()).unwrap();
+            }
+            Events::CreateReceiver {
+                tx,
+                options,
+                backend,
+                description,
+            } => {
+                let func = || {
+                    let window = self.window.as_ref().unwrap().clone();
+
+                    window.set_visible(true);
+
+                    let receiver = create_receiver(
+                        &description,
+                        &options,
+                        AVFrameStreamPlayer::new(AVFrameStreamPlayerOptions::All(
+                            VideoRenderOptionsBuilder::new(VideoRenderSurfaceOptions {
+                                size: {
+                                    let size = window.inner_size();
+                                    Size {
+                                        width: size.width,
+                                        height: size.height,
+                                    }
+                                },
+                                window,
+                            })
+                            .set_backend(backend)
+                            .from_receiver(&description, &options)
+                            .build(),
+                        ))?,
+                        HylaranaObserver {
+                            events: self.events.clone(),
+                            is_sender: false,
+                        },
+                    )?;
+
+                    self.receiver.lock().replace(receiver);
+                    self.router.send_event("ReceiverCreatedNotify");
+
+                    Ok::<_, anyhow::Error>(())
+                };
+
+                tx.send(func()).unwrap();
+            }
             Events::CloseSender => {
                 let _ = self.sender.lock().take();
             }
@@ -298,20 +325,14 @@ impl ApplicationHandler<Events> for App {
                 let _ = self.receiver.lock().take();
             }
             Events::SenderClosed => {
-                let router = self.router.clone();
-                RUNTIME.spawn(async move {
-                    let _ = router.call::<_, ()>("SenderClosedNotify", ()).await;
-                });
+                self.router.send_event("SenderClosedNotify");
             }
             Events::ReceiverClosed => {
-                if let Some(window) = self.window.read().as_ref() {
+                if let Some(window) = self.window.as_ref() {
                     window.set_visible(false);
                 }
 
-                let router = self.router.clone();
-                RUNTIME.spawn(async move {
-                    let _ = router.call::<_, ()>("ReceiverClosedNotify", ()).await;
-                });
+                self.router.send_event("ReceiverClosedNotify");
             }
         }
     }

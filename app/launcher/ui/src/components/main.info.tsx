@@ -1,6 +1,6 @@
 import "../styles/main.info.css";
 import { useAtomValue } from "jotai";
-import { VideoEncoders } from "../hylarana";
+import { VideoEncoders } from "../core";
 import { localesAtom, settingsAtom } from "../state";
 
 export default function () {

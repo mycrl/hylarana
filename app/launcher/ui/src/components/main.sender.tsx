@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faVolumeLow, faDisplay, faNetworkWired } from "@fortawesome/free-solid-svg-icons";
 import { useAtomValue } from "jotai";
 import { useRef, useState } from "react";
-import { closeSender, createSender, Source, Status, TransportStrategy } from "../hylarana";
+import { closeSender, createSender, Source, Status, TransportStrategy } from "../core";
 import { audiosAtom, displaysAtom, localesAtom, settingsAtom, statusAtom } from "../state";
 import SenderImage from "../assets/sender.svg";
 import ReceiverImage from "../assets/receiver.svg";
