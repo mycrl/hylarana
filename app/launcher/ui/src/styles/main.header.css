@@ -1,0 +1,59 @@
+#Header {
+    user-select: none;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    display: flex;
+}
+
+#Header #switch {
+    background-color: #3951af;
+    width: 212px;
+    height: 44px;
+    border-radius: 44px;
+    position: relative;
+    box-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+    margin-left: 300px;
+}
+
+#Header #navigation .icon {
+    color: #3951af;
+    font-size: 17px;
+}
+
+#Header #navigation span {
+    color: #555;
+    margin-left: 5px;
+    position: relative;
+    top: -2px;
+}
+
+#Header #switch .item {
+    width: 106px;
+    height: 44px;
+    border-radius: 44px;
+}
+
+#Header #switch .item p {
+    text-align: center;
+    line-height: 44px;
+}
+
+#Header #switch .left {
+    position: absolute;
+    left: 0;
+}
+
+#Header #switch .right {
+    position: absolute;
+    right: 0;
+}
+
+#Header #switch #selected {
+    background-color: #829bff;
+}
+
+#Header #switch #selected p {
+    color: #fff;
+}

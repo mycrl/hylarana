@@ -48,8 +48,10 @@ use common::{
     Size,
 };
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Error)]
 pub enum CaptureError {
@@ -96,7 +98,8 @@ pub trait CaptureHandler: Sync + Send {
 }
 
 /// Video source type or Audio source type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum SourceType {
     /// Camera or video capture card and other devices (and support virtual
     /// camera)
@@ -109,7 +112,8 @@ pub enum SourceType {
 }
 
 /// Video source or Audio source.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Source {
     /// Device ID, usually the symbolic link to the device or the address of the
     /// device file handle.

@@ -103,7 +103,7 @@ struct View(Mutex<VideoRender<'a>>);
 
 impl AVFrameStream for View {}
 
-impl AVFrameSink for View {
+impl MediaStreamSink for View {
     fn audio(&self, frame: &AudioFrame) -> bool {
         true
     }

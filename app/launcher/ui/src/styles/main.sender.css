@@ -1,0 +1,90 @@
+#Sender {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
+#Sender #content {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    top: 70px;
+}
+
+#Sender #content #control {
+    border-top: 1px solid #e3e9ff;
+}
+
+#Sender #content #control .box {
+    margin: 0 auto;
+    width: 50%;
+    text-align: center;
+}
+
+#Sender #content #control .box .items {
+    display: flex;
+    margin-top: 20px;
+}
+
+#Sender #content #control .box .items .item {
+    flex: 1;
+}
+
+#Sender #content #control .box .items .item .icon {
+    text-align: center;
+}
+
+#Sender #content #control .box .items .item .icon > * {
+    color: #829bff;
+    font-size: 17px;
+}
+
+#Sender #content #control .box .items .item select {
+    width: 90%;
+    margin: 0 5%;
+    margin-top: 5px;
+    text-align: center;
+    border: 0;
+    background-color: #fff;
+    border-bottom: 1px solid #dddddd;
+    border-radius: 0;
+}
+
+#Sender #content #control .box .items .item select:focus {
+    outline: none;
+}
+
+#Sender #content #control .box button {
+    height: 40px;
+    width: 170px;
+    border-radius: 40px;
+    margin-top: 18px;
+    border: 0;
+    background-color: #3951af;
+    color: #fff;
+}
+
+#Sender #content .working {
+    text-align: center;
+    height: 355px;
+    width: 100%;
+}
+
+#Sender #content .working img {
+    width: 300px;
+}
+
+#Sender #content .working p {
+    margin-top: 50px;
+    color: #999;
+}
+
+#Sender #content .working button {
+    width: 150px;
+    height: 35px;
+    margin-top: 50px;
+    border-radius: 35px;
+    border: 0;
+    background-color: #f00222;
+    color: #fff;
+}

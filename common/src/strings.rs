@@ -1,8 +1,4 @@
-use std::{
-    ffi::{c_char, CStr, CString},
-    ptr,
-    str::Utf8Error,
-};
+use std::{ffi::c_char, ptr, str::Utf8Error};
 
 use thiserror::Error;
 
@@ -12,6 +8,32 @@ pub enum StringError {
     Utf8Error(#[from] Utf8Error),
     #[error("the string ptr is null")]
     Null,
+}
+
+pub mod ffi {
+    use std::ffi::{c_char, CStr, CString};
+
+    use super::StringError;
+
+    pub fn into(value: &str) -> *const c_char {
+        CString::new(value).unwrap().into_raw()
+    }
+
+    pub fn from(value: *const c_char) -> Result<String, StringError> {
+        if !value.is_null() {
+            Ok(unsafe { CStr::from_ptr(value) }
+                .to_str()
+                .map(|s| s.to_string())?)
+        } else {
+            Err(StringError::Null)
+        }
+    }
+
+    pub fn free(value: *const c_char) {
+        if !value.is_null() {
+            drop(unsafe { CString::from_raw(value as _) })
+        }
+    }
 }
 
 /// A type representing an owned, C-compatible, nul-terminated string with no
@@ -38,7 +60,7 @@ impl From<*const c_char> for PSTR {
 impl From<&str> for PSTR {
     fn from(value: &str) -> Self {
         Self {
-            ptr: CString::new(value).unwrap().into_raw(),
+            ptr: ffi::into(value),
             drop: true,
         }
     }
@@ -47,7 +69,7 @@ impl From<&str> for PSTR {
 impl From<String> for PSTR {
     fn from(value: String) -> Self {
         Self {
-            ptr: CString::new(value).unwrap().into_raw(),
+            ptr: ffi::into(&value),
             drop: true,
         }
     }
@@ -60,13 +82,7 @@ impl PSTR {
     /// return the corresponding &str slice. Otherwise, it will return an error
     /// with details of where UTF-8 validation failed.
     pub fn to_string(&self) -> Result<String, StringError> {
-        if !self.ptr.is_null() {
-            Ok(unsafe { CStr::from_ptr(self.ptr) }
-                .to_str()
-                .map(|s| s.to_string())?)
-        } else {
-            Err(StringError::Null)
-        }
+        ffi::from(self.ptr)
     }
 
     /// Returns the inner pointer to this C string.
@@ -103,8 +119,8 @@ impl PSTR {
 
 impl Drop for PSTR {
     fn drop(&mut self) {
-        if self.drop && !self.ptr.is_null() {
-            drop(unsafe { CString::from_raw(self.ptr as *mut c_char) })
+        if self.drop {
+            ffi::free(self.ptr);
         }
     }
 }

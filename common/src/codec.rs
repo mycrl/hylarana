@@ -3,10 +3,12 @@ use std::{
     str::FromStr,
 };
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Video decoder type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum VideoDecoderType {
     /// [Open H264](https://www.openh264.org/)
     ///
@@ -55,7 +57,8 @@ impl FromStr for VideoDecoderType {
 }
 
 /// Video encoder type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum VideoEncoderType {
     /// [X264](https://www.videolan.org/developers/x264.html)
     ///

@@ -1,5 +1,9 @@
 <!--lint disable no-literal-urls-->
 <div align="center">
+   <img src="./logo.png" width="50px"/>
+   <br>
+   <br>
+   <br>
    <h1>Hylarana</h1>
 </div>
 <br/>
