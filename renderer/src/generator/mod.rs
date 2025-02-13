@@ -28,10 +28,10 @@ use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, BlendState,
     ColorTargetState, ColorWrites, CommandEncoder, Device, Extent3d, FilterMode, FragmentState,
-    IndexFormat, MultisampleState, Origin3d, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, PrimitiveTopology, Queue, RenderPipeline, RenderPipelineDescriptor, Sampler,
-    SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages,
-    TexelCopyBufferLayout, TexelCopyTextureInfo, Texture as WGPUTexture, TextureAspect,
+    ImageCopyTexture, ImageDataLayout, IndexFormat, MultisampleState, Origin3d,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PrimitiveTopology, Queue,
+    RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor,
+    ShaderModuleDescriptor, ShaderSource, ShaderStages, Texture as WGPUTexture, TextureAspect,
     TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
     TextureView, TextureViewDescriptor, TextureViewDimension, VertexState,
 };
@@ -199,14 +199,14 @@ trait Texture2DSample {
     fn update(&self, queue: &Queue, resource: &Texture2DBuffer) {
         for (buffer, texture, aspect, size) in self.copy_buffer_descriptors(resource.buffers) {
             queue.write_texture(
-                TexelCopyTextureInfo {
+                ImageCopyTexture {
                     aspect,
                     texture,
                     mip_level: 0,
                     origin: Origin3d::ZERO,
                 },
                 buffer,
-                TexelCopyBufferLayout {
+                ImageDataLayout {
                     offset: 0,
                     // Bytes per "row" in an image.
                     //
