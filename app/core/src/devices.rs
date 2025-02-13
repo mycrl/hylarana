@@ -12,6 +12,7 @@ use futures_util::{SinkExt, StreamExt};
 use hylarana::{DiscoveryObserver, DiscoveryService};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use tokio::{
     net::TcpListener,
     sync::mpsc::{unbounded_channel, UnboundedSender},
@@ -20,7 +21,7 @@ use tokio::{
 
 use tokio_tungstenite::{
     accept_async, connect_async,
-    tungstenite::{client::IntoClientRequest, http::StatusCode, Message},
+    tungstenite::{client::IntoClientRequest, http::StatusCode, Bytes, Message},
 };
 
 use crate::RUNTIME;
@@ -64,15 +65,16 @@ struct Device {
 
 impl Device {
     fn new<T>(
-        name: String,
+        name: &str,
         kind: DeviceType,
         addrs: Vec<Ipv4Addr>,
         port: u16,
         observer: T,
     ) -> Result<Self>
     where
-        T: FnOnce(&str) + Send + 'static,
+        T: FnOnce(String) + Send + 'static,
     {
+        let name = name.to_string();
         let url = format!("ws://{}:{}", addrs[0], port);
         log::info!(
             "connectioning to remote device, name={}, url = {}",
@@ -102,7 +104,7 @@ impl Device {
         let name_ = name.clone();
         let (tx, mut rx) = unbounded_channel::<String>();
         RUNTIME.spawn(async move {
-            let timeout = sleep(Duration::from_secs(1));
+            let timeout = sleep(Duration::from_secs(2));
             tokio::pin!(timeout);
 
             'a: loop {
@@ -113,16 +115,20 @@ impl Device {
                         }
                     },
                     Some(_) = socket.next() => (),
-                    _ = &mut timeout => (),
+                    _ = &mut timeout =>  {
+                        if socket.send(Message::Ping(Bytes::new())).await.is_err() {
+                            break 'a;
+                        }
+                    },
                     else => {
                         break;
                     }
                 };
             }
 
-            observer(&name_);
-
             log::warn!("remote device disconnection, name={}", name_);
+
+            observer(name_);
         });
 
         Ok(Self {
@@ -145,30 +151,44 @@ impl Device {
         }
     }
 
-    fn update_description(&self, description: MediaStreamDescription) {
+    fn update_description(&self, description: Option<MediaStreamDescription>) {
         log::info!("update device description from remote, name={}", self.name);
 
-        self.description.write().replace(description);
+        *self.description.write() = description;
     }
 
-    fn send_description(&mut self, description: &MediaStreamDescription) -> Result<()> {
+    fn send_description(&mut self, description: Option<&MediaStreamDescription>) -> Result<()> {
         log::info!("send device description to remote, name={:?}", self.name);
 
-        self.tx.send(serde_json::to_string(description)?)?;
+        self.tx.send(serde_json::to_string(&description)?)?;
 
         Ok(())
     }
 }
 
-#[derive(Default)]
+enum DevicesRemoveParams<'a> {
+    Name(String),
+    IpAddr(Ipv4Addr),
+    Names(&'a [String]),
+}
+
 struct Devices {
+    notify: Sender<()>,
     /// addr name mapping
     anm: RwLock<HashMap<Ipv4Addr, String>>,
     table: RwLock<HashMap<String, Device>>,
 }
 
 impl Devices {
-    fn set(&self, name: &str, device: Device) {
+    fn new(notify: Sender<()>) -> Self {
+        Self {
+            anm: Default::default(),
+            table: Default::default(),
+            notify,
+        }
+    }
+
+    fn add(&self, name: &str, device: Device) {
         let mut anm = self.anm.write();
         for it in &device.addrs {
             anm.insert(*it, name.to_string());
@@ -177,28 +197,47 @@ impl Devices {
         self.table.write().insert(name.to_string(), device);
 
         log::info!("add a new device for devices, name={}", name);
+
+        if let Err(e) = self.notify.send(()) {
+            log::error!("devices send change notify error={:?}", e);
+        }
     }
 
-    fn remove(&self, name: &str) {
-        if let Some(it) = self.table.write().remove(name) {
-            let mut anm = self.anm.write();
-            for it in it.addrs {
-                anm.remove(&it);
+    fn remove(&self, params: DevicesRemoveParams) {
+        let mut table = self.table.write();
+        let mut anm = self.anm.write();
+
+        let mut items: SmallVec<[String; 5]> = SmallVec::with_capacity(5);
+        match params {
+            DevicesRemoveParams::Name(it) => items.push(it),
+            DevicesRemoveParams::Names(list) => {
+                for it in list {
+                    items.push(it.clone());
+                }
+            }
+            DevicesRemoveParams::IpAddr(ip) => {
+                if let Some(it) = anm.get(&ip) {
+                    items.push(it.clone());
+                }
             }
         }
 
-        log::info!("remove a device for devices, name={}", name);
-    }
+        for it in items {
+            if let Some(device) = table.remove(&it) {
+                for ip in device.addrs {
+                    anm.remove(&ip);
+                }
 
-    fn remove_from_addr(&self, addr: Ipv4Addr) {
-        if let Some(it) = self.anm.write().remove(&addr) {
-            self.remove(&it);
+                log::info!("remove a device for devices, name={}", device.name);
+            }
         }
 
-        log::info!("remove device for address, ip={}", addr);
+        if let Err(e) = self.notify.send(()) {
+            log::error!("devices send change notify error={:?}", e);
+        }
     }
 
-    fn update_description_from_addr(&self, addr: Ipv4Addr, description: MediaStreamDescription) {
+    fn update_description(&self, addr: Ipv4Addr, description: Option<MediaStreamDescription>) {
         if let Some(it) = self.anm.read().get(&addr) {
             if let Some(device) = self.table.read().get(it) {
                 device.update_description(description);
@@ -206,13 +245,16 @@ impl Devices {
         }
 
         log::info!("update remote description for address, ip={}", addr);
+
+        if let Err(e) = self.notify.send(()) {
+            log::error!("devices send change notify error={:?}", e);
+        }
     }
 }
 
 struct DiscoveryServiceObserver {
     description: Arc<RwLock<Option<MediaStreamDescription>>>,
     devices: Arc<Devices>,
-    tx: Sender<()>,
     name: String,
 }
 
@@ -234,14 +276,9 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
             info
         );
 
-        let tx = self.tx.clone();
         let devices = self.devices.clone();
-        match Device::new(name.to_string(), info.kind, addrs, info.port, move |name| {
-            devices.remove(name);
-
-            if let Err(e) = tx.send(()) {
-                log::error!("devices send change notify error={:?}", e);
-            }
+        match Device::new(name, info.kind, addrs, info.port, move |name| {
+            devices.remove(DevicesRemoveParams::Name(name));
 
             log::info!("device is drop, clean device table and send notify events");
         }) {
@@ -249,8 +286,10 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
                 log::info!("new device connected, name={}", name);
 
                 if let Some(description) = self.description.read().as_ref() {
-                    if let Err(e) = device.send_description(description) {
+                    if let Err(e) = device.send_description(Some(description)) {
                         log::error!("failed to send description to remote device, error={}", e);
+
+                        return;
                     }
 
                     log::info!("broadcast mode has been enabled, sending the current sender description to the remote device");
@@ -258,11 +297,7 @@ impl DiscoveryObserver<ServiceInfo> for DiscoveryServiceObserver {
                     log::info!("the broadcast mode is not enabled and the device is treated as a normal receiving device");
                 }
 
-                self.devices.set(&name, device);
-
-                if let Err(e) = self.tx.send(()) {
-                    log::error!("devices send change notify error={:?}", e);
-                }
+                self.devices.add(&name, device);
             }
             Err(e) => {
                 log::error!("failed to create device, error={}", e);
@@ -281,16 +316,14 @@ pub struct DevicesManager {
 
 impl DevicesManager {
     pub fn new(name: String) -> Result<Self> {
-        let devices: Arc<Devices> = Arc::new(Devices::default());
+        let (tx, rx) = unbounded::<()>();
+        let devices: Arc<Devices> = Arc::new(Devices::new(tx));
 
         let listener = RUNTIME.block_on(TcpListener::bind("0.0.0.0:0"))?;
         let local_addr = listener.local_addr()?;
 
         log::info!("devices manager server listener addr={}", local_addr);
 
-        let (tx, rx) = unbounded::<()>();
-
-        let tx_ = tx.clone();
         let devices_ = Arc::downgrade(&devices);
         RUNTIME.spawn(async move {
             while let Ok((socket, addr)) = listener.accept().await {
@@ -302,7 +335,6 @@ impl DevicesManager {
                     _ => unimplemented!(),
                 };
 
-                let tx_ = tx_.clone();
                 RUNTIME.spawn(async move {
                     match accept_async(socket).await {
                         Ok(mut stream) => {
@@ -312,14 +344,7 @@ impl DevicesManager {
 
                                     if let Some(devices) = devices_.upgrade() {
                                         if let Ok(it) = serde_json::from_str(text.as_str()) {
-                                            devices.update_description_from_addr(ip, it);
-
-                                            if let Err(e) = tx_.send(()) {
-                                                log::error!(
-                                                    "devices send change notify error={:?}",
-                                                    e
-                                                );
-                                            }
+                                            devices.update_description(ip, it);
                                         }
                                     } else {
                                         log::error!("device ref is droped! close the recv thread, address={}", addr);
@@ -335,7 +360,7 @@ impl DevicesManager {
                     }
 
                     if let Some(devices) = devices_.upgrade() {
-                        devices.remove_from_addr(ip);
+                        devices.remove(DevicesRemoveParams::IpAddr(ip));
                     }
                 });
             }
@@ -354,7 +379,6 @@ impl DevicesManager {
                 description: description.clone(),
                 devices: devices.clone(),
                 name,
-                tx,
             })?,
         );
 
@@ -366,11 +390,7 @@ impl DevicesManager {
         })
     }
 
-    pub fn set_description(
-        &self,
-        name_list: Vec<String>,
-        description: MediaStreamDescription,
-    ) -> Result<()> {
+    pub fn set_description(&self, name_list: Vec<String>, description: MediaStreamDescription) {
         log::info!("set description, names={:?}", name_list);
 
         let mut devices = self.devices.table.write();
@@ -383,19 +403,44 @@ impl DevicesManager {
             let _ = self.description.write().take();
         }
 
+        let mut closeds: SmallVec<[String; 5]> = SmallVec::with_capacity(5);
+
         if name_list.is_empty() {
-            for (_, device) in devices.iter_mut() {
-                device.send_description(&description)?;
+            for (name, device) in devices.iter_mut() {
+                if device.send_description(Some(&description)).is_err() {
+                    closeds.push(name.clone());
+                }
             }
         } else {
             for name in name_list {
                 if let Some(device) = devices.get_mut(&name) {
-                    device.send_description(&description)?;
+                    if device.send_description(Some(&description)).is_err() {
+                        closeds.push(name.clone());
+                    }
                 }
             }
         }
 
-        Ok(())
+        if !closeds.is_empty() {
+            self.devices.remove(DevicesRemoveParams::Names(&closeds));
+        }
+    }
+
+    pub fn remove_description(&self) {
+        let _ = self.description.write().take();
+
+        let mut closeds: SmallVec<[String; 5]> = SmallVec::with_capacity(5);
+
+        let mut devices = self.devices.table.write();
+        for (name, device) in devices.iter_mut() {
+            if device.send_description(None).is_err() {
+                closeds.push(name.clone());
+            }
+        }
+
+        if !closeds.is_empty() {
+            self.devices.remove(DevicesRemoveParams::Names(&closeds));
+        }
     }
 
     pub fn get_devices(&self) -> Vec<DeviceInfo> {

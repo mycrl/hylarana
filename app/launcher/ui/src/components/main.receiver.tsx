@@ -12,7 +12,9 @@ export default function () {
     const status = useAtomValue(statusAtom);
 
     async function stop() {
-        await closeReceiver();
+        if (status == Status.Receiving) {
+            await closeReceiver();
+        }
     }
 
     return (

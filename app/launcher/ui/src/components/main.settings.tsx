@@ -1,9 +1,16 @@
 import "../styles/main.settings.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { Backend, VideoDecoders, VideoEncoders } from "../core";
+import {
+    Backend,
+    getDeviceName,
+    setDevicename,
+    Status,
+    VideoDecoders,
+    VideoEncoders,
+} from "../core";
 import { DefaultSettings, SettingsType } from "../settings";
-import { deviceNameAtom, languageAtom, localesAtom, settingsAtom } from "../state";
+import { languageAtom, localesAtom, settingsAtom, statusAtom } from "../state";
 import { LanguageOptions } from "../locales";
 
 class SubmitEvent extends EventTarget {
@@ -57,18 +64,6 @@ function freezeSettingsRef(ref: Ref<SettingsType>): SettingsType {
     }
 
     return values;
-}
-
-function createRefHandle<T>(value: T) {
-    return {
-        value,
-        get() {
-            return this.value;
-        },
-        set(value: T) {
-            this.value = value;
-        },
-    };
 }
 
 function Input<T extends string | number | null>({
@@ -154,12 +149,19 @@ function System({
 }) {
     const locales = useAtomValue(localesAtom);
     const [language, setLanguage] = useAtom(languageAtom);
-    const [deviceName, setDeviceName] = useAtom(deviceNameAtom);
+    const [name, setName] = useState("");
 
-    const name = createRefHandle(deviceName);
-    event.on(() => {
-        setDeviceName(name.value);
+    event.on(async () => {
+        if (name != (await getDeviceName())) {
+            await setDevicename(name);
+        }
     });
+
+    useEffect(() => {
+        getDeviceName().then((value) => {
+            setName(value);
+        });
+    }, []);
 
     return (
         <>
@@ -167,7 +169,11 @@ function System({
                 <h1>{locales.System}</h1>
                 <div className='item'>
                     <p>{locales.DeviceName}:</p>
-                    <Input ref={name} disabled={disabled} />
+                    <input
+                        value={name}
+                        onChange={({ target }) => setName(target.value)}
+                        disabled={disabled}
+                    />
                 </div>
                 <div className='item'>
                     <p>{locales.Language}:</p>
@@ -327,8 +333,7 @@ export default function () {
     const submitEvent = new SubmitEvent();
     const settings = createSettingsRef();
     const locales = useAtomValue(localesAtom);
-    const [disabled, setDisabled] = useState(false);
-
+    const [disabled, setDisabled] = useState(useAtomValue(statusAtom) != Status.Idle);
     const setSettings = useSetAtom(settingsAtom);
 
     return (

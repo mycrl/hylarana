@@ -265,7 +265,7 @@ impl ApplicationHandler<Events> for App {
                     )?;
 
                     self.devices_manager
-                        .set_description(names, sender.get_description().clone())?;
+                        .set_description(names, sender.get_description().clone());
 
                     self.sender.lock().replace(sender);
                     self.router.send_event("SenderCreatedNotify");
@@ -319,15 +319,21 @@ impl ApplicationHandler<Events> for App {
                 tx.send(func()).unwrap();
             }
             Events::CloseSender => {
-                let _ = self.sender.lock().take();
+                drop(self.sender.lock().take());
+
+                self.devices_manager.remove_description();
             }
             Events::CloseReceiver => {
-                let _ = self.receiver.lock().take();
+                drop(self.receiver.lock().take());
             }
             Events::SenderClosed => {
+                drop(self.sender.lock().take());
+
                 self.router.send_event("SenderClosedNotify");
             }
             Events::ReceiverClosed => {
+                drop(self.receiver.lock().take());
+
                 if let Some(window) = self.window.as_ref() {
                     window.set_visible(false);
                 }

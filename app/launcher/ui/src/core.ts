@@ -121,8 +121,8 @@ export enum Status {
     Idle = "Idle",
 }
 
-export async function onDevicesChange(listener: () => void) {
-    return await Route.on(Methods.DevicesChangeNotify, listener);
+export function onDevicesChange(listener: () => void) {
+    Route.on(Methods.DevicesChangeNotify, listener);
 }
 
 export async function getDevices() {
@@ -149,20 +149,20 @@ export async function closeReceiver() {
     return await Route.call(Methods.CloseReceiver);
 }
 
-export async function onSenderClose(listener: () => void) {
-    return await Route.on(Methods.SenderClosedNotify, listener);
+export function onSenderClose(listener: () => void) {
+    Route.on(Methods.SenderClosedNotify, listener);
 }
 
-export async function onReceiverClose(listener: () => void) {
-    return await Route.on(Methods.ReceiverClosedNotify, listener);
+export function onReceiverClose(listener: () => void) {
+    Route.on(Methods.ReceiverClosedNotify, listener);
 }
 
-export async function onSenderCreated(listener: () => void) {
-    return await Route.on(Methods.SenderCreatedNotify, listener);
+export function onSenderCreated(listener: () => void) {
+    Route.on(Methods.SenderCreatedNotify, listener);
 }
 
-export async function onReceiverCreated(listener: () => void) {
-    return await Route.on(Methods.ReceiverCreatedNotify, listener);
+export function onReceiverCreated(listener: () => void) {
+    Route.on(Methods.ReceiverCreatedNotify, listener);
 }
 
 export async function createReceiver(
@@ -171,4 +171,12 @@ export async function createReceiver(
     description: MediaStreamDescription
 ) {
     return await Route.call(Methods.CreateReceiver, [options, backend, description]);
+}
+
+export async function getDeviceName() {
+    return await window.MessageTransport.getName();
+}
+
+export async function setDevicename(name: string) {
+    return await window.MessageTransport.setName(name);
 }

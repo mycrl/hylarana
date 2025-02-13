@@ -134,45 +134,49 @@ export default function () {
     const audio = useRef<number>(0);
 
     async function start() {
-        await createSender(names.current, {
-            transport: {
-                mtu: settings.NetworkMtu,
-                strategy: {
-                    [transport]:
-                        ({
-                            [TransportStrategy.Relay]: settings.NetworkServer,
-                            [TransportStrategy.Direct]: settings.NetworkInterface,
-                            [TransportStrategy.Multicast]: settings.NetworkMulticast,
-                        }[transport] as string) +
-                        ":" +
-                        settings.NetworkPort,
-                } as any,
-            },
-            media: {
-                video: {
-                    source: displays[display.current],
-                    options: {
-                        codec: settings.CodecEncoder,
-                        frame_rate: settings.VideoFrameRate,
-                        width: settings.VideoSizeWidth,
-                        height: settings.VideoSizeHeight,
-                        bit_rate: settings.VideoBitRate,
-                        key_frame_interval: settings.VideoKeyFrameInterval,
+        if (status == Status.Idle) {
+            await createSender(names.current, {
+                transport: {
+                    mtu: settings.NetworkMtu,
+                    strategy: {
+                        [transport]:
+                            ({
+                                [TransportStrategy.Relay]: settings.NetworkServer,
+                                [TransportStrategy.Direct]: settings.NetworkInterface,
+                                [TransportStrategy.Multicast]: settings.NetworkMulticast,
+                            }[transport] as string) +
+                            ":" +
+                            settings.NetworkPort,
+                    } as any,
+                },
+                media: {
+                    video: {
+                        source: displays[display.current],
+                        options: {
+                            codec: settings.CodecEncoder,
+                            frame_rate: settings.VideoFrameRate,
+                            width: settings.VideoSizeWidth,
+                            height: settings.VideoSizeHeight,
+                            bit_rate: settings.VideoBitRate,
+                            key_frame_interval: settings.VideoKeyFrameInterval,
+                        },
+                    },
+                    audio: {
+                        source: audios[audio.current],
+                        options: {
+                            sample_rate: settings.AudioSampleRate,
+                            bit_rate: settings.AudioBitRate,
+                        },
                     },
                 },
-                audio: {
-                    source: audios[audio.current],
-                    options: {
-                        sample_rate: settings.AudioSampleRate,
-                        bit_rate: settings.AudioBitRate,
-                    },
-                },
-            },
-        });
+            });
+        }
     }
 
     async function stop() {
-        await closeSender();
+        if (status == Status.Sending) {
+            await closeSender();
+        }
     }
 
     return (

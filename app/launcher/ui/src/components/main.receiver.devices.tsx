@@ -1,32 +1,35 @@
 import "../styles/main.receiver.devices.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import { devicesAtom, localesAtom, settingsAtom } from "../state";
+import { devicesAtom, localesAtom, settingsAtom, statusAtom } from "../state";
+import { createReceiver, Device, Status, TransportStrategy } from "../core";
 import { useAtomValue } from "jotai";
-import { createReceiver, Device, TransportStrategy } from "../core";
 
 export default function () {
     const locales = useAtomValue(localesAtom);
     const devices = useAtomValue(devicesAtom);
     const settings = useAtomValue(settingsAtom);
+    const status = useAtomValue(statusAtom);
 
     async function accept(device: Device) {
-        let description = Object.assign({}, device.description!);
-        for (const [key, value] of Object.entries(description.transport.strategy)) {
-            if (key == TransportStrategy.Direct) {
-                description.transport.strategy[key as TransportStrategy] = `${device.addrs[0]}:${
-                    value.split(":")[1]
-                }`;
+        if (status == Status.Receiving) {
+            let description = Object.assign({}, device.description!);
+            for (const [key, value] of Object.entries(description.transport.strategy)) {
+                if (key == TransportStrategy.Direct) {
+                    description.transport.strategy[key as TransportStrategy] = `${
+                        device.addrs[0]
+                    }:${value.split(":")[1]}`;
+                }
             }
-        }
 
-        await createReceiver(
-            {
-                video_decoder: settings.CodecDecoder,
-            },
-            settings.RendererBackend,
-            description
-        );
+            await createReceiver(
+                {
+                    video_decoder: settings.CodecDecoder,
+                },
+                settings.RendererBackend,
+                description
+            );
+        }
     }
 
     return (

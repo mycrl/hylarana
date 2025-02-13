@@ -14,6 +14,7 @@ tokio-tungstenite = "0.26"
 parking_lot = "0.12"
 futures-util = "0.3.31"
 crossbeam = "0.8.4"
+smallvec = "1.13"
 clap = { version = "4", features = ["derive"] }
 hylarana = { path = "../../hylarana", features = ["serde"]}
 common = { path = "../../common", package = "hylarana-common", features = ["serde"]}
