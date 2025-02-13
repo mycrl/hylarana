@@ -10,7 +10,7 @@ repository = "https://github.com/mycrl/hylarana"
 [dependencies]
 log = "0.4"
 thiserror = "2.0"
-common = { path = "../common", version = "0.3.0", package = "hylarana-common" }
+common = { path = "../common", version = "0.3.1", package = "hylarana-common" }
 
 [target.'cfg(target_os = "windows")'.dependencies.ffmpeg]
 package = "hylarana-ffmpeg-sys"

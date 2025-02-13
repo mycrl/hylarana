@@ -152,6 +152,8 @@ where
     T: DiscoveryObserver<P> + 'static,
 {
     if let Some(properties) = info.get_property("p") {
+        println!("=========================== {}", properties.val_str());
+
         let properties = serde_json::from_str(properties.val_str())?;
         let addrs = info
             .get_addresses_v4()

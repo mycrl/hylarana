@@ -13,8 +13,8 @@ bytes = "1.5"
 log = "0.4"
 parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
-common = { path = "../common", version = "0.3", package = "hylarana-common" }
-transport = { path = "../transport", version = "0.3", package = "hylarana-transport" }
+common = { path = "../common", version = "0.3.1", package = "hylarana-common" }
+transport = { path = "../transport", version = "0.3.0", package = "hylarana-transport" }
 renderer = { path = "../renderer", version = "0.3.0", package = "hylarana-renderer" }
 discovery = { path = "../discovery", version = "0.3.1", package = "hylarana-discovery" }
 capture = { path = "../capture", version = "0.3.0", package = "hylarana-capture" }
@@ -23,4 +23,4 @@ rodio = { version = "0.19", default-features = false }
 
 [features]
 serde = ["common/serde", "capture/serde"]
-serde-short = ["common/serde-short", "capture/serde"]
+serde-short = ["common/serde-short", "serde"]
