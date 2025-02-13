@@ -2,9 +2,9 @@ import "../styles/main.sender.devices.css";
 import { Device } from "../hylarana";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWindows, faApple, faAndroid } from "@fortawesome/free-brands-svg-icons";
-import { useAtomValue } from "jotai";
 import { RefObject, useRef, useState } from "react";
 import { devicesAtom, localesAtom } from "../state";
+import { useAtomValue } from "jotai";
 
 function DeviceNode({
     device,
@@ -36,18 +36,16 @@ function DeviceNode({
                 }}
             >
                 <div className='logo'>
-                    {device.kind == "Windows" && (
-                        <FontAwesomeIcon
-                            className='icon'
-                            icon={
-                                device.kind == "Windows"
-                                    ? faWindows
-                                    : device.kind == "Android"
-                                    ? faAndroid
-                                    : faApple
-                            }
-                        />
-                    )}
+                    <FontAwesomeIcon
+                        className='icon'
+                        icon={
+                            device.kind == "Windows"
+                                ? faWindows
+                                : device.kind == "Android"
+                                ? faAndroid
+                                : faApple
+                        }
+                    />
                 </div>
                 <div className='info'>
                     <p>{device.name}</p>

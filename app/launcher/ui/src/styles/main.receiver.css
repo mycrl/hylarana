@@ -33,3 +33,26 @@
     right: 20px;
     top: 70px;
 }
+
+#Receiver .devices .working {
+    text-align: center;
+}
+
+#Receiver .devices .working img {
+    width: 300px;
+}
+
+#Receiver .devices .working p {
+    margin-top: 50px;
+    color: #999;
+}
+
+#Receiver .devices .working button {
+    width: 150px;
+    height: 35px;
+    margin-top: 50px;
+    border-radius: 35px;
+    border: 0;
+    background-color: #f00222;
+    color: #fff;
+}

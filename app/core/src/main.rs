@@ -163,6 +163,8 @@ impl App {
 
                     let mut receiver = receiver.lock();
                     if receiver.is_none() && sender.lock().is_none() {
+                        window.set_visible(true);
+
                         receiver.replace(create_receiver(
                             &description,
                             &options,
@@ -263,7 +265,7 @@ impl ApplicationHandler<Events> for App {
                     .create_window(
                         WindowAttributes::default()
                             .with_inner_size(PhysicalSize::new(1280, 720))
-                            .with_visible(false),
+                            .with_visible(true),
                     )
                     .unwrap(),
             ));
@@ -302,6 +304,10 @@ impl ApplicationHandler<Events> for App {
                 });
             }
             Events::ReceiverClosed => {
+                if let Some(window) = self.window.read().as_ref() {
+                    window.set_visible(false);
+                }
+
                 let router = self.router.clone();
                 RUNTIME.spawn(async move {
                     let _ = router.call::<_, ()>("ReceiverClosedNotify", ()).await;

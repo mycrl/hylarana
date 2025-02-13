@@ -11,11 +11,6 @@
     top: 70px;
 }
 
-#Sender #content .padding {
-    height: 355px;
-    width: 100%;
-}
-
 #Sender #content #control {
     border-top: 1px solid #e3e9ff;
 }
@@ -66,5 +61,30 @@
     margin-top: 18px;
     border: 0;
     background-color: #3951af;
+    color: #fff;
+}
+
+#Sender #content .working {
+    text-align: center;
+    height: 355px;
+    width: 100%;
+}
+
+#Sender #content .working img {
+    width: 300px;
+}
+
+#Sender #content .working p {
+    margin-top: 50px;
+    color: #999;
+}
+
+#Sender #content .working button {
+    width: 150px;
+    height: 35px;
+    margin-top: 50px;
+    border-radius: 35px;
+    border: 0;
+    background-color: #f00222;
     color: #fff;
 }

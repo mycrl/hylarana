@@ -6,11 +6,15 @@ import { useAtomValue } from "jotai";
 import { useRef, useState } from "react";
 import { closeSender, createSender, Source, Status, TransportStrategy } from "../hylarana";
 import { audiosAtom, displaysAtom, localesAtom, settingsAtom, statusAtom } from "../state";
+import SenderImage from "../assets/sender.svg";
+import ReceiverImage from "../assets/receiver.svg";
 
 function Displays({
     displays,
+    disabled,
     onChange,
 }: {
+    disabled: boolean;
     displays: Source[];
     onChange: (index: number) => void;
 }) {
@@ -25,6 +29,7 @@ function Displays({
                 <select
                     className='click'
                     value={index}
+                    disabled={disabled}
                     onChange={({ target }) => {
                         const value = Number(target.value);
                         setIndex(value);
@@ -42,7 +47,15 @@ function Displays({
     );
 }
 
-function Audios({ audios, onChange }: { audios: Source[]; onChange: (index: number) => void }) {
+function Audios({
+    audios,
+    disabled,
+    onChange,
+}: {
+    audios: Source[];
+    disabled: boolean;
+    onChange: (index: number) => void;
+}) {
     const [index, setIndex] = useState(0);
 
     return (
@@ -54,6 +67,7 @@ function Audios({ audios, onChange }: { audios: Source[]; onChange: (index: numb
                 <select
                     className='click'
                     value={index}
+                    disabled={disabled}
                     onChange={({ target }) => {
                         const value = Number(target.value);
                         setIndex(value);
@@ -73,8 +87,10 @@ function Audios({ audios, onChange }: { audios: Source[]; onChange: (index: numb
 
 function Transport({
     value,
+    disabled,
     onChange,
 }: {
+    disabled: boolean;
     value: TransportStrategy;
     onChange: (value: TransportStrategy) => void;
 }) {
@@ -90,6 +106,7 @@ function Transport({
                 <select
                     className='click'
                     value={value}
+                    disabled={disabled}
                     onChange={({ target }) => onChange(target.value as TransportStrategy)}
                 >
                     <option value='Direct'>{locales.Direct}</option>
@@ -162,33 +179,50 @@ export default function () {
         <>
             <div id='Sender'>
                 <div id='content'>
-                    <Devices
-                        onChange={(it) => {
-                            names.current = it;
-                        }}
-                    />
-                    {/* {!broadcast ? (
-                        
-                    ) : (
-                        <div className='padding'></div>
-                    )} */}
-
+                    {status == Status.Idle && (
+                        <Devices
+                            onChange={(it) => {
+                                names.current = it;
+                            }}
+                        />
+                    )}
+                    {status != Status.Idle && (
+                        <div className='working'>
+                            <img
+                                src={status == Status.Receiving ? ReceiverImage : SenderImage}
+                                style={{
+                                    marginTop: status == Status.Receiving ? "50px" : "100px",
+                                }}
+                            />
+                            <p>
+                                {status == Status.Receiving
+                                    ? locales.Receivering
+                                    : locales.Sendering}
+                            </p>
+                        </div>
+                    )}
                     <div id='control'>
                         <div className='box'>
                             <div className='items'>
                                 <Audios
+                                    disabled={status != Status.Idle}
                                     audios={audios}
                                     onChange={(it) => {
                                         audio.current = it;
                                     }}
                                 />
                                 <Displays
+                                    disabled={status != Status.Idle}
                                     displays={displays}
                                     onChange={(it) => {
                                         display.current = it;
                                     }}
                                 />
-                                <Transport value={transport} onChange={setTransport} />
+                                <Transport
+                                    disabled={status != Status.Idle}
+                                    value={transport}
+                                    onChange={setTransport}
+                                />
                             </div>
                             <button
                                 className='click'

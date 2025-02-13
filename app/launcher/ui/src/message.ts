@@ -2,6 +2,7 @@ import {
     Backend,
     Device,
     MediaStreamDescription,
+    ReceiverOptions,
     SenderOptions,
     Source,
     SourceType,
@@ -182,7 +183,7 @@ interface CallTypes {
     [Methods.GetCaptureSources]: [SourceType, Source[]];
     [Methods.CreateSender]: [[Array<string>, SenderOptions], void];
     [Methods.CloseSender]: [void, void];
-    [Methods.CreateReceiver]: [[SenderOptions, Backend, MediaStreamDescription], void];
+    [Methods.CreateReceiver]: [[ReceiverOptions, Backend, MediaStreamDescription], void];
     [Methods.CloseReceiver]: [void, void];
     [Methods.GetStatus]: [void, Status];
 }

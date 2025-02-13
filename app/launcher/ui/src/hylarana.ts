@@ -159,3 +159,12 @@ export async function onSenderClose(listener: () => void) {
 export async function onReceiverClose(listener: () => void) {
     return await Route.on(Methods.ReceiverClosedNotify, listener);
 }
+
+export async function createReceiver(
+    options: ReceiverOptions,
+    backend: Backend,
+    description: MediaStreamDescription
+) {
+    await Route.call(Methods.CreateReceiver, [options, backend, description]);
+    events.dispatchEvent(new Event("receiverCreated"));
+}

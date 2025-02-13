@@ -1,7 +1,8 @@
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
-    sync::Arc, time::Duration,
+    sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{anyhow, Result};
@@ -13,7 +14,8 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tokio::{
     net::TcpListener,
-    sync::mpsc::{unbounded_channel, UnboundedSender}, time::sleep,
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    time::{sleep, timeout},
 };
 
 use tokio_tungstenite::{
@@ -56,6 +58,7 @@ struct Device {
     description: Arc<RwLock<Option<MediaStreamDescription>>>,
     addrs: Vec<Ipv4Addr>,
     kind: DeviceType,
+    name: String,
     port: u16,
 }
 
@@ -70,9 +73,22 @@ impl Device {
     where
         T: FnOnce(&str) + Send + 'static,
     {
-        let (mut socket, response) = RUNTIME.block_on(connect_async(
-            format!("ws://{}:{}", addrs[0], port).into_client_request()?,
-        ))?;
+        let url = format!("ws://{}:{}", addrs[0], port);
+        log::info!(
+            "connectioning to remote device, name={}, url = {}",
+            name,
+            url
+        );
+
+        let (mut socket, response) = RUNTIME.block_on(async move {
+            Ok::<_, anyhow::Error>(
+                timeout(
+                    Duration::from_secs(5),
+                    connect_async(url.into_client_request()?),
+                )
+                .await??,
+            )
+        })?;
 
         if response.status() != StatusCode::SWITCHING_PROTOCOLS {
             return Err(anyhow!(
@@ -81,13 +97,9 @@ impl Device {
             ));
         }
 
-        log::info!(
-            "connection to remote device success, name={}, url = ws://{}:{}",
-            name,
-            addrs[0],
-            port
-        );
+        log::info!("connection to remote device success, name={}", name);
 
+        let name_ = name.clone();
         let (tx, mut rx) = unbounded_channel::<String>();
         RUNTIME.spawn(async move {
             let timeout = sleep(Duration::from_secs(1));
@@ -108,9 +120,9 @@ impl Device {
                 };
             }
 
-            observer(&name);
+            observer(&name_);
 
-            log::warn!("remote device disconnection, name={}", name);
+            log::warn!("remote device disconnection, name={}", name_);
         });
 
         Ok(Self {
@@ -118,24 +130,19 @@ impl Device {
             addrs,
             port,
             kind,
+            name,
             tx,
         })
     }
 
-    fn get_port(&self) -> u16 {
-        self.port
-    }
-
-    fn get_kind(&self) -> DeviceType {
-        self.kind
-    }
-
-    fn get_addrs(&self) -> Vec<Ipv4Addr> {
-        self.addrs.clone()
-    }
-
-    fn get_description(&self) -> Option<MediaStreamDescription> {
-        self.description.read().clone()
+    fn get_info(&self) -> DeviceInfo {
+        DeviceInfo {
+            description: self.description.read().clone(),
+            addrs: self.addrs.clone(),
+            name: self.name.clone(),
+            port: self.port,
+            kind: self.kind,
+        }
     }
 
     fn update_description(&self, description: MediaStreamDescription) {
@@ -272,6 +279,7 @@ impl DevicesManager {
 
         let (tx, rx) = unbounded::<()>();
 
+        let tx_ = tx.clone();
         let devices_ = Arc::downgrade(&devices);
         RUNTIME.spawn(async move {
             while let Ok((socket, addr)) = listener.accept().await {
@@ -281,6 +289,7 @@ impl DevicesManager {
                     _ => unimplemented!(),
                 };
 
+                let tx_ = tx_.clone();
                 RUNTIME.spawn(async move {
                     match accept_async(socket).await {
                         Ok(mut stream) => {
@@ -289,6 +298,13 @@ impl DevicesManager {
                                     if let Some(devices) = devices_.upgrade() {
                                         if let Ok(it) = serde_json::from_str(text.as_str()) {
                                             devices.update_description_from_addr(ip, it);
+
+                                            if let Err(e) = tx_.send(()) {
+                                                log::error!(
+                                                    "devices send change notify error={:?}",
+                                                    e
+                                                );
+                                            }
                                         }
                                     } else {
                                         break;
@@ -364,14 +380,8 @@ impl DevicesManager {
     pub fn get_devices(&self) -> Vec<DeviceInfo> {
         let mut devices = Vec::with_capacity(100);
 
-        for (k, v) in self.devices.table.read().iter() {
-            devices.push(DeviceInfo {
-                description: v.get_description(),
-                addrs: v.get_addrs(),
-                port: v.get_port(),
-                kind: v.get_kind(),
-                name: k.clone(),
-            });
+        for it in self.devices.table.read().values() {
+            devices.push(it.get_info());
         }
 
         devices

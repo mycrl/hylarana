@@ -61,6 +61,9 @@ const Chinase = {
     RendererBackend: "渲染器后端",
     RendererBackendHelp:
         "Direct3D11：使用D3D11实现的后端，在较老的设备和平台上受支持，具有更好的性能表现和内存占用，但仅限于Windows。\r\nWebGPU：使用WebGPU实现的跨平台图形后端，在许多常见的平台或设备上均受支持。",
+    Accapt: "接受",
+    Sendering: "正在投屏中...",
+    Receivering: "正在接收投屏中...",
 };
 
 const English = {
@@ -122,6 +125,9 @@ const English = {
     RendererBackend: "renderer backend",
     RendererBackendHelp:
         "Direct3D11: Backend implemented using D3D11, which is supported on an older device and platform and has better performance performance and memory footprint, but only on windows. \r\nWebGPU: Cross-platform graphics backends implemented using WebGPUs are supported on a number of common platforms or devices.",
+    Accapt: "Accapt",
+    Sendering: "In the screen of casting...",
+    Receivering: "In the screen of receiving...",
 };
 
 export type Language = typeof English;
