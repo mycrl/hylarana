@@ -23,12 +23,16 @@ pub trait MessageTransport: Send + Sync {
     type Error;
 
     fn send(&self, message: &str) -> Result<(), Self::Error>;
-    fn read(&self, message: &mut String) -> Result<(), Self::Error>;
+    fn read<'a>(&self, message: &'a mut String) -> Result<Option<&'a str>, Self::Error>;
 }
 
 pub struct Stdio {
     stdin: Stdin,
     stdout: Stdout,
+}
+
+impl Stdio {
+    const FLAG: &str = "::MESSAGE-";
 }
 
 impl Default for Stdio {
@@ -43,18 +47,25 @@ impl Default for Stdio {
 impl MessageTransport for Stdio {
     type Error = anyhow::Error;
 
-    fn read(&self, message: &mut String) -> Result<(), Self::Error> {
-        self.stdin.lock().read_line(message)?;
+    fn read<'a>(&self, line: &'a mut String) -> Result<Option<&'a str>, Self::Error> {
+        self.stdin.lock().read_line(line)?;
 
-        log::info!("stdio message transport recv message={}", message.trim());
+        Ok(if !line.starts_with(Self::FLAG) {
+            let message = line.split_at(Self::FLAG.len()).1.trim();
 
-        Ok(())
+            log::info!("stdio message transport recv message={}", message);
+
+            Some(message)
+        } else {
+            None
+        })
     }
 
     fn send(&self, message: &str) -> Result<(), Self::Error> {
         log::info!("stdio message transport send message={}", message);
 
         let mut stdout = self.stdout.lock();
+        stdout.write(Self::FLAG.as_bytes())?;
         stdout.write(message.as_bytes())?;
         stdout.write("\n".as_bytes())?;
         stdout.flush()?;

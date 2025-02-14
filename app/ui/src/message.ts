@@ -163,38 +163,3 @@ export class Route {
         });
     }
 }
-
-export enum Methods {
-    GetDevices = "GetDevices",
-    DevicesChangeNotify = "DevicesChangeNotify",
-    ReadyNotify = "ReadyNotify",
-    GetCaptureSources = "GetCaptureSources",
-    CreateSender = "CreateSender",
-    CloseSender = "CloseSender",
-    CreateReceiver = "CreateReceiver",
-    CloseReceiver = "CloseReceiver",
-    GetStatus = "GetStatus",
-    SenderClosedNotify = "SenderClosedNotify",
-    ReceiverClosedNotify = "ReceiverClosedNotify",
-    SenderCreatedNotify = "SenderCreatedNotify",
-    ReceiverCreatedNotify = "ReceiverCreatedNotify",
-}
-
-interface CallTypes {
-    [Methods.GetDevices]: [void, Device[]];
-    [Methods.GetCaptureSources]: [SourceType, Source[]];
-    [Methods.CreateSender]: [[Array<string>, SenderOptions], void];
-    [Methods.CloseSender]: [void, void];
-    [Methods.CreateReceiver]: [[ReceiverOptions, Backend, MediaStreamDescription], void];
-    [Methods.CloseReceiver]: [void, void];
-    [Methods.GetStatus]: [void, Status];
-}
-
-interface OnTypes {
-    [Methods.DevicesChangeNotify]: [void, void];
-    [Methods.ReadyNotify]: [void, void];
-    [Methods.SenderClosedNotify]: [void, void];
-    [Methods.ReceiverClosedNotify]: [void, void];
-    [Methods.SenderCreatedNotify]: [void, void];
-    [Methods.ReceiverCreatedNotify]: [void, void];
-}

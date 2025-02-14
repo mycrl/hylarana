@@ -20,10 +20,10 @@
     "homepage": "https://github.com/mycrl/hylarana#readme",
     "dependencies": {
         "@faker-js/faker": "^9.4.0",
-        "electron": "^34.1.1"
+        "electron": "^34.1.1",
+        "dotenv": "^16.4.7"
     },
     "devDependencies": {
-        "dotenv": "^16.4.7",
         "typescript": "^5.7.3"
     }
 }
