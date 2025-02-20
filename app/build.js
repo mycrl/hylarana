@@ -47,7 +47,7 @@ void (async () => {
     });
 
     if (process.platform == "win32") {
-        const outdir = await FindCrateOutdir("hylarana-ffmpeg-sys", "ffmpeg");
+        const outdir = await FindCrateOutdir("ffmpeg-dev-sys", "ffmpeg");
         for (const item of ["avcodec-61.dll", "avutil-59.dll", "swresample-5.dll"]) {
             const path = join("../target/release/", item);
             if (!existsSync(path)) {

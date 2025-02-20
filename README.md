@@ -62,6 +62,8 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 
 ## Build Instructions
 
+> ❗ This project has a dependency on ffmpeg version 7.1, because it may need to use gpl or nofree dependencies, so this project is not statically linked to ffmpeg. In this case, you need to manually add the dll or so to the dynamic library lookup path, and you can download the ffmpeg build you need at this [link](https://github.com/mycrl/ffmpeg-rs/releases).
+
 #### Requirements
 
 -   [Git](https://git-scm.com/downloads)
@@ -77,7 +79,7 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 
 ```sh
 sudo apt-get update
-sudo apt-get install tclsh pkg-config cmake libssl-dev build-essential libasound2-dev libsdl2-dev libva-dev v4l-utils
+sudo apt-get install unzip tclsh pkg-config cmake libssl-dev build-essential libasound2-dev
 ```
 
 ##### Macos

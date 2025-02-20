@@ -46,7 +46,7 @@ cpal = "0.15"
 windows-capture = "1.4.0"
 windows = "0.58"
 screencapturekit = "0.3.2"
-ffmpeg = { package = "hylarana-ffmpeg-sys", version = "0.1", default-features = false }
+ffmpeg = { package = "ffmpeg-dev-sys", version = "0.1", default-features = false }
 serde_repr = "0.1"
 fern = "0.6"
 chrono = "0.4"
