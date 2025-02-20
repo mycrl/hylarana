@@ -102,6 +102,7 @@ For Android, there is no need to manually call compilation. You can directly use
 ##### Build Application
 
 ```sh
+yarn
 cp app
 yarn build
 ```
