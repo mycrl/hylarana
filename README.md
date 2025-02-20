@@ -3,10 +3,8 @@
    <img src="./logo.png" width="50px"/>
    <br>
    <br>
-   <br>
    <h1>Hylarana</h1>
 </div>
-<br/>
 <div align="center">
   <strong>A cross-platform screen cast implemented by Rust.</strong>
 </div>
@@ -16,25 +14,19 @@
   <img src="https://img.shields.io/github/issues/mycrl/hylarana"/>
   <img src="https://img.shields.io/github/stars/mycrl/hylarana"/>
 </div>
-
+<br/>
+<br/>
 <div align="center">
-  <span>documentation:</span>
-  <a href="https://docs.rs/hylarana/latest/hylarana">docs.rs</a>
+   <img src="./app/capture.png"/>
+   <span>This is a screen cast application implemented using the hylarana SDK.</span>
 </div>
 <div align="center">
-  <span>examples:</span>
-  <a href="./examples/rust">rust</a>
-  <span>/</span>
-  <a href="./examples/Android">kotlin</a>
-</div>
-<div align="center">
-  <span>watch the demo on youtube:</span>
+  <span>Watch it in action on YouTube:</span>
   <a href="https://youtu.be/AkW3eRlKl1U">link</a>
 </div>
 <br/>
-<br/>
 
----
+## Introduction
 
 Unlike implementations such as Miracast, AirPlay, etc. that rely on hardware support (WIFI Direct), this library works on most common hardware.
 
@@ -42,7 +34,9 @@ The project is cross-platform, but the prioritized supported platforms are Windo
 
 Unlike traditional screen casting implementations, this project can work in forwarding mode, in which it can support casting to hundreds or thousands of devices at the same time, which can be useful in some specific scenarios (e.g., all advertising screens in a building).
 
-## How was this achieved?
+At the heart of hylarana is an SDK that provides rust crate on desktop and a kotlin implementation on android. And, this project uses the hylarana SDK and Electron to create a screen casting application that supports Macos and Windows. So, hylarana is not a mere application project, the main core is the SDK and the development is focused around the SDK.
+
+## Technical overview
 
 The first is screen capture, this part of each platform independently separate implementation, but all use hardware accelerated texture, Android use virtual display, Windows use WGC, and Macos use screenshencapturekit.
 
@@ -51,6 +45,20 @@ In terms of audio and video codecs, H264 is used for video and Opus is used for 
 Both SRT and UDP multicast schemes are used for the transport layer of the data. The audio and video data transmitted by the transport layer are bare streams and do not contain similar encapsulations such as FLV. For SRT, many parameters have been adjusted in detail to suit the LAN environment, so that when using the SRT transport layer, the delay can be controlled at about 20-40 ms. The UDP multicast scheme has only a receive buffer and no transmit buffer, and the fixed maximum delay of UDP multicast is 40 ms, which is used to sort and wait for packets in the buffer.
 
 The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is a cross-platform graphics interface wrapper library, but WebGPU can't work on some old devices on Windows, because WebGPU needs at least Direct3D12 support, so Direct3D11 is provided on Windows. Similarly, the graphics implementations for Windows, Android, Macos are all fully hardware accelerated. In general, the capture, encoding, decoding and display of a video frame is performed inside the GPU, and the scaling and formatting of video frames on Windows is also fully hardware accelerated. For Macos and Android the situation is somewhat less so, except for YUV textures which are not available hardware accelerated, otherwise in line with Windows, they are fully hardware accelerated.
+
+## Project structure
+
+* [app](./app) - Applications implemented using Electron and React.
+* [capture](./capture) - Cross-platform screen/audio capture implementation, but no Linux support.
+* [codec](./codec) - Codec implementation that handles H264 and Opus.
+* [common](./common) - The public section, which contains public types, runtime, atomic operations, strings, logging, platform API wrappers, and more.
+* [discovery](./discovery) - LAN discovery implementation using MDNS.
+* [hylarana](./hylarana) - Rust crate, the core SDK implementation used on desktop systems.
+* [renderer](./renderer) - Cross-platform graphics renderer responsible for rendering video frames to the window.
+* [resample](./resample) - Resampling module, responsible for resampling audio, as well as scaling and converting texture formats using D3D11.
+* [sdk](./sdk) - The SDK provided for Android use is a Native Module implemented using Kotlin.
+* [server](./server) - An implementation of a forwarding server, which is required when using forwarding mode.
+* [transport](./transport) - The unified transport layer, which internally uses SRT and UDP multicast, provides multiple modes of operation.
 
 ## Build Instructions
 
@@ -85,11 +93,20 @@ brew install cmake ffmpeg@7
 Examples and SDK library files can be automatically packaged by running an automatic compilation script.
 
 ```sh
-npm run build:release
+yarn build:release
 ```
 
-The Release version is compiled by default. If you need the Debug version, just run `npm run build:debug`.  
+The Release version is compiled by default. If you need the Debug version, just run `yarn build:debug`.  
 For Android, there is no need to manually call compilation. You can directly use Android Studio to open [Android](./examples/Android).
+
+##### Build Application
+
+```sh
+cp app
+yarn build
+```
+
+The build product is under the `app/out` directory, which provides the installer and the directory after unfolding.
 
 ## License
 
