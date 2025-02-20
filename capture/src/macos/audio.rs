@@ -7,7 +7,10 @@ use thiserror::Error;
 use common::{atomic::EasyAtomic, frame::AudioFrame};
 use core_foundation::error::CFError;
 use parking_lot::Mutex;
-use resample::{AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription, AudioSampleFormat};
+use resample::{
+    AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription,
+    AudioSampleFormat,
+};
 use screencapturekit::{
     output::CMSampleBuffer,
     shareable_content::SCShareableContent,
@@ -85,7 +88,7 @@ impl CaptureHandler for AudioCapture {
                         frame: {
                             let mut frame = AudioFrame::default();
                             frame.sample_rate = options.sample_rate;
-    
+
                             frame
                         },
                     },

@@ -184,8 +184,8 @@ class HylaranaBackgroundService : Service() {
             Discovery()
                 .query(
                     object : DiscoveryServiceQueryObserver() {
-                        override fun resolve(addrs: Array<String>, description: MediaStreamDescription) {
-                            if (receiver == null) {
+                        override fun resolve(name: String, addrs: Array<String>, description: MediaStreamDescription) {
+                            if (receiver == null && name == "sender") {
                                 if (description.transport.strategy.type == HylaranaStrategyType.DIRECT) {
                                     description.transport.strategy.addr =
                                         addrs[0] + ":" + description.transport.strategy.addr.split(":")[1]
@@ -298,6 +298,7 @@ class HylaranaBackgroundService : Service() {
                 Discovery()
                     .register(
                         3456,
+                        "sender",
                         sender!!.getDescription()
                     )
             }

@@ -1,10 +1,14 @@
 <!--lint disable no-literal-urls-->
 <div align="center">
+   <img src="./logo.png" width="50px"/>
+   <br>
+   <br>
+   <br>
    <h1>Hylarana</h1>
 </div>
 <br/>
 <div align="center">
-  <strong>A cross-platform screen casting library implemented by rust.</strong>
+  <strong>A cross-platform screen cast implemented by Rust.</strong>
 </div>
 <div align="center">
   <img src="https://img.shields.io/github/actions/workflow/status/mycrl/hylarana/release.yml"/>
@@ -40,7 +44,7 @@ Unlike traditional screen casting implementations, this project can work in forw
 
 ## How was this achieved?
 
-The first is screen capture, this part of each platform independently separate implementation, but all use hardware accelerated texture, Android use virtual display, Windows use WGC, and Macos use screencapturekit.
+The first is screen capture, this part of each platform independently separate implementation, but all use hardware accelerated texture, Android use virtual display, Windows use WGC, and Macos use screenshencapturekit.
 
 In terms of audio and video codecs, H264 is used for video and Opus is used for audio. Similarly, Windows, Android and Macos all provide hardware accelerated codecs, and the current hardware codecs on Windows are adapted to Qsv and D3D11VA, Android is adapted to Qualcomm, Kirin, and RK series of socs, while Macos uses the Video Toolbox.
 

@@ -1,17 +1,19 @@
 use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameArrived, Source, SourceType};
 
+use std::sync::LazyLock;
+
 use common::frame::AudioFrame;
 use cpal::{traits::*, Host, Stream, StreamConfig};
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use resample::{
     AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription,
     AudioSampleFormat,
 };
+
 use thiserror::Error;
 
 // Just use a default audio port globally.
-static HOST: Lazy<Host> = Lazy::new(|| cpal::default_host());
+static HOST: LazyLock<Host> = LazyLock::new(|| cpal::default_host());
 
 #[derive(Error, Debug)]
 pub enum AudioCaptureError {

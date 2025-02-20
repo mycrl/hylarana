@@ -5,8 +5,8 @@
     "main": "build.js",
     "private": true,
     "scripts": {
-        "build:debug": "node --no-deprecation ./build.js",
-        "build:release": "node --no-deprecation ./build.js -- --release",
+        "build:debug": "node ./build.js",
+        "build:release": "node ./build.js -- --release",
         "fmt": "cargo +nightly fmt"
     },
     "repository": {
@@ -18,5 +18,9 @@
     "bugs": {
         "url": "https://github.com/mycrl/hylarana/issues"
     },
-    "homepage": "https://github.com/mycrl/hylarana#readme"
+    "homepage": "https://github.com/mycrl/hylarana#readme",
+    "workspaces": [
+        "app/ui",
+        "app"
+    ]
 }

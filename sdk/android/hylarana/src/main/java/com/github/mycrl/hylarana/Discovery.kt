@@ -9,7 +9,7 @@ abstract class DiscoveryServiceQueryObserver {
     /**
      * The query service has yielded results.
      */
-    abstract fun resolve(addrs: Array<String>, description: MediaStreamDescription)
+    abstract fun resolve(name: String, addrs: Array<String>, description: MediaStreamDescription)
 }
 
 abstract class DiscoveryServiceQueryRawObserver {
@@ -17,7 +17,7 @@ abstract class DiscoveryServiceQueryRawObserver {
     /**
      * The query service has yielded results.
      */
-    abstract fun resolve(addrs: String, description: String)
+    abstract fun resolve(name: String, addrs: String, description: String)
 }
 
 class DiscoveryService(private val releaseHandle: () -> Unit) {
@@ -46,8 +46,8 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    fun register(port: Int, description: MediaStreamDescription): DiscoveryService {
-        val discovery = registerDiscoveryService(port, Json.encodeToString(description))
+    fun register(port: Int, name: String, description: MediaStreamDescription): DiscoveryService {
+        val discovery = registerDiscoveryService(port, name, Json.encodeToString(description))
         if (discovery == 0L) {
             throw Exception("failed to register discovery service")
         }
@@ -64,8 +64,8 @@ class Discovery {
      */
     fun query(observer: DiscoveryServiceQueryObserver): DiscoveryService {
         val discovery = queryDiscoveryService(object : DiscoveryServiceQueryRawObserver() {
-            override fun resolve(addrs: String, description: String) {
-                observer.resolve(Json.decodeFromString(addrs), Json.decodeFromString(description))
+            override fun resolve(name: String, addrs: String, description: String) {
+                observer.resolve(name, Json.decodeFromString(addrs), Json.decodeFromString(description))
             }
         })
         if (discovery == 0L) {
@@ -83,7 +83,7 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    private external fun registerDiscoveryService(port: Int, description: String): Long
+    private external fun registerDiscoveryService(port: Int, name: String, description: String): Long
 
     /**
      * Query the registered service, the service type is fixed, when the query

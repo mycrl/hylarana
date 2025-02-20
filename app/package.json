@@ -1,0 +1,75 @@
+{
+    "name": "hylarana-app",
+    "version": "0.0.1",
+    "description": "Hylarana - cross platform screencast",
+    "main": "index.js",
+    "scripts": {
+        "prebuild": "node ./build.js",
+        "build": "tsc && electron-builder",
+        "dev": "tsc && electron ./",
+        "predev": "cargo build --package hylarana-app-core"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/mycrl/hylarana.git"
+    },
+    "author": "mycrl (lepidodendraceae@gmail.com)",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/mycrl/hylarana/issues"
+    },
+    "homepage": "https://github.com/mycrl/hylarana#readme",
+    "dependencies": {
+        "@faker-js/faker": "9.4.0",
+        "dotenv": "16.4.7"
+    },
+    "devDependencies": {
+        "electron": "34.2.0",
+        "electron-builder": "^25.1.8",
+        "typescript": "5.7.3"
+    },
+    "build": {
+        "appId": "com.github.mycrl.hylarana",
+        "icon": "assets/icon.png",
+        "productName": "Hylarana",
+        "directories": {
+            "output": "out"
+        },
+        "files": [
+            "dist",
+            "assets",
+            "index.js",
+            "package.json",
+            "preload.js",
+            "ui/dist"
+        ],
+        "win": {
+            "extraFiles": [
+                {
+                    "from": "../target/release/hylarana-app-core.exe",
+                    "to": "hylarana-app-core.exe"
+                },
+                {
+                    "from": "../target/release/avcodec-61.dll",
+                    "to": "avcodec-61.dll"
+                },
+                {
+                    "from": "../target/release/avutil-59.dll",
+                    "to": "avutil-59.dll"
+                },
+                {
+                    "from": "../target/release/swresample-5.dll",
+                    "to": "swresample-5.dll"
+                }
+            ]
+        },
+        "mac": {
+            "extraFiles": [
+                {
+                    "from": "../target/release/hylarana-app-core",
+                    "to": "hylarana-app-core"
+                }
+            ]
+        }
+    }
+}
