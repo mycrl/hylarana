@@ -33,7 +33,7 @@
         "icon": "assets/icon.png",
         "productName": "Hylarana",
         "directories": {
-            "output": "out"
+            "output": "../target/app"
         },
         "files": [
             "dist",
