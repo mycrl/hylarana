@@ -90,24 +90,13 @@ brew install cmake ffmpeg@7
 
 #### Build
 
-Examples and SDK library files can be automatically packaged by running an automatic compilation script.
-
-```sh
-yarn build:release
-```
-
-The Release version is compiled by default. If you need the Debug version, just run `yarn build:debug`.  
-For Android, there is no need to manually call compilation. You can directly use Android Studio to open [Android](./examples/Android).
-
-##### Build Application
-
 ```sh
 yarn
 cp app
 yarn build
 ```
 
-The build product is under the `app/out` directory, which provides the installer and the directory after unfolding.
+The build product is under the `target/app` directory, which provides the installer and the directory after unfolding.
 
 ## License
 
