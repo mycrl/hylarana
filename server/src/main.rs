@@ -13,8 +13,8 @@ use transport::{
     shutdown, startup, StreamInfo, StreamInfoKind, TransmissionOptions, TransmissionServer,
 };
 
-// #[global_allocator]
-// static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Parser, Clone, Debug)]
 #[command(

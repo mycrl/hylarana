@@ -1,101 +1,82 @@
 name: publish release
 on:
-  push:
-    tags:
-      - v*
+    push:
+        tags:
+            - v*
 jobs:
-  build:
-    runs-on: "${{ matrix.os }}"
-    strategy:
-      matrix:
-        os:
-          - windows-latest
-          - macos-latest
-          - ubuntu-latest
-        target:
-          - debug
-          - release
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            node_modules/
-            target/
-          key: "${{ matrix.os }}-cargo-${{ matrix.target }}"
+    build:
+        runs-on: "${{ matrix.os }}"
+        strategy:
+            matrix:
+                os:
+                    - windows-latest
+                    - macos-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/bin/
+                      ~/.cargo/registry/index/
+                      ~/.cargo/registry/cache/
+                      ~/.cargo/git/db/
+                      node_modules/
+                      target/
+                  key: "${{ matrix.os }}-cargo"
 
-      # installation of dependencies
-      - name: Installation of dependencies
-        if: runner.os == 'Macos'
-        run: brew install ffmpeg@7 cmake
+            # installation of dependencies
+            - name: Installation of dependencies
+              if: runner.os == 'Macos'
+              run: brew install ffmpeg@7 cmake
 
-      - name: Installation of dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install tclsh pkg-config cmake libssl-dev build-essential libasound2-dev libsdl2-dev libva-dev v4l-utils -y
+            # use auto build script
+            - name: Build application
+              run: |
+                  npm i yarn -g
+                  yarn
+                  cd app
+                  yarn build
 
-      # use auto build script
-      - name: Build distributions
-        run: |
-          npm i
-          npm run build:${{ matrix.target }}
+            # compress shared libraries
+            - name: Compress distributions (Windows)
+              if: runner.os == 'Windows'
+              run: Compress-Archive -Path ./build -DestinationPath ./hylarana-windows-x64.zip
 
-      # compress shared libraries
-      - name: Compress distributions (Windows)
-        if: runner.os == 'Windows'
-        run: Compress-Archive -Path ./build -DestinationPath ./windows-x64-${{ matrix.target }}.zip
+            - name: Compress distributions (Macos)
+              if: runner.os == 'Macos'
+              run: tar -czvf hylarana-macos-arm64.tar.gz -C ./build .
 
-      - name: Compress distributions (Macos)
-        if: runner.os == 'Macos'
-        run: tar -czvf macos-arm64-${{ matrix.target }}.tar.gz -C ./build .
+            # upload to artifact
+            - name: Upload artifact (Windows)
+              if: runner.os == 'Windows'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: hylarana-windows-x64
+                  path: ./hylarana-windows-x64.zip
 
-      - name: Compress distributions (Linux)
-        if: runner.os == 'Linux'
-        run: tar -czvf linux-x64-${{ matrix.target }}-gnu.tar.gz -C ./build .
+            - name: Upload artifact (Macos)
+              if: runner.os == 'Macos'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: hylarana-macos-arm64
+                  path: ./hylarana-macos-arm64.tar.gz
 
-      # upload to artifact
-      - name: Upload artifact (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-x64-${{ matrix.target }}
-          path: ./windows-x64-${{ matrix.target }}.zip
-
-      - name: Upload artifact (Macos)
-        if: runner.os == 'Macos'
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-arm64-${{ matrix.target }}
-          path: ./macos-arm64-${{ matrix.target }}.tar.gz
-
-      - name: Upload artifact (Linux)
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-x64-${{ matrix.target }}
-          path: ./linux-x64-${{ matrix.target }}-gnu.tar.gz
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Create release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          files: artifacts/**/*
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Download All Artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+            - name: Create release
+              id: create_release
+              uses: softprops/action-gh-release@v1
+              env:
+                  GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  name: ${{ github.ref_name }}
+                  draft: false
+                  prerelease: false
+                  files: artifacts/**/*

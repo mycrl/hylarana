@@ -1,6 +1,6 @@
 [package]
 name = "hylarana-common"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
@@ -8,15 +8,17 @@ readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
-thiserror = "1.0.56"
-log = "0.4.20"
-serde_repr = "0.1"
-serde = { version = "1", features = ["derive"] }
-fern = { version = "0.6.2", features = ["date-based", "colored", "syslog-6"] }
-chrono = { version = "0.4", features = ["clock", "alloc"] }
+thiserror.workspace = true
+log.workspace = true
+serde_repr.workspace = true
+serde.workspace = true
+parking_lot.workspace = true
+fern = { workspace = true, features = ["date-based", "colored", "syslog-6"] }
+chrono = { workspace = true, features = ["clock", "alloc"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.58.0"
+workspace = true
 features = [
     "Win32",
     "Win32_UI",
@@ -37,9 +39,12 @@ features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-media = { version = "0.3.0", package = "objc2-core-media" }
-core-video = { version = "0.3.0", package = "objc2-core-video" }
 core-foundation = { version = "0.3.0", package = "objc2-core-foundation" }
-core-metal = { version = "0.3.0",  package = "objc2-metal" }
-core-audo-types = { version = "0.3.0", package = "objc2-core-audio-types"}
-objc2 = "0.6.0"
-metal = "0.29"
+core-audo-types.workspace = true
+core-video.workspace = true
+core-metal.workspace = true
+objc2.workspace = true
+metal.workspace = true
+
+[features]
+serde = []

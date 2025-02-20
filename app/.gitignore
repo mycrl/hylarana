@@ -1,0 +1,6 @@
+/dist
+package-lock.json
+*.env
+
+out/
+resources/

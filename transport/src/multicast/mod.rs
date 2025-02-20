@@ -7,18 +7,15 @@ use std::{
 };
 
 use bytes::Bytes;
+use common::runtime::get_runtime_handle;
 use crossbeam::channel::{bounded, Receiver};
 use fragments::FragmentEncoder;
-use once_cell::sync::Lazy;
-use tokio::{runtime::Runtime, sync::mpsc::unbounded_channel};
+use tokio::sync::mpsc::{channel, Sender};
 
 use self::{
     dequeue::Dequeue,
     fragments::{Fragment, FragmentDecoder},
 };
-
-static RUNTIME: Lazy<Runtime> =
-    Lazy::new(|| Runtime::new().expect("failed to create tokio runtime, this is a bug"));
 
 /// A UDP socket.
 ///
@@ -37,7 +34,7 @@ static RUNTIME: Lazy<Runtime> =
 /// multicast packets.
 pub struct Socket {
     rx: Receiver<(u64, Bytes)>,
-    close_signal: tokio::sync::mpsc::UnboundedSender<()>,
+    signal: Sender<()>,
 }
 
 unsafe impl Send for Socket {}
@@ -53,7 +50,7 @@ impl Socket {
     pub fn new(multicast: Ipv4Addr, bind: SocketAddr, delay: usize) -> Result<Self, Error> {
         assert!(bind.is_ipv4());
 
-        RUNTIME.block_on(Self::create(multicast, bind, delay))
+        get_runtime_handle().block_on(Self::create(multicast, bind, delay))
     }
 
     /// Reads packets sent from the multicast server.
@@ -67,7 +64,7 @@ impl Socket {
     }
 
     pub fn close(&self) {
-        let _ = self.close_signal.send(());
+        let _ = self.signal.send(());
     }
 
     async fn create(multicast: Ipv4Addr, bind: SocketAddr, delay: usize) -> Result<Self, Error> {
@@ -81,7 +78,7 @@ impl Socket {
             socket.set_broadcast(true)?;
         }
 
-        let (close_signal, mut closed) = unbounded_channel();
+        let (signal, mut closed) = channel(1);
         let (tx, rx) = bounded(5);
 
         tokio::spawn(async move {
@@ -108,7 +105,7 @@ impl Socket {
                             }
                         }
                     }
-                    Some(_) = closed.recv() => {
+                    _ = closed.recv() => {
                         break
                     }
                     else => break
@@ -116,7 +113,7 @@ impl Socket {
             }
         });
 
-        Ok(Self { close_signal, rx })
+        Ok(Self { signal, rx })
     }
 }
 

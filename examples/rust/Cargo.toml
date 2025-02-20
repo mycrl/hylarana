@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.82"
-clap = { version = "4.5.19", features = ["derive"] }
-log = "0.4.20"
-hylarana = { path = "../../hylarana" }
-winit = "0.30.5"
-simple_logger = "5"
+anyhow.workspace = true
+clap.workspace = true
+winit.workspace = true
+log.workspace = true
+simple_logger.workspace = true
+hylarana = { workspace = true, features = ["serde"] }

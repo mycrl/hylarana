@@ -8,14 +8,12 @@ readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
-log = "0.4"
-thiserror = "2.0"
-common = { path = "../common", version = "0.3.0", package = "hylarana-common" }
+log.workspace = true
+thiserror.workspace = true
+common.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies.ffmpeg]
-package = "hylarana-ffmpeg-sys"
-default-features = false
-version = "0.1"
+workspace = true
 features = [
     "avcodec",
     "avdevice",
@@ -24,9 +22,7 @@ features = [
 ]
 
 [target.'cfg(not(target_os = "windows"))'.dependencies.ffmpeg]
-package = "hylarana-ffmpeg-sys"
-default-features = false
-version = "0.1"
+workspace = true
 features = [
     "avcodec",
     "avdevice",

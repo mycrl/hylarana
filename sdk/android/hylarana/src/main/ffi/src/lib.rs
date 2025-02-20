@@ -2,21 +2,17 @@ mod discovery;
 mod receiver;
 mod sender;
 
-use std::{
-    cell::RefCell,
-    ffi::c_void,
-    ptr::null_mut,
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::{cell::RefCell, ffi::c_void, ptr::null_mut, sync::Arc, thread};
 
 use anyhow::Result;
-use common::{logger, MediaStreamDescription};
+use common::logger;
 use jni::{
     objects::{JByteArray, JClass, JObject, JString},
-    sys::{jint, JNI_VERSION_1_6},
+    sys::JNI_VERSION_1_6,
     JNIEnv, JavaVM,
 };
+
+use parking_lot::Mutex;
 
 use self::{
     discovery::{DiscoveryService, DiscoveryServiceObserver},
@@ -47,7 +43,7 @@ pub(crate) fn get_current_env<'local>() -> JNIEnv<'local> {
             ENV.with(|cell| {
                 let mut env = cell.borrow_mut();
                 if env.is_none() {
-                    let vm = JVM.lock().unwrap();
+                    let vm = JVM.lock();
                     env.replace(
                         vm.as_ref()
                             .unwrap()
@@ -99,7 +95,7 @@ pub(crate) fn get_current_env<'local>() -> JNIEnv<'local> {
 extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> i32 {
     logger::init_with_android("com.github.mycrl.hylarana", log::LevelFilter::Info);
     transport::startup();
-    JVM.lock().unwrap().replace(vm);
+    JVM.lock().replace(vm);
 
     JNI_VERSION_1_6
 }
@@ -326,15 +322,15 @@ extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportRecei
 extern "system" fn Java_com_github_mycrl_hylarana_Discovery_registerDiscoveryService(
     mut env: JNIEnv,
     _this: JClass,
-    port: jint,
+    name: JString,
     description: JString,
 ) -> *const DiscoveryService {
     ok_or_check(&mut env, |env| {
+        let name: String = env.get_string(&name)?.into();
         let description: String = env.get_string(&description)?.into();
-        let description: MediaStreamDescription = serde_json::from_str(&description)?;
 
         Ok(Box::into_raw(Box::new(DiscoveryService::register(
-            port as u16,
+            &name,
             &description,
         )?)))
     })
@@ -354,13 +350,7 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_queryDiscoveryServic
     ok_or_check(&mut env, |env| {
         let observer = DiscoveryServiceObserver(env.new_global_ref(observer)?);
 
-        Ok(Box::into_raw(Box::new(DiscoveryService::query(
-            move |addrs, description: MediaStreamDescription| {
-                if let Err(e) = observer.resolve(&addrs, &description) {
-                    log::warn!("{:?}", e);
-                }
-            },
-        )?)))
+        Ok(Box::into_raw(Box::new(DiscoveryService::query(observer)?)))
     })
     .unwrap_or_else(|| null_mut())
 }
