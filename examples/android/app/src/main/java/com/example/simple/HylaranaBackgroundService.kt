@@ -297,7 +297,6 @@ class HylaranaBackgroundService : Service() {
             strategy?.let {
                 Discovery()
                     .register(
-                        3456,
                         "sender",
                         sender!!.getDescription()
                     )

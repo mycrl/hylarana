@@ -59,13 +59,13 @@ mdns-sd = "0.13"
 uuid = { version = "1.11", features = ["v4"] }
 simple_logger = "5"
 bytes = "1.5"
-transport = { path = "transport", version = "0.3.0", package = "hylarana-transport" }
-renderer = { path = "renderer", version = "0.3.0", package = "hylarana-renderer" }
+transport = { path = "transport", version = "0.3.1", package = "hylarana-transport" }
+renderer = { path = "renderer", version = "0.3.1", package = "hylarana-renderer" }
 discovery = { path = "discovery", version = "0.3.1", package = "hylarana-discovery" }
-capture = { path = "capture", version = "0.3.0", package = "hylarana-capture" }
-codec = { path = "codec", version = "0.3.0", package = "hylarana-codec" }
-resample = { path = "resample", version = "0.3.0", package = "hylarana-resample" }
-common = { path = "common", package = "hylarana-common" }
+capture = { path = "capture", version = "0.3.1", package = "hylarana-capture" }
+codec = { path = "codec", version = "0.3.1", package = "hylarana-codec" }
+resample = { path = "resample", version = "0.3.1", package = "hylarana-resample" }
+common = { path = "common", version = "0.3.1", package = "hylarana-common" }
 hylarana = { path = "hylarana", version = "0.4.0" }
 rodio = { version = "0.19", default-features = false }
 pollster = "0.3"

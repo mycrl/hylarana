@@ -107,13 +107,13 @@ impl CodecType {
     pub unsafe fn find_av_codec(&self) -> *const AVCodec {
         match self {
             Self::Encoder(kind) => {
-                avcodec_find_encoder_by_name(PSTR::from(kind.to_string()).as_ptr())
+                unsafe { avcodec_find_encoder_by_name(PSTR::from(kind.to_string()).as_ptr()) }
             }
             Self::Decoder(kind) => {
                 if *kind == VideoDecoderType::D3D11 || *kind == VideoDecoderType::VideoToolBox {
-                    avcodec_find_decoder(AVCodecID::AV_CODEC_ID_H264)
+                    unsafe { avcodec_find_decoder(AVCodecID::AV_CODEC_ID_H264) }
                 } else {
-                    avcodec_find_decoder_by_name(PSTR::from(kind.to_string()).as_ptr())
+                    unsafe { avcodec_find_decoder_by_name(PSTR::from(kind.to_string()).as_ptr()) }
                 }
             }
         }

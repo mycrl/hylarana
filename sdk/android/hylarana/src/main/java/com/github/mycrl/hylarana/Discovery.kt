@@ -46,8 +46,8 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    fun register(port: Int, name: String, description: MediaStreamDescription): DiscoveryService {
-        val discovery = registerDiscoveryService(port, name, Json.encodeToString(description))
+    fun register(name: String, description: MediaStreamDescription): DiscoveryService {
+        val discovery = registerDiscoveryService(name, Json.encodeToString(description))
         if (discovery == 0L) {
             throw Exception("failed to register discovery service")
         }
@@ -83,7 +83,7 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    private external fun registerDiscoveryService(port: Int, name: String, description: String): Long
+    private external fun registerDiscoveryService(name: String, description: String): Long
 
     /**
      * Query the registered service, the service type is fixed, when the query

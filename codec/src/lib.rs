@@ -54,7 +54,7 @@ type va_list = *mut __va_list_tag;
 #[allow(non_camel_case_types)]
 type va_list = [u64; 4];
 
-extern "C" {
+unsafe extern "C" {
     // Write formatted data from variable argument list to sized buffer
     // Composes a string with the same text that would be printed if format was used
     // on printf, but using the elements in the variable argument list identified by
@@ -85,9 +85,9 @@ unsafe extern "C" fn logger_proc(
     args: va_list,
 ) {
     let mut chars: [c_char; 1024] = [0; 1024];
-    vsnprintf(chars.as_mut_ptr(), 2048, message, args);
+    unsafe { vsnprintf(chars.as_mut_ptr(), 2048, message, args) };
 
-    let level: LoggerLevel = std::mem::transmute(level);
+    let level: LoggerLevel = unsafe { std::mem::transmute(level) } ;
     if let Ok(message) = PSTR::from(chars.as_ptr()).to_string() {
         log::log!(
             target: "ffmpeg",

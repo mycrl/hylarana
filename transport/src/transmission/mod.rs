@@ -287,7 +287,7 @@ pub struct SRT_TRACEBSTATS {
     pub byte_recv_unique: u64,
 }
 
-extern "C" {
+unsafe extern "C" {
     pub(crate) fn srt_getlasterror_str() -> *const c_char;
     /// By default logs are printed to standard error stream. This function
     /// replaces the sending to a stream with a handler function that will

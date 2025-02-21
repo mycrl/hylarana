@@ -1,16 +1,19 @@
 [package]
 name = "hylarana-discovery"
 version = "0.3.1"
-edition = "2021"
+edition = "2024"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
 readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
+bytes.workspace = true
 thiserror.workspace = true
 mdns-sd.workspace = true
 log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
+common.workspace = true
+tokio = { workspace = true, features = ["net", "sync", "io-util", "macros", "time"]}
