@@ -10,12 +10,12 @@ use std::{
 use bytes::BytesMut;
 use common::runtime::get_runtime_handle;
 use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent, ServiceInfo};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{Sender, channel},
     time::{self, timeout},
 };
 use uuid::Uuid;

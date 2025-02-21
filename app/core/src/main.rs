@@ -7,22 +7,22 @@ use self::{
 };
 
 use std::{
-    io::{stderr, Stderr, Write},
+    io::{Stderr, Write, stderr},
     net::Ipv4Addr,
     sync::{
-        mpsc::{channel, Sender},
         Arc,
+        mpsc::{Sender, channel},
     },
     thread,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use common::{MediaStreamDescription, Size};
 use hylarana::{
-    create_receiver, create_sender, shutdown, startup, AVFrameStreamPlayer,
-    AVFrameStreamPlayerOptions, Capture, HylaranaReceiver, HylaranaReceiverOptions, HylaranaSender,
-    HylaranaSenderOptions, MediaStreamObserver, VideoDecoderType, VideoRenderBackend,
-    VideoRenderOptionsBuilder, VideoRenderSurfaceOptions,
+    AVFrameStreamPlayer, AVFrameStreamPlayerOptions, Capture, HylaranaReceiver,
+    HylaranaReceiverOptions, HylaranaSender, HylaranaSenderOptions, MediaStreamObserver,
+    VideoDecoderType, VideoRenderBackend, VideoRenderOptionsBuilder, VideoRenderSurfaceOptions,
+    create_receiver, create_sender, shutdown, startup,
 };
 
 use parking_lot::RwLock;

@@ -3,7 +3,7 @@ use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameArrived, Source,
 use std::sync::LazyLock;
 
 use common::frame::AudioFrame;
-use cpal::{traits::*, Host, Stream, StreamConfig};
+use cpal::{Host, Stream, StreamConfig, traits::*};
 use parking_lot::Mutex;
 use resample::{
     AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription,

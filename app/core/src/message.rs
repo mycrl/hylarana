@@ -1,17 +1,17 @@
 use std::{
     collections::HashMap,
-    io::{stdin, stdout, BufRead, Stdin, Stdout, Write},
+    io::{BufRead, Stdin, Stdout, Write, stdin, stdout},
     str,
     sync::{
-        mpsc::{channel, Sender},
         Arc,
+        mpsc::{Sender, channel},
     },
     thread,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use parking_lot::RwLock;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 pub trait MessageTransport: Send + Sync {

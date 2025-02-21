@@ -10,7 +10,7 @@ use anyhow::Result;
 use clap::Parser;
 use parking_lot::RwLock;
 use transport::{
-    shutdown, startup, StreamInfo, StreamInfoKind, TransmissionOptions, TransmissionServer,
+    StreamInfo, StreamInfoKind, TransmissionOptions, TransmissionServer, shutdown, startup,
 };
 
 #[global_allocator]

@@ -1,7 +1,7 @@
 use crate::{MediaStreamDescription, MediaStreamObserver, MediaStreamSink};
 
 use std::{
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
 };
 

@@ -1,30 +1,30 @@
 use crate::{CaptureHandler, FrameArrived, Source, SourceType, VideoCaptureSourceDescription};
 
 use std::{
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
     time::Duration,
 };
 
 use common::{
+    Size,
     atomic::EasyAtomic,
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
     win32::{EasyTexture, MediaThreadClass},
-    Size,
 };
 
 use parking_lot::Mutex;
 use resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
 use thiserror::Error;
 use windows::{
-    core::Interface,
     Win32::Graphics::{
         Direct3D11::{
-            ID3D11DeviceContext, ID3D11Texture2D, D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC,
-            D3D11_USAGE_DEFAULT,
+            D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+            ID3D11DeviceContext, ID3D11Texture2D,
         },
         Dxgi::Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC},
     },
+    core::Interface,
 };
 
 use windows_capture::{

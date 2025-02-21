@@ -11,21 +11,21 @@ pub use self::generator::{
 };
 
 use common::{
-    frame::{VideoFormat, VideoSubFormat},
     Size,
+    frame::{VideoFormat, VideoSubFormat},
 };
 use generator::{Generator, GeneratorOptions};
 use pollster::FutureExt;
 use thiserror::Error;
 use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
     Backends, Buffer, BufferUsages, Color, CommandEncoderDescriptor, CompositeAlphaMode, Device,
     DeviceDescriptor, IndexFormat, Instance, InstanceDescriptor, LoadOp, MemoryHints, Operations,
     PowerPreference, PresentMode, Queue, RenderPassColorAttachment, RenderPassDescriptor,
     RequestAdapterOptions, StoreOp, Surface, TextureFormat, TextureUsages, TextureViewDescriptor,
+    util::{BufferInitDescriptor, DeviceExt},
 };
 
-pub use wgpu::{rwh as raw_window_handle, SurfaceTarget};
+pub use wgpu::{SurfaceTarget, rwh as raw_window_handle};
 
 #[derive(Debug, Error)]
 pub enum GraphicsError {
@@ -225,18 +225,18 @@ pub mod win32 {
     use common::{
         frame::VideoFormat,
         win32::{
+            Direct3DDevice,
             windows::Win32::{
                 Foundation::HWND,
                 Graphics::{
-                    Direct3D11::{ID3D11RenderTargetView, ID3D11Texture2D, D3D11_VIEWPORT},
+                    Direct3D11::{D3D11_VIEWPORT, ID3D11RenderTargetView, ID3D11Texture2D},
                     Dxgi::{
-                        Common::DXGI_FORMAT_R8G8B8A8_UNORM, CreateDXGIFactory, IDXGIFactory,
-                        IDXGISwapChain, DXGI_PRESENT, DXGI_SWAP_CHAIN_DESC,
-                        DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                        Common::DXGI_FORMAT_R8G8B8A8_UNORM, CreateDXGIFactory, DXGI_PRESENT,
+                        DXGI_SWAP_CHAIN_DESC, DXGI_USAGE_RENDER_TARGET_OUTPUT, IDXGIFactory,
+                        IDXGISwapChain,
                     },
                 },
             },
-            Direct3DDevice,
         },
     };
 

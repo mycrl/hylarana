@@ -2,11 +2,11 @@ use std::{ffi::c_int, io::Error, net::SocketAddr};
 
 use os_socketaddr::OsSocketAddr;
 
-use super::{srt_getsockstate, SRT_SOCKSTATUS};
+use super::{SRT_SOCKSTATUS, srt_getsockstate};
 
 use super::{
-    error, options::Options, socket::Socket, srt_accept, srt_bind, srt_bstats, srt_close,
-    srt_create_socket, srt_getsockname, srt_listen, TraceStats, SRTSOCKET, SRT_INVALID_SOCK,
+    SRT_INVALID_SOCK, SRTSOCKET, TraceStats, error, options::Options, socket::Socket, srt_accept,
+    srt_bind, srt_bstats, srt_close, srt_create_socket, srt_getsockname, srt_listen,
 };
 
 pub struct Server {

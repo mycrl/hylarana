@@ -5,7 +5,7 @@ pub mod bgra {
 
     use std::borrow::Cow;
 
-    use common::{frame::VideoSubFormat, Size};
+    use common::{Size, frame::VideoSubFormat};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -82,7 +82,7 @@ pub mod i420 {
 
     use std::borrow::Cow;
 
-    use common::{frame::VideoSubFormat, Size};
+    use common::{Size, frame::VideoSubFormat};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -223,7 +223,7 @@ pub mod nv12 {
 
     use std::borrow::Cow;
 
-    use common::{frame::VideoSubFormat, Size};
+    use common::{Size, frame::VideoSubFormat};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };
@@ -358,7 +358,7 @@ pub mod rgba {
 
     use std::borrow::Cow;
 
-    use common::{frame::VideoSubFormat, Size};
+    use common::{Size, frame::VideoSubFormat};
     use wgpu::{
         Device, ShaderModuleDescriptor, ShaderSource, Texture, TextureAspect, TextureFormat,
     };

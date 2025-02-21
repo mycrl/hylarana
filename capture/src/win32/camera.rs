@@ -3,7 +3,7 @@ use crate::{CaptureHandler, FrameArrived, Source, SourceType, VideoCaptureSource
 use std::{
     ptr::null_mut,
     slice::from_raw_parts,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
 };
 
@@ -15,18 +15,18 @@ use common::{
 
 use thiserror::Error;
 use windows::{
-    core::Interface,
     Win32::Media::MediaFoundation::{
-        IMF2DBuffer, IMFAttributes, IMFMediaSource, IMFSample, IMFSourceReader, MFCreateAttributes,
-        MFCreateDeviceSource, MFCreateMediaType, MFCreateSourceReaderFromMediaSource,
-        MFEnumDeviceSources, MFMediaType_Video, MFVideoFormat_NV12,
+        IMF2DBuffer, IMFAttributes, IMFMediaSource, IMFSample, IMFSourceReader,
         MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
         MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
         MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, MF_MT_DEFAULT_STRIDE,
         MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
         MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING,
-        MF_SOURCE_READER_FIRST_VIDEO_STREAM,
+        MF_SOURCE_READER_FIRST_VIDEO_STREAM, MFCreateAttributes, MFCreateDeviceSource,
+        MFCreateMediaType, MFCreateSourceReaderFromMediaSource, MFEnumDeviceSources,
+        MFMediaType_Video, MFVideoFormat_NV12,
     },
+    core::Interface,
 };
 
 #[derive(Debug, Error)]

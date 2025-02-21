@@ -8,7 +8,7 @@ use crate::util::get_direct3d;
 
 use std::{
     mem::size_of,
-    sync::{atomic::AtomicBool, Arc, Weak},
+    sync::{Arc, Weak, atomic::AtomicBool},
 };
 
 use bytes::BytesMut;
@@ -18,21 +18,21 @@ use capture::{
 };
 
 use common::{
+    Size, TransportOptions,
     atomic::EasyAtomic,
     codec::VideoEncoderType,
     frame::{AudioFrame, VideoFormat, VideoFrame},
-    Size, TransportOptions,
 };
 
 use codec::{
-    create_opus_identification_header, AudioEncoder, AudioEncoderSettings, CodecType, VideoEncoder,
-    VideoEncoderSettings,
+    AudioEncoder, AudioEncoderSettings, CodecType, VideoEncoder, VideoEncoderSettings,
+    create_opus_identification_header,
 };
 
 use thiserror::Error;
 use transport::{
-    copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
-    TransportSender,
+    BufferFlag, StreamBufferInfo, StreamSenderAdapter, TransportSender,
+    copy_from_slice as package_copy_from_slice,
 };
 
 #[cfg(feature = "serde")]

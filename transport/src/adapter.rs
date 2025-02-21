@@ -2,7 +2,7 @@ use std::{
     fmt,
     sync::{
         atomic::{AtomicBool, AtomicU8},
-        mpsc::{channel, Receiver, Sender},
+        mpsc::{Receiver, Sender, channel},
     },
 };
 

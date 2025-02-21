@@ -3,7 +3,7 @@ mod texture;
 use std::{borrow::Cow, sync::Arc};
 
 use self::texture::{bgra::Bgra, i420::I420, nv12::Nv12, rgba::Rgba};
-use crate::{transform::TransformError, Vertex};
+use crate::{Vertex, transform::TransformError};
 
 #[cfg(target_os = "windows")]
 use crate::transform::direct3d::Transformer;
@@ -12,8 +12,8 @@ use crate::transform::direct3d::Transformer;
 use crate::transform::metal::Transformer;
 
 use common::{
-    frame::{VideoFormat, VideoSubFormat},
     Size,
+    frame::{VideoFormat, VideoSubFormat},
 };
 
 use smallvec::SmallVec;
@@ -23,7 +23,7 @@ use thiserror::Error;
 use common::macos::CVPixelBufferRef;
 
 #[cfg(target_os = "windows")]
-use common::win32::{windows::Win32::Graphics::Direct3D11::ID3D11Texture2D, Direct3DDevice};
+use common::win32::{Direct3DDevice, windows::Win32::Graphics::Direct3D11::ID3D11Texture2D};
 
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,

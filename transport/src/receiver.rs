@@ -8,9 +8,9 @@ use std::{
 use common::{TransportOptions, TransportStrategy};
 
 use crate::{
-    adapter::StreamReceiverAdapterAbstract, MulticastSocket, StreamInfo, StreamInfoKind,
-    StreamMultiReceiverAdapter, StreamReceiverAdapter, TransmissionFragmentDecoder,
-    TransmissionOptions, TransmissionSocket, UnPackage,
+    MulticastSocket, StreamInfo, StreamInfoKind, StreamMultiReceiverAdapter, StreamReceiverAdapter,
+    TransmissionFragmentDecoder, TransmissionOptions, TransmissionSocket, UnPackage,
+    adapter::StreamReceiverAdapterAbstract,
 };
 
 enum Socket {

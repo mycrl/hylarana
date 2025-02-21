@@ -1,7 +1,7 @@
 use std::{slice::from_raw_parts, str::FromStr};
 
 use crate::{
-    sender::HylaranaSenderOptions, HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink,
+    HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink, sender::HylaranaSenderOptions,
 };
 
 #[cfg(target_os = "windows")]
@@ -20,9 +20,9 @@ use renderer::win32::D3D11Renderer;
 use renderer::Texture2DRaw;
 
 use common::{
+    Size,
     codec::{VideoDecoderType, VideoEncoderType},
     frame::{AudioFrame, VideoFormat, VideoFrame, VideoSubFormat},
-    Size,
 };
 
 use renderer::{

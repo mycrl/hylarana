@@ -1,6 +1,6 @@
 use std::{env, fs, path::Path, process::Command};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use which::which;
 
 fn is_exsit(dir: &str) -> bool {

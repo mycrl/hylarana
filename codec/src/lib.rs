@@ -10,8 +10,8 @@ use log::Level;
 
 pub use self::{
     audio::{
-        create_opus_identification_header, AudioDecoder, AudioDecoderError, AudioEncoder,
-        AudioEncoderError, AudioEncoderSettings,
+        AudioDecoder, AudioDecoderError, AudioEncoder, AudioEncoderError, AudioEncoderSettings,
+        create_opus_identification_header,
     },
     codec::{CodecError, CodecType, CreateVideoContextError, CreateVideoFrameError},
     video::{
@@ -87,7 +87,7 @@ unsafe extern "C" fn logger_proc(
     let mut chars: [c_char; 1024] = [0; 1024];
     unsafe { vsnprintf(chars.as_mut_ptr(), 2048, message, args) };
 
-    let level: LoggerLevel = unsafe { std::mem::transmute(level) } ;
+    let level: LoggerLevel = unsafe { std::mem::transmute(level) };
     if let Ok(message) = PSTR::from(chars.as_ptr()).to_string() {
         log::log!(
             target: "ffmpeg",

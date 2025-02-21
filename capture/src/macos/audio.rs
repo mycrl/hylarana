@@ -15,8 +15,8 @@ use screencapturekit::{
     output::CMSampleBuffer,
     shareable_content::SCShareableContent,
     stream::{
-        configuration::SCStreamConfiguration, content_filter::SCContentFilter,
-        output_trait::SCStreamOutputTrait, output_type::SCStreamOutputType, SCStream,
+        SCStream, configuration::SCStreamConfiguration, content_filter::SCContentFilter,
+        output_trait::SCStreamOutputTrait, output_type::SCStreamOutputType,
     },
 };
 

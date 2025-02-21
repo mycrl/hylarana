@@ -44,8 +44,8 @@ pub use self::macos::{
 use common::win32::Direct3DDevice;
 
 use common::{
-    frame::{AudioFrame, VideoFrame},
     Size,
+    frame::{AudioFrame, VideoFrame},
 };
 
 use thiserror::Error;

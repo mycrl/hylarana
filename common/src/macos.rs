@@ -1,30 +1,31 @@
 use std::{
     fmt::Display,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use core_foundation::kCFAllocatorDefault;
 use core_media::{CMAudioFormatDescription, CMAudioFormatDescriptionGetStreamBasicDescription};
 use core_metal::{MTLDevice as Objc2MTLDevice, MTLPixelFormat as Objc2MTLPixelFormat};
 use core_video::{
-    kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
-    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
-    kCVReturnSuccess, CVMetalTexture, CVMetalTextureCache, CVMetalTextureCacheCreate,
+    CVMetalTexture, CVMetalTextureCache, CVMetalTextureCacheCreate,
     CVMetalTextureCacheCreateTextureFromImage, CVMetalTextureCacheFlush, CVMetalTextureGetTexture,
     CVPixelBuffer, CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane,
     CVPixelBufferGetHeight, CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth,
     CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
+    kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
+    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
+    kCVReturnSuccess,
 };
 
 use objc2::{rc::Retained, runtime::ProtocolObject};
 
-use crate::{frame::VideoFormat, Size};
+use crate::{Size, frame::VideoFormat};
 
 pub use core_audo_types::AudioStreamBasicDescription;
 pub use metal::{
-    foreign_types::ForeignType, Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture,
-    TextureRef,
+    Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture, TextureRef,
+    foreign_types::ForeignType,
 };
 
 pub type CVPixelBufferRef = *mut CVPixelBuffer;

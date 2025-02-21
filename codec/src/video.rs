@@ -1,6 +1,6 @@
 use crate::codec::{
-    create_video_context, create_video_frame, set_option, set_str_option, CodecError, CodecType,
-    CreateVideoContextError, CreateVideoFrameError,
+    CodecError, CodecType, CreateVideoContextError, CreateVideoFrameError, create_video_context,
+    create_video_frame, set_option, set_str_option,
 };
 
 use std::{ffi::c_int, ptr::null_mut};

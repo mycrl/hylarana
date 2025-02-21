@@ -16,11 +16,11 @@ use screencapturekit::{
     output::CMSampleBuffer,
     shareable_content::SCShareableContent,
     stream::{
-        configuration::{pixel_format::PixelFormat, SCStreamConfiguration},
+        SCStream,
+        configuration::{SCStreamConfiguration, pixel_format::PixelFormat},
         content_filter::SCContentFilter,
         output_trait::SCStreamOutputTrait,
         output_type::SCStreamOutputType,
-        SCStream,
     },
 };
 

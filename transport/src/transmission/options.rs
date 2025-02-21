@@ -7,7 +7,7 @@ use std::{
 
 use common::strings::PSTR;
 
-use super::{error, srt_getsockflag, srt_setsockflag, SRTSOCKET, SRT_SOCKOPT, SRT_TRANSTYPE};
+use super::{SRT_SOCKOPT, SRT_TRANSTYPE, SRTSOCKET, error, srt_getsockflag, srt_setsockflag};
 
 #[derive(Debug, Clone)]
 pub struct Options {

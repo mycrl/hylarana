@@ -11,8 +11,8 @@ use parking_lot::RwLock;
 use uuid::Uuid;
 
 use crate::{
-    adapter::StreamSenderAdapter, MulticastServer, Package, PacketInfo, StreamInfo, StreamInfoKind,
-    TransmissionFragmentEncoder, TransmissionOptions, TransmissionServer, TransmissionSocket,
+    MulticastServer, Package, PacketInfo, StreamInfo, StreamInfoKind, TransmissionFragmentEncoder,
+    TransmissionOptions, TransmissionServer, TransmissionSocket, adapter::StreamSenderAdapter,
 };
 
 pub struct Sender {
