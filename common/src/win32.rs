@@ -218,7 +218,7 @@ impl MediaThreadClass {
             Err(e) => {
                 log::warn!("AvSetMmThreadCharacteristics error={:?}", e);
 
-                return e;
+                return Err(e);
             }
         }
 
