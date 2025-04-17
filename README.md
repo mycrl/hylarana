@@ -95,8 +95,8 @@ brew install cmake ffmpeg@7
 
 ```sh
 yarn
-cp app
-yarn build
+cp app/desktop
+yarn build:release
 ```
 
 The build product is under the `target/app` directory, which provides the installer and the directory after unfolding.
