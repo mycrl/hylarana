@@ -49,7 +49,7 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 ## Project structure
 
 -   [android](./android) - The SDK provided for Android use is a Native Module implemented using Kotlin.
--   [app](./app) - Applications implemented using Electron and React.
+-   [app](./app) - android applications and desktop applications packaged using CEF.
 -   [capture](./capture) - Cross-platform screen/audio capture implementation, but no Linux support.
 -   [codec](./codec) - Codec implementation that handles H264 and Opus.
 -   [common](./common) - The public section, which contains public types, runtime, atomic operations, strings, logging, platform API wrappers, and more.
