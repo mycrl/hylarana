@@ -48,6 +48,7 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 
 ## Project structure
 
+-   [android](./android) - The SDK provided for Android use is a Native Module implemented using Kotlin.
 -   [app](./app) - Applications implemented using Electron and React.
 -   [capture](./capture) - Cross-platform screen/audio capture implementation, but no Linux support.
 -   [codec](./codec) - Codec implementation that handles H264 and Opus.
@@ -55,7 +56,6 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 -   [discovery](./discovery) - LAN discovery implementation using MDNS.
 -   [ffi](./ffi) - Cross-language related, providing SDK to different language packaging.
 -   [hylarana](./hylarana) - Rust crate, the core SDK implementation used on desktop systems.
-    -   [android](./android) - The SDK provided for Android use is a Native Module implemented using Kotlin.
 -   [renderer](./renderer) - Cross-platform graphics renderer responsible for rendering video frames to the window.
 -   [resample](./resample) - Resampling module, responsible for resampling audio, as well as scaling and converting texture formats using D3D11.
 -   [server](./server) - An implementation of a forwarding server, which is required when using forwarding mode.
