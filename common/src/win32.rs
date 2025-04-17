@@ -5,7 +5,6 @@ use crate::Size;
 pub use windows;
 
 use windows::{
-    core::{s, Interface, Result, GUID, HSTRING, PCSTR, PCWSTR, PWSTR},
     Win32::{
         Foundation::{HANDLE, HWND, RECT},
         Graphics::{
@@ -14,26 +13,27 @@ use windows::{
                 D3D_FEATURE_LEVEL_11_1,
             },
             Direct3D11::{
+                D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC,
                 D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Multithread,
-                ID3D11Texture2D, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION,
-                D3D11_TEXTURE2D_DESC,
+                ID3D11Texture2D,
             },
             Dxgi::IDXGIResource,
         },
         Media::MediaFoundation::{
-            IMFActivate, IMFAttributes, IMFMediaType, MFShutdown, MFStartup, MF_VERSION,
+            IMFActivate, IMFAttributes, IMFMediaType, MF_VERSION, MFShutdown, MFStartup,
         },
         System::{
-            Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
+            Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize},
             Threading::{
-                AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, GetCurrentProcess,
-                SetPriorityClass, BELOW_NORMAL_PRIORITY_CLASS, HIGH_PRIORITY_CLASS,
+                AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA,
+                BELOW_NORMAL_PRIORITY_CLASS, GetCurrentProcess, HIGH_PRIORITY_CLASS,
                 NORMAL_PRIORITY_CLASS, PROCESS_CREATION_FLAGS, PROCESS_MODE_BACKGROUND_BEGIN,
-                REALTIME_PRIORITY_CLASS,
+                REALTIME_PRIORITY_CLASS, SetPriorityClass,
             },
         },
         UI::WindowsAndMessaging::GetClientRect,
     },
+    core::{GUID, HSTRING, Interface, PCSTR, PCWSTR, PWSTR, Result, s},
 };
 
 pub fn get_hwnd_size(hwnd: HWND) -> Result<Size> {
@@ -216,7 +216,9 @@ impl MediaThreadClass {
         match unsafe { AvSetMmThreadCharacteristicsA(taskname, &mut taskindex) } {
             Ok(handle) => THREAD_CLASS_HANDLE.set(Some(handle)),
             Err(e) => {
-                log::warn!("AvSetMmThreadCharacteristics error={:?}", e)
+                log::warn!("AvSetMmThreadCharacteristics error={:?}", e);
+
+                return e;
             }
         }
 

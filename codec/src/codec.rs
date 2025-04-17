@@ -9,7 +9,7 @@ use thiserror::Error;
 use common::Size;
 
 #[cfg(target_os = "windows")]
-use common::win32::{windows::core::Interface, Direct3DDevice};
+use common::win32::{Direct3DDevice, windows::core::Interface};
 
 #[derive(Error, Debug)]
 pub enum CreateVideoContextError {
@@ -106,14 +106,14 @@ impl CodecType {
 
     pub unsafe fn find_av_codec(&self) -> *const AVCodec {
         match self {
-            Self::Encoder(kind) => {
+            Self::Encoder(kind) => unsafe {
                 avcodec_find_encoder_by_name(PSTR::from(kind.to_string()).as_ptr())
-            }
+            },
             Self::Decoder(kind) => {
                 if *kind == VideoDecoderType::D3D11 || *kind == VideoDecoderType::VideoToolBox {
-                    avcodec_find_decoder(AVCodecID::AV_CODEC_ID_H264)
+                    unsafe { avcodec_find_decoder(AVCodecID::AV_CODEC_ID_H264) }
                 } else {
-                    avcodec_find_decoder_by_name(PSTR::from(kind.to_string()).as_ptr())
+                    unsafe { avcodec_find_decoder_by_name(PSTR::from(kind.to_string()).as_ptr()) }
                 }
             }
         }

@@ -11,7 +11,7 @@ pub enum StringError {
 }
 
 pub mod ffi {
-    use std::ffi::{c_char, CStr, CString};
+    use std::ffi::{CStr, CString, c_char};
 
     use super::StringError;
 

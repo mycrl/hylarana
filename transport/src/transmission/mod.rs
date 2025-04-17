@@ -4,22 +4,22 @@ mod server;
 mod socket;
 
 pub use self::{
+    SRT_TRACEBSTATS as TraceStats,
     fragments::{FragmentDecoder, FragmentEncoder},
     options::Options,
     server::Server,
     socket::Socket,
-    SRT_TRACEBSTATS as TraceStats,
 };
 
 use std::{
-    ffi::{c_char, c_int, c_void, CStr},
+    ffi::{CStr, c_char, c_int, c_void},
     io::Error,
     ptr::null,
 };
 
 use common::strings::PSTR;
 use libc::sockaddr;
-use log::{log, Level};
+use log::{Level, log};
 
 pub(crate) fn error() -> Error {
     Error::other(
@@ -287,7 +287,7 @@ pub struct SRT_TRACEBSTATS {
     pub byte_recv_unique: u64,
 }
 
-extern "C" {
+unsafe extern "C" {
     pub(crate) fn srt_getlasterror_str() -> *const c_char;
     /// By default logs are printed to standard error stream. This function
     /// replaces the sending to a stream with a handler function that will
@@ -664,7 +664,7 @@ extern "C" {
     /// binding for system autoselection. With this function you can
     /// extract the port number after it has been autoselected.
     pub(crate) fn srt_getsockname(s: SRTSOCKET, addr: *mut sockaddr, addr_len: *mut c_int)
-        -> c_int;
+    -> c_int;
     /// Gets the current status of the socket.
     pub(crate) fn srt_getsockstate(s: SRTSOCKET) -> SRT_SOCKSTATUS;
     /// Sets a value for a socket option in the socket or group.

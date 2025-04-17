@@ -11,9 +11,9 @@ pub use self::{
         StreamReceiverAdapter, StreamReceiverAdapterAbstract, StreamSenderAdapter,
     },
     multicast::{Server as MulticastServer, Socket as MulticastSocket},
-    package::{copy_from_slice, with_capacity, Package, PacketInfo, UnPackage},
-    receiver::{create_mix_receiver, create_split_receiver, Receiver as TransportReceiver},
-    sender::{create_sender, Sender as TransportSender},
+    package::{Package, PacketInfo, UnPackage, copy_from_slice, with_capacity},
+    receiver::{Receiver as TransportReceiver, create_mix_receiver, create_split_receiver},
+    sender::{Sender as TransportSender, create_sender},
     transmission::{
         FragmentDecoder as TransmissionFragmentDecoder,
         FragmentEncoder as TransmissionFragmentEncoder, Options as TransmissionOptions,

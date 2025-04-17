@@ -1,175 +1,262 @@
 use std::{
-    fmt::Debug,
+    collections::HashMap,
+    io::{Error as IoError, ErrorKind as IoErrorKind},
     net::Ipv4Addr,
-    sync::atomic::{AtomicBool, Ordering},
-    thread,
+    time::Duration,
 };
 
-use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent, ServiceInfo};
-use serde::{de::DeserializeOwned, Serialize};
+use libp2p::{
+    BehaviourBuilderError, TransportError,
+    futures::StreamExt,
+    gossipsub::{self, MessageId, PublishError},
+    mdns,
+    multiaddr::{self, Protocol},
+    noise,
+    swarm::{NetworkBehaviour, SwarmEvent},
+    tcp, yamux,
+};
+
 use thiserror::Error;
+use tokio::sync::mpsc::{Sender, channel, error::SendError};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Server,
-    Client,
+#[derive(NetworkBehaviour)]
+pub struct DiscoveryBehaviour {
+    gossipsub: gossipsub::Behaviour,
+    mdns: mdns::tokio::Behaviour,
 }
 
-pub trait DiscoveryObserver<T>: Send {
-    #[allow(unused_variables)]
-    fn resolve(&self, name: &str, addrs: Vec<Ipv4Addr>, properties: T) {}
-
-    #[allow(unused_variables)]
-    fn remove(&self, name: &str) {}
+pub struct DiscoveryContext<'a> {
+    behaviour: &'a mut DiscoveryBehaviour,
+    topic: &'a gossipsub::IdentTopic,
+    pub local_id: &'a str,
+    pub id: String,
+    pub ip: Ipv4Addr,
 }
 
-#[derive(Debug, Error)]
-pub enum DiscoveryError {
-    #[error(transparent)]
-    MdnsError(#[from] mdns_sd::Error),
-    #[error(transparent)]
-    JsonError(#[from] serde_json::Error),
-}
-
-/// LAN service discovery.
-///
-/// which exposes its services through the MDNS protocol
-/// and can allow other nodes or clients to discover the current service.
-pub struct DiscoveryService {
-    kind: Kind,
-    runing: AtomicBool,
-    service: ServiceDaemon,
-}
-
-impl DiscoveryService {
-    /// Register the service, the service type is fixed, you can customize the
-    /// port number, in properties you can add
-    /// customized data to the published service.
-    pub fn register<P: Serialize + Debug>(
-        name: &str,
-        properties: &P,
-    ) -> Result<Self, DiscoveryError> {
-        let service = ServiceDaemon::new()?;
-        service.disable_interface(IfKind::IPv6)?;
-
-        let id = Uuid::new_v4().to_string();
-        service.register(
-            ServiceInfo::new(
-                "_hylarana._udp.local.",
-                name,
-                &format!("{}._hylarana._udp.local.", id),
-                "",
-                0,
-                &[("p", &serde_json::to_string(properties)?)][..],
-            )?
-            .enable_addr_auto(),
-        )?;
-
-        log::info!(
-            "discovery service register, id={}, properties={:?}",
-            id,
-            properties
-        );
-
-        Ok(Self {
-            runing: AtomicBool::new(true),
-            kind: Kind::Server,
-            service,
-        })
-    }
-
-    /// Query the registered service, the service type is fixed, when the query
-    /// is published the callback function will call back all the network
-    /// addresses of the service publisher as well as the attribute information.
-    pub fn query<P, T>(observer: T) -> Result<Self, DiscoveryError>
-    where
-        P: DeserializeOwned + Debug,
-        T: DiscoveryObserver<P> + 'static,
-    {
-        let service = ServiceDaemon::new()?;
-        service.disable_interface(IfKind::IPv6)?;
-
-        let receiver = service.browse("_hylarana._udp.local.")?;
-        thread::spawn(move || loop {
-            match receiver.recv() {
-                Ok(event) => match event {
-                    ServiceEvent::ServiceResolved(info) => {
-                        if let Err(e) = resolve(&observer, &info) {
-                            log::warn!("discovery service resolved error={:?}", e);
-                        }
-                    }
-                    ServiceEvent::ServiceRemoved(_, full_name) => {
-                        if let Some((name, _)) = full_name.split_once('.') {
-                            observer.remove(name);
-                        }
-                    }
-                    _ => log::info!("discovery service query event={:?}", event),
-                },
-                Err(e) => {
-                    log::warn!("discovery service query error={:?}", e);
-
-                    break;
-                }
-            }
-        });
-
-        Ok(Self {
-            runing: AtomicBool::new(true),
-            kind: Kind::Client,
-            service,
-        })
-    }
-
-    pub fn stop(&self) -> Result<(), DiscoveryError> {
-        if self.runing.load(Ordering::Relaxed) {
-            self.runing.store(false, Ordering::Relaxed);
-        } else {
-            return Ok(());
-        }
-
-        if self.kind == Kind::Server {
-            drop(self.service.unregister("_hylarana._udp.local.")?.recv());
-        } else {
-            self.service.stop_browse("_hylarana._udp.local.")?;
-        }
+impl<'a> DiscoveryContext<'a> {
+    pub fn broadcast(&mut self, message: Vec<u8>) -> Result<(), DiscoveryError> {
+        self.behaviour
+            .gossipsub
+            .publish(self.topic.clone(), message)?;
 
         Ok(())
     }
 }
 
-impl Drop for DiscoveryService {
-    fn drop(&mut self) {
-        if let Err(e) = self.stop() {
-            log::error!("discovery service drop error={:?}", e);
-        }
+pub trait DiscoveryObserver {
+    #[allow(unused_variables)]
+    fn online(&self, ctx: DiscoveryContext) -> impl Future<Output = ()> + Send {
+        async {}
+    }
+
+    #[allow(unused_variables)]
+    fn offline(&self, ctx: DiscoveryContext) -> impl Future<Output = ()> + Send {
+        async {}
+    }
+
+    #[allow(unused_variables)]
+    fn on_message(
+        &self,
+        ctx: DiscoveryContext,
+        message: Vec<u8>,
+    ) -> impl Future<Output = ()> + Send {
+        async {}
     }
 }
 
-fn resolve<P, T>(observer: &T, info: &ServiceInfo) -> Result<(), DiscoveryError>
-where
-    P: DeserializeOwned + Debug,
-    T: DiscoveryObserver<P> + 'static,
-{
-    if let Some(properties) = info.get_property("p") {
-        let properties = serde_json::from_str(properties.val_str())?;
-        let addrs = info
-            .get_addresses_v4()
-            .into_iter()
-            .map(|it| *it)
-            .collect::<Vec<_>>();
+#[derive(Debug, Error)]
+pub enum DiscoveryError {
+    #[error(transparent)]
+    IoError(#[from] IoError),
+    #[error(transparent)]
+    NoiseError(#[from] noise::Error),
+    #[error(transparent)]
+    BehaviourBuilderError(#[from] BehaviourBuilderError),
+    #[error(transparent)]
+    SubscriptionError(#[from] gossipsub::SubscriptionError),
+    #[error(transparent)]
+    MultiaddrError(#[from] multiaddr::Error),
+    #[error(transparent)]
+    TransportError(#[from] TransportError<IoError>),
+    #[error(transparent)]
+    PublishError(#[from] PublishError),
+}
+
+pub struct DiscoveryService {
+    channel: Sender<Vec<u8>>,
+    local_id: String,
+}
+
+impl DiscoveryService {
+    pub async fn new<O>(topic: String, observer: O) -> Result<Self, DiscoveryError>
+    where
+        O: DiscoveryObserver + Send + 'static,
+    {
+        let mut swarm = libp2p::SwarmBuilder::with_new_identity()
+            .with_tokio()
+            .with_tcp(
+                tcp::Config::default(),
+                noise::Config::new,
+                yamux::Config::default,
+            )?
+            .with_behaviour(|key| {
+                let gossipsub = gossipsub::Behaviour::new(
+                    gossipsub::MessageAuthenticity::Anonymous,
+                    gossipsub::ConfigBuilder::default()
+                        .duplicate_cache_time(Duration::from_secs(10))
+                        .heartbeat_interval(Duration::from_secs(10))
+                        .validation_mode(gossipsub::ValidationMode::None)
+                        .message_id_fn(move |_| MessageId::new(Uuid::new_v4().as_bytes()))
+                        .build()
+                        .map_err(|msg| IoError::new(IoErrorKind::Other, msg))?,
+                )?;
+
+                let mdns = mdns::tokio::Behaviour::new(
+                    mdns::Config::default(),
+                    key.public().to_peer_id(),
+                )?;
+
+                Ok(DiscoveryBehaviour { gossipsub, mdns })
+            })?
+            .build();
+
+        log::info!("discovery service swarm is created");
+
+        let topic = gossipsub::IdentTopic::new(topic);
+
+        swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
+        swarm.listen_on("/ip4/0.0.0.0/tcp/60342".parse()?)?;
+
+        let local_id = swarm.local_peer_id().to_string();
 
         log::info!(
-            "discovery service query, host={}, address={:?}, properties={:?}",
-            info.get_hostname(),
-            addrs,
-            properties,
+            "discovery service gossipsub subscribe topic={topic}, local_id={}",
+            local_id
         );
 
-        if let Some((name, _)) = info.get_fullname().split_once('.') {
-            observer.resolve(name, addrs, properties);
-        }
+        let (tx, mut rx) = channel(1);
+        let local_id_ = local_id.clone();
+        tokio::spawn(async move {
+            let mut address: HashMap<String, Ipv4Addr> = Default::default();
+
+            loop {
+                tokio::select! {
+                    Some(message) = rx.recv() => {
+                        log::info!("discovery service loop recv a message");
+
+                        if !address.is_empty() {
+                            if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic.clone(), message) {
+                                log::warn!("discovery service gossipsub publish is failed, error={}", e);
+                            }
+                        } else {
+                            log::info!("discovery service device table is empty, ignore message");
+                        }
+                    }
+                    event = swarm.select_next_some() => {
+                        log::info!("discovery service swarm event={:?}", event);
+
+                        match event {
+                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Mdns(mdns::Event::Discovered(
+                                peers,
+                            ))) => {
+                                let behaviour = swarm.behaviour_mut();
+
+                                for (peer_id, _) in peers {
+                                    behaviour.gossipsub.add_explicit_peer(&peer_id);
+                                }
+                            }
+                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Mdns(mdns::Event::Expired(peers))) => {
+                                let behaviour = swarm.behaviour_mut();
+
+                                for (peer_id, _) in peers {
+                                    behaviour.gossipsub.remove_explicit_peer(&peer_id);
+                                }
+                            }
+                            SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
+                                let mut addr = endpoint.get_remote_address().iter();
+
+                                while let Some(it) = addr.next() {
+                                    if let Protocol::Ip4(ip) = it {
+                                        address.insert(peer_id.to_string(), ip);
+
+                                        break;
+                                    }
+                                }
+                            }
+                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Gossipsub(
+                                gossipsub::Event::Subscribed { peer_id, .. },
+                            )) => {
+                                let id = peer_id.to_string();
+
+                                if let Some(ip) = address.get(&id).copied() {
+                                    observer.online(DiscoveryContext {
+                                        behaviour: swarm.behaviour_mut(),
+                                        local_id: &local_id_,
+                                        topic: &topic,
+                                        id,
+                                        ip,
+                                    }).await;
+                                }
+                            }
+                            SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                                let id = peer_id.to_string();
+
+                                let behaviour = swarm.behaviour_mut();
+                                if let Some(ip) = address.remove(&id) {
+                                    observer.offline(DiscoveryContext {
+                                        local_id: &local_id_,
+                                        topic: &topic,
+                                        behaviour,
+                                        id,
+                                        ip,
+                                    }).await;
+                                }
+
+                                behaviour.gossipsub.remove_explicit_peer(&peer_id);
+                            }
+                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Gossipsub(
+                                gossipsub::Event::Message { propagation_source, message, .. },
+                            )) => {
+                                let id = propagation_source.to_string();
+
+                                if let Some(ip) = address.get(&id).copied() {
+                                    observer.on_message(DiscoveryContext {
+                                        behaviour: swarm.behaviour_mut(),
+                                        local_id: &local_id_,
+                                        topic: &topic,
+                                        id,
+                                        ip,
+                                    }, message.data).await;
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                    else => {
+                        swarm.behaviour_mut().gossipsub.unsubscribe(&topic);
+
+                        break;
+                    }
+                }
+            }
+
+            log::info!("discovery service message loop is exited");
+        });
+
+        Ok(Self {
+            channel: tx,
+            local_id,
+        })
     }
 
-    Ok(())
+    pub fn local_id(&self) -> &str {
+        &self.local_id
+    }
+
+    pub async fn broadcast(&self, message: Vec<u8>) -> Result<(), SendError<Vec<u8>>> {
+        log::info!("discovery service broadcast message before");
+
+        self.channel.send(message).await
+    }
 }

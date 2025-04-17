@@ -1,0 +1,13 @@
+[package]
+name = "hylarana-example"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+winit = "0.30"
+log = "0.4"
+serde_json = "1.0"
+simple_logger = "5"
+hylarana = { workspace = true, features = ["serde"] }

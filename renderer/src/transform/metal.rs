@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use common::{
+    Size,
     frame::VideoFormat,
     macos::{CVPixelBufferRef, MTLTextureType, MetalTextureCache, PixelBuffer},
-    Size,
 };
 
 use wgpu::{
-    hal::{api::Metal, Api, CopyExtent},
     CommandEncoder, Device, Extent3d, ImageCopyTexture, Origin3d, Texture, TextureAspect,
     TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    hal::{Api, CopyExtent, api::Metal},
 };
 
 use super::TransformError;

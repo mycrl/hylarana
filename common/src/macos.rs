@@ -1,31 +1,46 @@
 use std::{
     fmt::Display,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
+    sync::{Arc, Mutex},
 };
 
-use core_foundation::kCFAllocatorDefault;
-use core_media::{CMAudioFormatDescription, CMAudioFormatDescriptionGetStreamBasicDescription};
-use core_metal::{MTLDevice as Objc2MTLDevice, MTLPixelFormat as Objc2MTLPixelFormat};
-use core_video::{
-    kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
-    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
-    kCVReturnSuccess, CVMetalTexture, CVMetalTextureCache, CVMetalTextureCacheCreate,
+use block2::RcBlock;
+use objc2_av_foundation::{
+    AVAuthorizationStatus, AVCaptureDevice, AVMediaTypeAudio, AVMediaTypeVideo,
+};
+
+use objc2_core_foundation::kCFAllocatorDefault;
+use objc2_core_media::{
+    CMAudioFormatDescription, CMAudioFormatDescriptionGetStreamBasicDescription,
+};
+
+use objc2_core_video::{
+    CVMetalTexture, CVMetalTextureCache, CVMetalTextureCacheCreate,
     CVMetalTextureCacheCreateTextureFromImage, CVMetalTextureCacheFlush, CVMetalTextureGetTexture,
     CVPixelBuffer, CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane,
     CVPixelBufferGetHeight, CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth,
     CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
+    kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
+    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
+    kCVReturnSuccess,
 };
 
-use objc2::{rc::Retained, runtime::ProtocolObject};
+use objc2::{
+    rc::Retained,
+    runtime::{Bool, ProtocolObject},
+};
 
-use crate::{frame::VideoFormat, Size};
+use objc2_metal::{MTLDevice as Objc2MTLDevice, MTLPixelFormat as Objc2MTLPixelFormat};
 
-pub use core_audo_types::AudioStreamBasicDescription;
+use crate::{Size, frame::VideoFormat};
+
 pub use metal::{
-    foreign_types::ForeignType, Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture,
-    TextureRef,
+    Device, MTLPixelFormat, MTLTexture, MTLTextureType, Texture, TextureRef,
+    foreign_types::ForeignType,
 };
+
+pub use objc2_core_audio_types::AudioStreamBasicDescription;
 
 pub type CVPixelBufferRef = *mut CVPixelBuffer;
 
@@ -253,6 +268,45 @@ impl MetalTexture {
             Ok(unsafe { Texture::from_ptr(Retained::into_raw(texture).cast()).to_owned() })
         } else {
             Err(Error(-1))
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AVMediaType {
+    Video,
+    Audio,
+}
+
+pub fn request_av_capture_permissions(ty: AVMediaType) {
+    let ty = unsafe {
+        match ty {
+            AVMediaType::Video => AVMediaTypeVideo.unwrap(),
+            AVMediaType::Audio => AVMediaTypeAudio.unwrap(),
+        }
+    };
+
+    if unsafe { AVCaptureDevice::authorizationStatusForMediaType(&ty) }
+        != AVAuthorizationStatus::Authorized
+    {
+        let callback = Arc::new(Mutex::<Option<RcBlock<dyn Fn(Bool)>>>::new(None));
+
+        unsafe {
+            let callback_ = callback.clone();
+            let fun = RcBlock::new(move |ret: Bool| {
+                if ret.is_false() {
+                    log::error!("failed to request permissions, type={:?}", ty);
+                }
+
+                let _ = callback_.lock().unwrap().take();
+            });
+
+            AVCaptureDevice::requestAccessForMediaType_completionHandler(
+                &ty,
+                &*RcBlock::as_ptr(&fun),
+            );
+
+            callback.lock().unwrap().replace(fun);
         }
     }
 }

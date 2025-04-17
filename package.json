@@ -18,7 +18,6 @@
     },
     "homepage": "https://github.com/mycrl/hylarana#readme",
     "workspaces": [
-        "app/ui",
-        "app"
+        "app/frontend"
     ]
 }

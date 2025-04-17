@@ -8,9 +8,9 @@ use std::{
 
 use bytes::Bytes;
 use common::runtime::get_runtime_handle;
-use crossbeam::channel::{bounded, Receiver};
+use crossbeam::channel::{Receiver, bounded};
 use fragments::FragmentEncoder;
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::{Sender, channel};
 
 use self::{
     dequeue::Dequeue,

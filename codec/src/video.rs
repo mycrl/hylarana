@@ -1,6 +1,9 @@
-use crate::codec::{
-    create_video_context, create_video_frame, set_option, set_str_option, CodecError, CodecType,
-    CreateVideoContextError, CreateVideoFrameError,
+use crate::{
+    VideoDecoderSettings, VideoEncoderSettings,
+    codec::{
+        CodecError, CodecType, CreateVideoContextError, CreateVideoFrameError,
+        create_video_context, create_video_frame, set_option, set_str_option,
+    },
 };
 
 use std::{ffi::c_int, ptr::null_mut};
@@ -16,23 +19,8 @@ use thiserror::Error;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use common::Size;
 
-#[cfg(target_os = "windows")]
-use common::win32::Direct3DDevice;
-
 #[cfg(target_os = "macos")]
 use common::macos::get_pixel_buffer_format;
-
-#[derive(Debug, Clone)]
-pub struct VideoDecoderSettings {
-    /// Name of the codec implementation.
-    ///
-    /// The name is globally unique among encoders and among decoders (but
-    /// an encoder and a decoder can share the same name). This is
-    /// the primary way to find a codec from the user perspective.
-    pub codec: VideoDecoderType,
-    #[cfg(target_os = "windows")]
-    pub direct3d: Option<Direct3DDevice>,
-}
 
 #[derive(Error, Debug)]
 pub enum VideoDecoderError {
@@ -295,27 +283,6 @@ impl Drop for VideoDecoder {
             }
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct VideoEncoderSettings {
-    /// Name of the codec implementation.
-    ///
-    /// The name is globally unique among encoders and among decoders (but an
-    /// encoder and a decoder can share the same name). This is the primary way
-    /// to find a codec from the user perspective.
-    pub codec: VideoEncoderType,
-    pub frame_rate: u8,
-    /// picture width / height
-    pub width: u32,
-    /// picture width / height
-    pub height: u32,
-    /// the average bitrate
-    pub bit_rate: u64,
-    /// the number of pictures in a group of pictures, or 0 for intra_only
-    pub key_frame_interval: u32,
-    #[cfg(target_os = "windows")]
-    pub direct3d: Option<Direct3DDevice>,
 }
 
 #[derive(Error, Debug)]

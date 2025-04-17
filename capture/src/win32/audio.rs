@@ -1,9 +1,9 @@
-use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameArrived, Source, SourceType};
+use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameConsumer, Source, SourceType};
 
 use std::sync::LazyLock;
 
 use common::frame::AudioFrame;
-use cpal::{traits::*, Host, Stream, StreamConfig};
+use cpal::{Host, Stream, StreamConfig, traits::*};
 use parking_lot::Mutex;
 use resample::{
     AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription,
@@ -78,10 +78,10 @@ impl CaptureHandler for AudioCapture {
         Ok(sources)
     }
 
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
-        arrived: S,
+        consumer: S,
     ) -> Result<(), Self::Error> {
         // Find devices with matching names
         let (device, kind) = HOST
@@ -119,7 +119,7 @@ impl CaptureHandler for AudioCapture {
                 channels: 2,
             },
             Output {
-                arrived,
+                consumer,
                 frame: {
                     let mut frame = AudioFrame::default();
                     frame.sample_rate = options.sample_rate;
@@ -174,18 +174,18 @@ impl CaptureHandler for AudioCapture {
 }
 
 struct Output<S> {
-    arrived: S,
+    consumer: S,
     frame: AudioFrame,
 }
 
 impl<S> AudioResamplerOutput<i16> for Output<S>
 where
-    S: FrameArrived<Frame = AudioFrame> + 'static,
+    S: FrameConsumer<Frame = AudioFrame> + 'static,
 {
     fn output(&mut self, buffer: &[i16], frames: u32) -> bool {
         self.frame.data = buffer.as_ptr();
         self.frame.frames = frames;
 
-        self.arrived.sink(&self.frame)
+        self.consumer.sink(&self.frame)
     }
 }

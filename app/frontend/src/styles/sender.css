@@ -1,0 +1,97 @@
+.Sender {
+    position: absolute;
+    width: 100vw;
+    transition: 0.5s;
+}
+
+.Sender .Content {
+    padding: 0 20px 0 20px;
+}
+
+.Sender .Content .Control {
+    border-top: 1px solid var(--line-color);
+    height: 132px;
+}
+
+.Sender .Content .Control .box {
+    margin: 0 auto;
+    width: 50%;
+    text-align: center;
+}
+
+.Sender .Content .Control .box .items {
+    display: flex;
+    margin-top: 20px;
+}
+
+.Sender .Content .Control .box .items .item {
+    flex: 1;
+}
+
+.Sender .Content .Control .box .items .item .icon {
+    text-align: center;
+}
+
+.Sender .Content .Control .box .items .item .icon > * {
+    color: var(--secondary-color);
+    font-size: 17px;
+}
+
+.Sender .Content .Control .box .items .item select {
+    width: 90%;
+    margin: 0 5%;
+    margin-top: 5px;
+    text-align: center;
+    border: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-bottom: 1px solid var(--line-color);
+    border-radius: 0;
+    color: var(--primary-text-color);
+}
+
+.Sender .Content .Control .box .items .item select option {
+    background-color: var(--primary-background-color);
+}
+
+.Sender .Content .Control .box .items .item select:focus {
+    outline: none;
+}
+
+.Sender .Content .Control .box button {
+    height: 40px;
+    width: 170px;
+    border-radius: 40px;
+    margin-top: 14px;
+    border: 0;
+    background-color: var(--secondary-color);
+    color: #fff;
+}
+
+.Sender .Content .Working {
+    text-align: center;
+    width: 100%;
+    height: calc(100vh - 240px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.Sender .Content .Working img {
+    width: 250px;
+}
+
+.Sender .Content .Working p {
+    margin-top: 50px;
+    color: var(--secondary-text-color);
+}
+
+.Sender .Content .Working button {
+    width: 150px;
+    height: 35px;
+    margin-top: 50px;
+    border-radius: 35px;
+    border: 0;
+    background-color: #f00222;
+    color: #fff;
+}

@@ -1,6 +1,6 @@
 use std::{env, fs, path::Path, process::Command};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use which::which;
 
 fn is_exsit(dir: &str) -> bool {
@@ -48,52 +48,51 @@ fn main() -> Result<()> {
     let target = env::var("TARGET")?;
     let out_dir = env::var("OUT_DIR")?;
 
-    if target.contains("android") {
-        use_android_library(out_dir)?;
-    } else {
-        let srt_dir = join(&out_dir, "srt");
-        if !is_exsit(&srt_dir) {
-            exec(
-                "git clone --branch v1.5.4 https://github.com/Haivision/srt",
-                &out_dir,
-            )?;
-        }
+    let srt_dir = join(&out_dir, "srt");
+    if !is_exsit(&srt_dir) {
+        exec(
+            "git clone --branch v1.5.4 https://github.com/Haivision/srt",
+            &out_dir,
+        )?;
+    }
 
+    if target.contains("android") {
+        #[cfg(not(target_os = "windows"))]
+        use_android_library(&srt_dir)?;
+    } else {
         use_library(srt_dir)?;
     }
 
     Ok(())
 }
 
-fn use_android_library(out_dir: String) -> Result<()> {
-    if !is_exsit(&join(&out_dir, "libsrt.a")) {
+#[cfg(not(target_os = "windows"))]
+fn use_android_library(srt_dir: &str) -> Result<()> {
+    let ndk_path = env::var("ANDROID_NDK_PATH")?;
+    let api_level = env::var("ANDROID_API_LEVEL")?;
+
+    if !is_exsit(&join(srt_dir, "./libsrt.a")) {
+        {
+            let cmake = join(srt_dir, "CMakeLists.txt");
+            fs::write(
+                &cmake,
+                fs::read_to_string(&cmake)?.replace(
+                    "cmake_minimum_required (VERSION 2.8.12 FATAL_ERROR)",
+                    "cmake_minimum_required (VERSION 3.5 FATAL_ERROR)",
+                ),
+            )?;
+        }
+
         exec(
-            "wget \
-            -O libsrt.a \
-            https://github.com/mycrl/third-party/releases/download/distributions/libsrt-arm64-v8a.a",
-            &out_dir,
+            &format!("./build-android -n {ndk_path} -a {api_level} -t arm64-v8a"),
+            &join(srt_dir, "./scripts/build-android"),
         )?;
     }
 
-    if !is_exsit(&join(&out_dir, "libssl.a")) {
-        exec(
-            "wget \
-            -O libssl.a \
-            https://github.com/mycrl/third-party/releases/download/distributions/libssl-arm64-v8a.a",
-            &out_dir,
-        )?;
-    }
-
-    if !is_exsit(&join(&out_dir, "libcrypto.a")) {
-        exec(
-            "wget \
-            -O libcrypto.a \
-            https://github.com/mycrl/third-party/releases/download/distributions/libcrypto-arm64-v8a.a",
-            &out_dir,
-        )?;
-    }
-
-    println!("cargo:rustc-link-search=all={}", out_dir);
+    println!(
+        "cargo:rustc-link-search=all={}/scripts/build-android/arm64-v8a/lib",
+        srt_dir
+    );
     println!("cargo:rustc-link-lib=static=srt");
     println!("cargo:rustc-link-lib=static=ssl");
     println!("cargo:rustc-link-lib=static=crypto");
@@ -104,6 +103,17 @@ fn use_android_library(out_dir: String) -> Result<()> {
 #[cfg(target_os = "windows")]
 fn use_library(srt_dir: String) -> Result<()> {
     if !is_exsit(&join(&srt_dir, "./Release/srt_static.lib")) {
+        {
+            let cmake = join(&srt_dir, "CMakeLists.txt");
+            fs::write(
+                &cmake,
+                fs::read_to_string(&cmake)?.replace(
+                    "cmake_minimum_required (VERSION 2.8.12 FATAL_ERROR)",
+                    "cmake_minimum_required (VERSION 3.5 FATAL_ERROR)",
+                ),
+            )?;
+        }
+
         exec(
             "cmake \
             -DENABLE_DEBUG=OFF \
@@ -141,18 +151,29 @@ fn use_library(srt_dir: String) -> Result<()> {
 
 #[cfg(not(target_os = "windows"))]
 fn use_library(srt_dir: String) -> Result<()> {
-    // linux patch
-    #[cfg(target_os = "linux")]
-    if !fs::read_to_string(join(&srt_dir, "CMakeLists.txt"))?
-        .contains("set(CMAKE_CXX_FLAGS \"-fPIC\")")
-    {
-        exec(
-            "sed -i '12i set(CMAKE_CXX_FLAGS \"-fPIC\")' CMakeLists.txt",
-            &srt_dir,
-        )?;
-    }
-
     if !is_exsit(&join(&srt_dir, "./libsrt.a")) {
+        // linux patch
+        #[cfg(target_os = "linux")]
+        if !fs::read_to_string(join(&srt_dir, "CMakeLists.txt"))?
+            .contains("set(CMAKE_CXX_FLAGS \"-fPIC\")")
+        {
+            exec(
+                "sed -i '12i set(CMAKE_CXX_FLAGS \"-fPIC\")' CMakeLists.txt",
+                &srt_dir,
+            )?;
+        }
+
+        {
+            let cmake = join(&srt_dir, "CMakeLists.txt");
+            fs::write(
+                &cmake,
+                fs::read_to_string(&cmake)?.replace(
+                    "cmake_minimum_required (VERSION 2.8.12 FATAL_ERROR)",
+                    "cmake_minimum_required (VERSION 3.5 FATAL_ERROR)",
+                ),
+            )?;
+        }
+
         exec(
             "./configure \
             --enable-shared=OFF \

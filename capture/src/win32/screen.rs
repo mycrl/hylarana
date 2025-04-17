@@ -1,30 +1,30 @@
-use crate::{CaptureHandler, FrameArrived, Source, SourceType, VideoCaptureSourceDescription};
+use crate::{CaptureHandler, FrameConsumer, Source, SourceType, VideoCaptureSourceDescription};
 
 use std::{
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
     time::Duration,
 };
 
 use common::{
+    Size,
     atomic::EasyAtomic,
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
     win32::{EasyTexture, MediaThreadClass},
-    Size,
 };
 
 use parking_lot::Mutex;
 use resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
 use thiserror::Error;
 use windows::{
-    core::Interface,
     Win32::Graphics::{
         Direct3D11::{
-            ID3D11DeviceContext, ID3D11Texture2D, D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC,
-            D3D11_USAGE_DEFAULT,
+            D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+            ID3D11DeviceContext, ID3D11Texture2D,
         },
         Dxgi::Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC},
     },
+    core::Interface,
 };
 
 use windows_capture::{
@@ -161,7 +161,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
                             frame.data[0] = transform.get_output().as_raw();
                             frame.data[1] = 0 as *const _;
 
-                            if !flags.arrived.sink(&frame) {
+                            if !flags.consumer.sink(&frame) {
                                 break;
                             }
                         } else {
@@ -176,7 +176,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
                             frame.linesize[0] = texture.stride();
                             frame.linesize[1] = texture.stride();
 
-                            if !flags.arrived.sink(&frame) {
+                            if !flags.consumer.sink(&frame) {
                                 break;
                             }
                         }
@@ -194,7 +194,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
                 }
 
                 if let Some(status) = status_.upgrade() {
-                    status.update(false);
+                    status.set(false);
                 }
 
                 if let Some(guard) = thread_class_guard {
@@ -209,7 +209,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
         })
     }
 
-    fn on_frame_arrived(
+    fn on_frame_consumer(
         &mut self,
         frame: &mut Frame,
         control: InternalCaptureControl,
@@ -230,13 +230,13 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
     }
 
     fn on_closed(&mut self) -> Result<(), Self::Error> {
-        self.status.update(false);
+        self.status.set(false);
         Ok(())
     }
 }
 
 struct CaptureContext {
-    arrived: Box<dyn FrameArrived<Frame = VideoFrame>>,
+    consumer: Box<dyn FrameConsumer<Frame = VideoFrame>>,
     options: VideoCaptureSourceDescription,
     source: Monitor,
 }
@@ -266,10 +266,10 @@ impl CaptureHandler for ScreenCapture {
         Ok(displays)
     }
 
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
-        arrived: S,
+        consumer: S,
     ) -> Result<(), Self::Error> {
         let source = Monitor::enumerate()?
             .into_iter()
@@ -286,7 +286,7 @@ impl CaptureHandler for ScreenCapture {
                 DrawBorderSettings::Default,
                 ColorFormat::Rgba8,
                 CaptureContext {
-                    arrived: Box::new(arrived),
+                    consumer: Box::new(consumer),
                     options,
                     source,
                 },

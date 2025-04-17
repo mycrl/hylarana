@@ -17,7 +17,7 @@
 <br/>
 <br/>
 <div align="center">
-    <img src="./app/capture.png"/>
+    <img src="./app.jpeg"/>
     <span>This is a screen cast application implemented using the hylarana SDK.</span>
 </div>
 <div align="center">
@@ -53,10 +53,11 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 -   [codec](./codec) - Codec implementation that handles H264 and Opus.
 -   [common](./common) - The public section, which contains public types, runtime, atomic operations, strings, logging, platform API wrappers, and more.
 -   [discovery](./discovery) - LAN discovery implementation using MDNS.
+-   [ffi](./ffi) - Cross-language related, providing SDK to different language packaging.
 -   [hylarana](./hylarana) - Rust crate, the core SDK implementation used on desktop systems.
+    -   [android](./android) - The SDK provided for Android use is a Native Module implemented using Kotlin.
 -   [renderer](./renderer) - Cross-platform graphics renderer responsible for rendering video frames to the window.
 -   [resample](./resample) - Resampling module, responsible for resampling audio, as well as scaling and converting texture formats using D3D11.
--   [sdk](./sdk) - The SDK provided for Android use is a Native Module implemented using Kotlin.
 -   [server](./server) - An implementation of a forwarding server, which is required when using forwarding mode.
 -   [transport](./transport) - The unified transport layer, which internally uses SRT and UDP multicast, provides multiple modes of operation.
 
@@ -71,7 +72,7 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 -   C++20 or above compliant compiler. (G++/Clang/MSVC)
 -   [CMake](https://cmake.org/download/): CMake 3.16 or above as a build system.
 -   [Node.js](https://nodejs.org/en/download): Node.js 16 or above as a auto build script.
--   [Cargo NDK](https://github.com/willir/cargo-ndk-Android-gradle): Cargo NDK is optional and required for Android Studio projects.
+-   [Python3](https://www.python.org/downloads/): Python 3 is required to use the Android Studio Project.
 
 ##### Linux (Ubuntu/Debian)
 

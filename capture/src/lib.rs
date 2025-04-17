@@ -44,8 +44,8 @@ pub use self::macos::{
 use common::win32::Direct3DDevice;
 
 use common::{
-    frame::{AudioFrame, VideoFrame},
     Size,
+    frame::{AudioFrame, VideoFrame},
 };
 
 use thiserror::Error;
@@ -63,7 +63,7 @@ pub enum CaptureError {
     CameraCaptureError(#[from] CameraCaptureError),
 }
 
-pub trait FrameArrived: Sync + Send {
+pub trait FrameConsumer: Sync + Send {
     /// The type of data captured, such as video frames.
     type Frame;
 
@@ -90,10 +90,10 @@ pub trait CaptureHandler: Sync + Send {
 
     /// Start capturing. This function will not block until capturing is
     /// stopped, and it maintains its own capture thread internally.
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
-        arrived: S,
+        consumer: S,
     ) -> Result<(), Self::Error>;
 }
 
@@ -150,13 +150,13 @@ pub struct AudioCaptureSourceDescription {
 
 pub struct SourceCaptureOptions<T, P> {
     pub description: P,
-    pub arrived: T,
+    pub consumer: T,
 }
 
 pub struct CaptureOptions<V, A>
 where
-    V: FrameArrived<Frame = VideoFrame>,
-    A: FrameArrived<Frame = AudioFrame>,
+    V: FrameConsumer<Frame = VideoFrame>,
+    A: FrameConsumer<Frame = AudioFrame>,
 {
     pub video: Option<SourceCaptureOptions<V, VideoCaptureSourceDescription>>,
     pub audio: Option<SourceCaptureOptions<A, AudioCaptureSourceDescription>>,
@@ -164,8 +164,8 @@ where
 
 impl<V, A> Default for CaptureOptions<V, A>
 where
-    V: FrameArrived<Frame = VideoFrame>,
-    A: FrameArrived<Frame = AudioFrame>,
+    V: FrameConsumer<Frame = VideoFrame>,
+    A: FrameConsumer<Frame = AudioFrame>,
 {
     fn default() -> Self {
         Self {
@@ -206,25 +206,25 @@ impl Capture {
         CaptureOptions { video, audio }: CaptureOptions<V, A>,
     ) -> Result<Self, CaptureError>
     where
-        V: FrameArrived<Frame = VideoFrame> + 'static,
-        A: FrameArrived<Frame = AudioFrame> + 'static,
+        V: FrameConsumer<Frame = VideoFrame> + 'static,
+        A: FrameConsumer<Frame = AudioFrame> + 'static,
     {
         let mut devices = Vec::with_capacity(3);
 
         if let Some(SourceCaptureOptions {
             description,
-            arrived,
+            consumer,
         }) = video
         {
             match description.source.kind {
                 SourceType::Camera => {
                     let camera = CameraCapture::default();
-                    camera.start(description, arrived)?;
+                    camera.start(description, consumer)?;
                     devices.push(CaptureImplement::Camera(camera));
                 }
                 SourceType::Screen => {
                     let screen = ScreenCapture::default();
-                    screen.start(description, arrived)?;
+                    screen.start(description, consumer)?;
                     devices.push(CaptureImplement::Screen(screen));
                 }
                 _ => (),
@@ -233,11 +233,11 @@ impl Capture {
 
         if let Some(SourceCaptureOptions {
             description,
-            arrived,
+            consumer,
         }) = audio
         {
             let audio = AudioCapture::default();
-            audio.start(description, arrived)?;
+            audio.start(description, consumer)?;
             devices.push(CaptureImplement::Audio(audio));
         }
 

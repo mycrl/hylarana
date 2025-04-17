@@ -1,0 +1,65 @@
+.Settings {
+    position: fixed;
+    background-color: var(--primary-background-color);
+    z-index: 10;
+    width: 100%;
+    height: calc(100vh - 50px);
+    border-top: 1px solid var(--line-color);
+    transition: 0.3s;
+}
+
+.Settings .Content {
+    overflow-y: scroll;
+    max-height: calc(100vh - 155px);
+    margin: 25px 0 0 25px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    gap: 10px;
+}
+
+.Settings .Content .module {
+    margin-bottom: 50px;
+}
+
+.Settings .Content .module h1 {
+    font-size: 20px;
+    margin-bottom: 20px;
+    color: var(--secondary-color);
+    font-weight: 300;
+    text-transform: uppercase;
+}
+
+.Settings .Content .module .item {
+    margin-top: 7px;
+}
+
+.Settings .Content .module .item > * {
+    display: block;
+}
+
+.Settings .Content .module .item p {
+    color: var(--primary-text-color);
+}
+
+.Settings .Content .module .item sub {
+    color: var(--secondary-text-color);
+    white-space: break-spaces;
+}
+
+.Settings .Content .module .item input,
+.Settings .Content .module .item select {
+    width: 214px;
+    margin: 2px 0;
+}
+
+.Settings #Apply {
+    height: 35px;
+    width: 100px;
+    background-color: var(--primary-color);
+    border-radius: 35px;
+    border: 0;
+    color: #fff;
+    position: absolute;
+    bottom: 25px;
+    left: 25px;
+}

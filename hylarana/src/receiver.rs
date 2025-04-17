@@ -1,7 +1,7 @@
-use crate::{MediaStreamDescription, MediaStreamObserver, MediaStreamSink};
+use super::{MediaStreamDescription, MediaStreamObserver, MediaStreamSink};
 
 use std::{
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
 };
 
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use common::win32::MediaThreadClass;
 
 #[cfg(target_os = "windows")]
-use crate::util::get_direct3d;
+use super::util::get_direct3d;
 
 #[derive(Debug, Error)]
 pub enum HylaranaReceiverError {
@@ -83,7 +83,7 @@ where
             log::warn!("video decoder thread is closed!");
             if let Some(observer) = observer_.upgrade() {
                 if !status.get() {
-                    status.update(true);
+                    status.set(true);
                     observer.close();
                 }
             }
@@ -143,7 +143,7 @@ where
             log::warn!("audio decoder thread is closed!");
             if let Some(observer) = observer_.upgrade() {
                 if !status.get() {
-                    status.update(true);
+                    status.set(true);
                     observer.close();
                 }
             }
@@ -230,7 +230,7 @@ where
         log::info!("receiver drop");
 
         if !self.status.get() {
-            self.status.update(true);
+            self.status.set(true);
             self.observer.close();
         }
     }

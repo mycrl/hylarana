@@ -1,11 +1,11 @@
 use std::{slice::from_raw_parts, str::FromStr};
 
-use crate::{
-    sender::HylaranaSenderOptions, HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink,
+use super::{
+    HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink, sender::HylaranaSenderOptions,
 };
 
 #[cfg(target_os = "windows")]
-use crate::util::get_direct3d;
+use super::util::get_direct3d;
 
 #[cfg(target_os = "windows")]
 use common::win32::d3d_texture_borrowed_raw;
@@ -20,9 +20,9 @@ use renderer::win32::D3D11Renderer;
 use renderer::Texture2DRaw;
 
 use common::{
+    Size,
     codec::{VideoDecoderType, VideoEncoderType},
     frame::{AudioFrame, VideoFormat, VideoFrame, VideoSubFormat},
-    Size,
 };
 
 use renderer::{
@@ -144,8 +144,12 @@ impl<T> VideoRenderOptionsBuilder<T> {
             backend: VideoRenderBackend::WebGPU,
             source: VideoRenderSourceOptions {
                 size: Size::default(),
-                format: VideoFormat::NV12,
                 sub_format: VideoSubFormat::SW,
+                format: if cfg!(target_os = "macos") {
+                    VideoFormat::BGRA
+                } else {
+                    VideoFormat::NV12
+                },
             },
             surface,
         })
@@ -158,12 +162,6 @@ impl<T> VideoRenderOptionsBuilder<T> {
 
     pub fn from_sender(mut self, options: &HylaranaSenderOptions) -> Self {
         if let Some(it) = &options.media.video {
-            self.0.source.format = if cfg!(target_os = "macos") {
-                VideoFormat::BGRA
-            } else {
-                VideoFormat::NV12
-            };
-
             self.0.source.sub_format = match it.options.codec {
                 VideoEncoderType::X264 => VideoSubFormat::SW,
                 VideoEncoderType::Qsv => VideoSubFormat::D3D11,

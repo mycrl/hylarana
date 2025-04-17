@@ -2,9 +2,9 @@ use std::{
     marker::PhantomData,
     ptr::null_mut,
     sync::{
-        atomic::AtomicBool,
-        mpsc::{channel, Sender},
         Arc,
+        atomic::AtomicBool,
+        mpsc::{Sender, channel},
     },
     thread,
 };
@@ -110,7 +110,7 @@ where
                 }
             }
 
-            status_.update(false);
+            status_.set(false);
         });
 
         Ok(Self {
@@ -190,28 +190,29 @@ pub mod win32 {
     use std::mem::ManuallyDrop;
 
     use common::{
+        Size,
         frame::VideoFormat,
         win32::{
+            Direct3DDevice,
             windows::{
-                core::{Error, Interface},
                 Win32::{
                     Foundation::RECT,
                     Graphics::{
                         Direct3D11::{
-                            ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, ID3D11VideoContext,
-                            ID3D11VideoDevice, ID3D11VideoProcessor,
-                            ID3D11VideoProcessorEnumerator, ID3D11VideoProcessorInputView,
-                            ID3D11VideoProcessorOutputView, D3D11_BIND_RENDER_TARGET,
-                            D3D11_BIND_SHADER_RESOURCE, D3D11_CPU_ACCESS_READ,
-                            D3D11_CPU_ACCESS_WRITE, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ,
-                            D3D11_MAP_WRITE_DISCARD, D3D11_RESOURCE_MISC_SHARED,
-                            D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, D3D11_USAGE_DYNAMIC,
-                            D3D11_USAGE_STAGING, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
+                            D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE,
+                            D3D11_CPU_ACCESS_READ, D3D11_CPU_ACCESS_WRITE, D3D11_MAP_READ,
+                            D3D11_MAP_WRITE_DISCARD, D3D11_MAPPED_SUBRESOURCE,
+                            D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+                            D3D11_USAGE_DYNAMIC, D3D11_USAGE_STAGING,
+                            D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
                             D3D11_VIDEO_PROCESSOR_COLOR_SPACE, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
                             D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC,
                             D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_STREAM,
                             D3D11_VIDEO_USAGE_PLAYBACK_NORMAL, D3D11_VPIV_DIMENSION_TEXTURE2D,
-                            D3D11_VPOV_DIMENSION_TEXTURE2D,
+                            D3D11_VPOV_DIMENSION_TEXTURE2D, ID3D11Device, ID3D11DeviceContext,
+                            ID3D11Texture2D, ID3D11VideoContext, ID3D11VideoDevice,
+                            ID3D11VideoProcessor, ID3D11VideoProcessorEnumerator,
+                            ID3D11VideoProcessorInputView, ID3D11VideoProcessorOutputView,
                         },
                         Dxgi::Common::{
                             DXGI_FORMAT, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12,
@@ -219,10 +220,9 @@ pub mod win32 {
                         },
                     },
                 },
+                core::{Error, Interface},
             },
-            Direct3DDevice,
         },
-        Size,
     };
 
     #[derive(Clone)]

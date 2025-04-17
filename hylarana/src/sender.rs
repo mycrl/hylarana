@@ -1,38 +1,38 @@
-use crate::{
+use super::{
     MediaAudioStreamDescription, MediaStreamDescription, MediaStreamObserver, MediaStreamSink,
     MediaVideoStreamDescription,
 };
 
 #[cfg(target_os = "windows")]
-use crate::util::get_direct3d;
+use super::util::get_direct3d;
 
 use std::{
     mem::size_of,
-    sync::{atomic::AtomicBool, Arc, Weak},
+    sync::{Arc, Weak, atomic::AtomicBool},
 };
 
 use bytes::BytesMut;
 use capture::{
-    AudioCaptureSourceDescription, Capture, CaptureOptions, FrameArrived, Source,
+    AudioCaptureSourceDescription, Capture, CaptureOptions, FrameConsumer, Source,
     SourceCaptureOptions, VideoCaptureSourceDescription,
 };
 
 use common::{
+    Size, TransportOptions,
     atomic::EasyAtomic,
     codec::VideoEncoderType,
     frame::{AudioFrame, VideoFormat, VideoFrame},
-    Size, TransportOptions,
 };
 
 use codec::{
-    create_opus_identification_header, AudioEncoder, AudioEncoderSettings, CodecType, VideoEncoder,
-    VideoEncoderSettings,
+    AudioEncoder, AudioEncoderSettings, CodecType, VideoEncoder, VideoEncoderSettings,
+    create_opus_identification_header,
 };
 
 use thiserror::Error;
 use transport::{
-    copy_from_slice as package_copy_from_slice, BufferFlag, StreamBufferInfo, StreamSenderAdapter,
-    TransportSender,
+    BufferFlag, StreamBufferInfo, StreamSenderAdapter, TransportSender,
+    copy_from_slice as package_copy_from_slice,
 };
 
 #[cfg(feature = "serde")]
@@ -129,7 +129,7 @@ where
         })
     }
 
-    fn process(&mut self, frame: &VideoFrame) -> bool {
+    fn send(&mut self, frame: &VideoFrame) -> bool {
         // Push the audio and video frames into the encoder.
         if self.encoder.update(frame) {
             // Try to get the encoded data packets. The audio and video frames do not
@@ -173,7 +173,7 @@ where
     }
 }
 
-impl<S, O> FrameArrived for VideoSender<S, O>
+impl<S, O> FrameConsumer for VideoSender<S, O>
 where
     S: MediaStreamSink + 'static,
     O: MediaStreamObserver + 'static,
@@ -181,12 +181,12 @@ where
     type Frame = VideoFrame;
 
     fn sink(&mut self, frame: &Self::Frame) -> bool {
-        if self.process(frame) {
+        if self.send(frame) {
             true
         } else {
             if let Some(observer) = self.observer.upgrade() {
                 if !self.status.get() {
-                    self.status.update(true);
+                    self.status.set(true);
                     observer.close();
                 }
             }
@@ -248,7 +248,7 @@ where
         })
     }
 
-    fn process(&mut self, frame: &AudioFrame) -> bool {
+    fn send(&mut self, frame: &AudioFrame) -> bool {
         self.buffer.extend_from_slice(unsafe {
             std::slice::from_raw_parts(
                 frame.data as *const _,
@@ -309,7 +309,7 @@ where
     }
 }
 
-impl<S, O> FrameArrived for AudioSender<S, O>
+impl<S, O> FrameConsumer for AudioSender<S, O>
 where
     S: MediaStreamSink + 'static,
     O: MediaStreamObserver + 'static,
@@ -317,12 +317,12 @@ where
     type Frame = AudioFrame;
 
     fn sink(&mut self, frame: &Self::Frame) -> bool {
-        if self.process(frame) {
+        if self.send(frame) {
             true
         } else {
             if let Some(observer) = self.observer.upgrade() {
                 if !self.status.get() {
-                    self.status.update(true);
+                    self.status.set(true);
                     observer.close();
                 }
             }
@@ -371,7 +371,7 @@ where
 
         if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.audio {
             capture_options.audio = Some(SourceCaptureOptions {
-                arrived: AudioSender::new(
+                consumer: AudioSender::new(
                     status.clone(),
                     &transport,
                     AudioEncoderSettings {
@@ -401,7 +401,7 @@ where
                     #[cfg(target_os = "windows")]
                     direct3d: get_direct3d(),
                 },
-                arrived: VideoSender::new(
+                consumer: VideoSender::new(
                     status.clone(),
                     &transport,
                     VideoEncoderSettings {
@@ -475,7 +475,7 @@ where
         log::info!("sender drop");
 
         if !self.status.get() {
-            self.status.update(true);
+            self.status.set(true);
 
             // When the sender releases, the cleanup work should be done, but there is a
             // more troublesome point here. If it is actively released by the outside, it

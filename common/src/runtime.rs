@@ -24,6 +24,10 @@ pub fn set_runtime_handle(handle: Handle) {
 /// Internally, a multithreaded runtime is created by default internally if no
 /// runtime is provided externally.
 pub fn get_runtime_handle() -> Handle {
+    if let Ok(handle) = Handle::try_current() {
+        return handle;
+    }
+
     if let Some(handle) = HANDLE.lock().as_ref() {
         return handle.clone();
     }

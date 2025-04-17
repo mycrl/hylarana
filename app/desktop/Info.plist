@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CFBundleName</key>
+		<string>Hylarana</string>
+		<key>CFBundleDisplayName</key>
+		<string>Hylarana</string>
+		<key>CFBundleIdentifier</key>
+		<string>com.github.mycrl.hylarana</string>
+		<key>CFBundleVersion</key>
+		<string>1.0.0</string>
+		<key>CFBundleShortVersionString</key>
+		<string>1.0</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleExecutable</key>
+		<string>Hylarana</string>
+		<key>LSMinimumSystemVersion</key>
+		<string>15.4</string>
+		<key>CFBundleIconFile</key>
+		<string>icon</string>
+		<key>NSLocalNetworkUsageDescription</key>
+        <string></string>
+        <key>NSMicrophoneUsageDescription</key>
+        <string></string>
+        <key>NSCameraUsageDescription</key>
+        <string></string>
+        <key>NSAppleEventsUsageDescription</key>
+        <string></string>
+        <key>NSSystemAdministrationUsageDescription</key>
+        <string></string>
+        <key>NSScreenCaptureDescription</key>
+        <string></string>
+	</dict>
+</plist>

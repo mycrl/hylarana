@@ -1,4 +1,4 @@
-use crate::{CaptureHandler, FrameArrived, Source, VideoCaptureSourceDescription};
+use crate::{CaptureHandler, FrameConsumer, Source, VideoCaptureSourceDescription};
 
 use common::frame::VideoFrame;
 use thiserror::Error;
@@ -18,10 +18,10 @@ impl CaptureHandler for CameraCapture {
         Ok(Vec::new())
     }
 
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         _options: Self::CaptureOptions,
-        mut _arrived: S,
+        mut _consumer: S,
     ) -> Result<(), Self::Error> {
         unimplemented!("camera capture is not supported on macos")
     }

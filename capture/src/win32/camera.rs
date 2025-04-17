@@ -1,9 +1,9 @@
-use crate::{CaptureHandler, FrameArrived, Source, SourceType, VideoCaptureSourceDescription};
+use crate::{CaptureHandler, FrameConsumer, Source, SourceType, VideoCaptureSourceDescription};
 
 use std::{
     ptr::null_mut,
     slice::from_raw_parts,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
 };
 
@@ -15,18 +15,18 @@ use common::{
 
 use thiserror::Error;
 use windows::{
-    core::Interface,
     Win32::Media::MediaFoundation::{
-        IMF2DBuffer, IMFAttributes, IMFMediaSource, IMFSample, IMFSourceReader, MFCreateAttributes,
-        MFCreateDeviceSource, MFCreateMediaType, MFCreateSourceReaderFromMediaSource,
-        MFEnumDeviceSources, MFMediaType_Video, MFVideoFormat_NV12,
+        IMF2DBuffer, IMFAttributes, IMFMediaSource, IMFSample, IMFSourceReader,
         MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
         MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
         MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, MF_MT_DEFAULT_STRIDE,
         MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
         MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING,
-        MF_SOURCE_READER_FIRST_VIDEO_STREAM,
+        MF_SOURCE_READER_FIRST_VIDEO_STREAM, MFCreateAttributes, MFCreateDeviceSource,
+        MFCreateMediaType, MFCreateSourceReaderFromMediaSource, MFEnumDeviceSources,
+        MFMediaType_Video, MFVideoFormat_NV12,
     },
+    core::Interface,
 };
 
 #[derive(Debug, Error)]
@@ -41,8 +41,8 @@ pub enum CameraCaptureError {
     CaptureIsStoped,
     #[error("failed to lock textture 2d")]
     Lock2DError,
-    #[error("FrameArrived sink return false")]
-    FrameArrivedStoped,
+    #[error("FrameConsumer sink return false")]
+    FrameConsumerStoped,
 }
 
 /// Creates an empty attribute store.
@@ -88,13 +88,13 @@ struct Context<T> {
     device: IMFMediaSource,
     reader: IMFSourceReader,
     frame: VideoFrame,
-    arrived: T,
+    consumer: T,
 }
 
 unsafe impl<T> Sync for Context<T> {}
 unsafe impl<T> Send for Context<T> {}
 
-impl<T: FrameArrived<Frame = VideoFrame>> Context<T> {
+impl<T: FrameConsumer<Frame = VideoFrame>> Context<T> {
     fn poll(&mut self) -> Result<(), CameraCaptureError> {
         if !self.status.get() {
             return Err(CameraCaptureError::CaptureIsStoped);
@@ -135,8 +135,8 @@ impl<T: FrameArrived<Frame = VideoFrame>> Context<T> {
             unsafe { data.add(stride as usize * self.frame.height as usize) as *const _ };
 
         self.frame.linesize = [stride as u32, stride as u32, 0];
-        if !self.arrived.sink(&self.frame) {
-            return Err(CameraCaptureError::FrameArrivedStoped);
+        if !self.consumer.sink(&self.frame) {
+            return Err(CameraCaptureError::FrameConsumerStoped);
         }
 
         // Unlocks a buffer that was previously locked.
@@ -147,7 +147,7 @@ impl<T: FrameArrived<Frame = VideoFrame>> Context<T> {
 
 impl<T> Drop for Context<T> {
     fn drop(&mut self) {
-        self.status.update(false);
+        self.status.set(false);
 
         // Stops all active streams in the media source.
         if let Err(e) = unsafe { self.device.Stop() } {
@@ -204,10 +204,10 @@ impl CaptureHandler for CameraCapture {
     }
 
     #[rustfmt::skip]
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         opt: Self::CaptureOptions,
-        arrived: S,
+        consumer: S,
     ) -> Result<(), Self::Error> {
         let mut attributes = create_attributes()?;
         attributes.set(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, IMFValue::U32(1))?;
@@ -249,7 +249,7 @@ impl CaptureHandler for CameraCapture {
 
         let mut ctx = Context {
             status: self.0.clone(),
-            arrived,
+            consumer,
             reader,
             device,
             frame,
@@ -257,7 +257,7 @@ impl CaptureHandler for CameraCapture {
 
         // Create a thread to continuously process the video frames read from the 
         // device and pass them to the receiver.
-        self.0.update(true);
+        self.0.set(true);
         thread::Builder::new()
             .name("WindowsCameraCaptureThread".to_string())
             .spawn(move || {
@@ -272,7 +272,7 @@ impl CaptureHandler for CameraCapture {
                 }
 
                 log::info!("WindowsCameraCaptureThread stop");
-                ctx.status.update(false);
+                ctx.status.set(false);
 
                 if let Some(guard) = thread_class_guard {
                     drop(guard)
@@ -285,7 +285,7 @@ impl CaptureHandler for CameraCapture {
     fn stop(&self) -> Result<(), Self::Error> {
         log::info!("stop camera capture");
 
-        self.0.update(false);
+        self.0.set(false);
         Ok(())
     }
 }

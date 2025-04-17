@@ -1,0 +1,75 @@
+@keyframes action-button-loading {
+    0% {
+        transform: translateX(-50px);
+    }
+
+    100% {
+        transform: translateX(50px);
+    }
+}
+
+.Sender .Content .Control .Button {
+    border: 1px solid var(--secondary-color);
+    background-color: var(--secondary-color) !important;
+    color: #fff !important;
+}
+
+.Sender .Content .Control .Button,
+.Sender .Content .Control .Button > * {
+    transition: 0.5s;
+}
+
+.Sender .Content .Control .Button span {
+    position: relative;
+    left: -5px;
+}
+
+.Sender .Content .Control .Button .icon {
+    position: relative;
+    z-index: -10;
+    opacity: 0;
+    left: -20px;
+    font-size: 14px;
+    bottom: -14px;
+}
+
+.Sender .Content .Control .Button:hover {
+    background-color: var(--secondary-background-color) !important;
+    border: 1px solid var(--primary-color) !important;
+    color: #fff !important;
+}
+
+.Sender .Content .Control .Button:hover > span {
+    left: 10px;
+}
+
+.Sender .Content .Control .Button:hover .icon {
+    opacity: 1;
+    z-index: 1;
+    bottom: 0;
+}
+
+.Sender .Content .Control .ButtonLoading {
+    background-color: var(--secondary-background-color) !important;
+    border: 1px solid var(--primary-color) !important;
+    color: #fff !important;
+}
+
+.Sender .Content .Control .ButtonLoading span {
+    display: none;
+}
+
+.Sender .Content .Control .ButtonLoading .icon {
+    font-size: 14px;
+    animation: action-button-loading 0.7s infinite linear alternate;
+}
+
+.Sender .Content .Control .ButtonComplete {
+    border: 1px solid var(--stop-color) !important;
+    background-color: var(--stop-color) !important;
+    color: #fff !important;
+}
+
+.Sender .Content .Control .ButtonComplete .icon {
+    margin-right: 15px;
+}

@@ -1,0 +1,121 @@
+.Sender .Devices {
+    height: calc(100vh - 240px);
+    position: relative;
+}
+
+.Sender .Devices .header {
+    border-bottom: 1px solid var(--line-color);
+    position: relative;
+}
+
+.Sender .Devices .header p {
+    color: var(--primary-color);
+    text-transform: uppercase;
+}
+
+.Sender .Devices .header span {
+    color: var(--secondary-text-color);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.Sender .Devices .count {
+    position: absolute;
+    text-align: right;
+    color: var(--secondary-text-color);
+    right: 0;
+    top: -20px;
+}
+
+.Sender .Devices .count span {
+    margin: 0 5px;
+    color: var(--secondary-color);
+}
+
+.Sender .Devices .count input {
+    position: relative;
+    top: 10px;
+    margin-left: 5px;
+}
+
+.Sender .Devices .items {
+    position: absolute;
+    overflow-y: auto;
+    overflow-x: hidden;
+    top: 40px;
+    left: -10px;
+    right: -20px;
+    padding: 10px;
+    max-height: calc(100vh - 305px);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.Sender .Devices .items .loading {
+    text-align: center;
+    width: calc(100vw - 40px);
+    color: var(--secondary-text-color);
+    grid-column: 1 / -1;
+}
+
+.Sender .Devices .items .item {
+    border-radius: 5px;
+    height: 50px;
+    display: flex;
+    transition: 0.3s;
+    border: 1px solid var(--primary-color);
+}
+
+.Sender .Devices .items .item:hover {
+    border: 1px solid var(--secondary-color);
+}
+
+.Sender .Devices .items .item:hover .logo {
+    color: var(--secondary-color);
+}
+
+.Sender .Devices .items .item .logo {
+    border-radius: 5px 0 0 5px;
+    height: 50px;
+    width: 50px;
+    color: var(--primary-color);
+    text-align: center;
+    line-height: 50px;
+    border-right: 1px solid var(--line-color);
+}
+
+.Sender .Devices .items .item .logo .icon {
+    font-size: 20px;
+    position: relative;
+    top: 3px;
+}
+
+.Sender .Devices .items .item .info {
+    padding: 7px;
+    flex: 1;
+}
+
+.Sender .Devices .items .item .info p {
+    margin-top: 1px;
+    margin-bottom: 4px;
+    color: var(--primary-text-color);
+}
+
+.Sender .Devices .items .item .info span {
+    color: var(--secondary-text-color);
+}
+
+.Sender .Devices .items #selected {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--secondary-color);
+}
+
+.Sender .Devices .items #selected .info span {
+    color: var(--primary-text-color);
+}
+
+.Sender .Devices .items #selected .logo {
+    color: var(--primary-text-color);
+    border-right: 1px solid var(--primary-color);
+}

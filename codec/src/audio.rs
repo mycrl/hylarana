@@ -1,4 +1,7 @@
-use crate::codec::{set_option, set_str_option};
+use crate::{
+    AudioEncoderSettings,
+    codec::{set_option, set_str_option},
+};
 
 use std::{ffi::c_int, ptr::null_mut};
 
@@ -194,12 +197,6 @@ impl Drop for AudioDecoder {
             }
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct AudioEncoderSettings {
-    pub bit_rate: u64,
-    pub sample_rate: u64,
 }
 
 #[derive(Error, Debug)]

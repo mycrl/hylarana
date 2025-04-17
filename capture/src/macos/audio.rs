@@ -1,6 +1,6 @@
 use std::{slice::from_raw_parts, sync::atomic::AtomicBool};
 
-use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameArrived, Source, SourceType};
+use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameConsumer, Source, SourceType};
 
 use thiserror::Error;
 
@@ -11,12 +11,13 @@ use resample::{
     AudioResampler, AudioResamplerError, AudioResamplerOutput, AudioSampleDescription,
     AudioSampleFormat,
 };
+
 use screencapturekit::{
     output::CMSampleBuffer,
     shareable_content::SCShareableContent,
     stream::{
-        configuration::SCStreamConfiguration, content_filter::SCContentFilter,
-        output_trait::SCStreamOutputTrait, output_type::SCStreamOutputType, SCStream,
+        SCStream, configuration::SCStreamConfiguration, content_filter::SCContentFilter,
+        output_trait::SCStreamOutputTrait, output_type::SCStreamOutputType,
     },
 };
 
@@ -54,10 +55,10 @@ impl CaptureHandler for AudioCapture {
         }])
     }
 
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
-        arrived: S,
+        consumer: S,
     ) -> Result<(), Self::Error> {
         let mut stream = SCStream::new(
             &SCContentFilter::new().with_display_excluding_windows(
@@ -84,7 +85,7 @@ impl CaptureHandler for AudioCapture {
                         channels: 2,
                     },
                     Output {
-                        arrived,
+                        consumer,
                         frame: {
                             let mut frame = AudioFrame::default();
                             frame.sample_rate = options.sample_rate;
@@ -135,7 +136,7 @@ impl SCStreamOutputTrait for Capture {
                     }) {
                         log::error!("resample audio buffer error={:?}", e);
 
-                        self.status.update(false);
+                        self.status.set(false);
                         return;
                     }
                 }
@@ -145,18 +146,18 @@ impl SCStreamOutputTrait for Capture {
 }
 
 struct Output<S> {
-    arrived: S,
+    consumer: S,
     frame: AudioFrame,
 }
 
 impl<S> AudioResamplerOutput<i16> for Output<S>
 where
-    S: FrameArrived<Frame = AudioFrame> + 'static,
+    S: FrameConsumer<Frame = AudioFrame> + 'static,
 {
     fn output(&mut self, buffer: &[i16], frames: u32) -> bool {
         self.frame.data = buffer.as_ptr();
         self.frame.frames = frames;
 
-        self.arrived.sink(&self.frame)
+        self.consumer.sink(&self.frame)
     }
 }

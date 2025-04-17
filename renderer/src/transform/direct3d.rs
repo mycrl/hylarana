@@ -1,26 +1,26 @@
 use super::TransformError;
 
 use common::{
+    Size,
     frame::VideoFormat,
     win32::{
+        Direct3DDevice, EasyTexture,
         windows::Win32::Graphics::{
             Direct3D11::{
-                ID3D11Texture2D, D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC,
-                D3D11_USAGE_DEFAULT,
+                D3D11_RESOURCE_MISC_SHARED, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
+                ID3D11Texture2D,
             },
             Direct3D12::ID3D12Resource,
             Dxgi::Common::{
                 DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12, DXGI_FORMAT_R8G8B8A8_UNORM,
             },
         },
-        Direct3DDevice, EasyTexture,
     },
-    Size,
 };
 
 use wgpu::{
-    hal::api::Dx12, Device, Extent3d, Texture, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureUsages,
+    Device, Extent3d, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    hal::api::Dx12,
 };
 
 pub struct Transformer {

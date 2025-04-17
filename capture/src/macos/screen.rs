@@ -1,6 +1,6 @@
 use std::{ops::DerefMut, sync::atomic::AtomicBool};
 
-use crate::{CaptureHandler, FrameArrived, Source, SourceType, VideoCaptureSourceDescription};
+use crate::{CaptureHandler, FrameConsumer, Source, SourceType, VideoCaptureSourceDescription};
 
 use thiserror::Error;
 
@@ -16,11 +16,11 @@ use screencapturekit::{
     output::CMSampleBuffer,
     shareable_content::SCShareableContent,
     stream::{
-        configuration::{pixel_format::PixelFormat, SCStreamConfiguration},
+        SCStream,
+        configuration::{SCStreamConfiguration, pixel_format::PixelFormat},
         content_filter::SCContentFilter,
         output_trait::SCStreamOutputTrait,
         output_type::SCStreamOutputType,
-        SCStream,
     },
 };
 
@@ -52,31 +52,32 @@ impl CaptureHandler for ScreenCapture {
             .get()?
             .displays()
             .into_iter()
-            .map(|it| {
+            .enumerate()
+            .map(|(index, it)| {
                 let id = it.display_id();
 
                 Source {
-                    kind: SourceType::Screen,
-                    index: id as usize,
-                    is_default: id == 1,
+                    index,
                     id: id.to_string(),
+                    is_default: index == 0,
+                    kind: SourceType::Screen,
                     name: format!("{} {}x{}", id, it.width(), it.height()),
                 }
             })
             .collect())
     }
 
-    fn start<S: FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         options: Self::CaptureOptions,
-        arrived: S,
+        consumer: S,
     ) -> Result<(), Self::Error> {
         let display = SCShareableContent::with_options()
             .on_screen_windows_only()
             .get()?
             .displays()
             .into_iter()
-            .find(|it| it.display_id() == options.source.index as u32)
+            .find(|it| it.display_id().to_string() == options.source.id)
             .ok_or_else(|| ScreenCaptureError::NotFoundDevice)?;
 
         let mut frame = VideoFrame::default();
@@ -103,7 +104,7 @@ impl CaptureHandler for ScreenCapture {
 
         stream.add_output_handler(
             Capture {
-                ctx: Mutex::new(CaptureContext { arrived, frame }),
+                ctx: Mutex::new(CaptureContext { consumer, frame }),
                 status: AtomicBool::new(true),
             },
             SCStreamOutputType::Screen,
@@ -124,19 +125,19 @@ impl CaptureHandler for ScreenCapture {
     }
 }
 
-struct CaptureContext<S: FrameArrived<Frame = VideoFrame> + 'static> {
-    arrived: S,
+struct CaptureContext<S: FrameConsumer<Frame = VideoFrame> + 'static> {
+    consumer: S,
     frame: VideoFrame,
 }
 
-struct Capture<S: FrameArrived<Frame = VideoFrame> + 'static> {
+struct Capture<S: FrameConsumer<Frame = VideoFrame> + 'static> {
     ctx: Mutex<CaptureContext<S>>,
     status: AtomicBool,
 }
 
 impl<S> SCStreamOutputTrait for Capture<S>
 where
-    S: FrameArrived<Frame = VideoFrame> + 'static,
+    S: FrameConsumer<Frame = VideoFrame> + 'static,
 {
     fn did_output_sample_buffer(&self, buffer: CMSampleBuffer, _: SCStreamOutputType) {
         if !self.status.get() {
@@ -148,13 +149,13 @@ where
         if buffer.make_data_ready().is_ok() {
             if let Ok(buffer) = buffer.get_pixel_buffer() {
                 let mut lock = self.ctx.lock();
-                let CaptureContext { arrived, frame } = lock.deref_mut();
+                let CaptureContext { consumer, frame } = lock.deref_mut();
 
                 let buffer_ref = buffer.as_concrete_TypeRef();
                 frame.data[0] = buffer_ref as _;
 
-                if !arrived.sink(&frame) {
-                    self.status.update(false);
+                if !consumer.sink(&frame) {
+                    self.status.set(false);
                 }
             }
         }

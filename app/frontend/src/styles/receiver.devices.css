@@ -1,0 +1,154 @@
+.Receiver .Devices {
+    position: relative;
+    height: 100%;
+}
+
+.Receiver .Devices > .header {
+    border-bottom: 1px solid var(--line-color);
+}
+
+.Receiver .Devices > .header p {
+    color: var(--primary-color);
+    text-transform: uppercase;
+}
+
+.Receiver .Devices > .header span {
+    color: var(--secondary-text-color);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.Receiver .Devices .items {
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: absolute;
+    top: 40px;
+    left: -10px;
+    right: -20px;
+    padding: 10px;
+    max-height: calc(100vh - 165px);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.Receiver .Devices .items .loading {
+    text-align: center;
+    width: calc(100vw - 40px);
+    color: var(--secondary-text-color);
+    grid-column: 1 / -1;
+}
+
+.Receiver .Devices .items .item {
+    border-radius: 5px;
+    transition: 0.3s;
+    border: 1px solid var(--primary-color);
+}
+
+.Receiver .Devices .items .item:hover {
+    border: 1px solid var(--secondary-color);
+}
+
+.Receiver .Devices .items .item .header {
+    display: flex;
+    height: 49px;
+    border-bottom: 1px solid var(--line-color);
+}
+
+.Receiver .Devices .items .item:hover .header .logo {
+    color: var(--secondary-color);
+}
+
+.Receiver .Devices .items .item .header .logo {
+    height: 50px;
+    width: 50px;
+    text-align: center;
+    line-height: 50px;
+    border-radius: 5px 0 0 0;
+    color: var(--primary-color);
+    position: relative;
+    top: -1px;
+    left: -1px;
+}
+
+.Receiver .Devices .items .item .header .logo .icon {
+    font-size: 20px;
+    position: relative;
+    top: 3px;
+}
+
+.Receiver .Devices .items .item .header .info {
+    flex: 1;
+    margin-top: 8px;
+    margin-left: 8px;
+}
+
+.Receiver .Devices .items .item .header .info p {
+    color: var(--primary-text-color);
+}
+
+.Receiver .Devices .items .item .header .info span {
+    color: var(--secondary-text-color);
+}
+
+.Receiver .Devices .items .item .description .sub:first-of-type {
+    border-bottom: 1px solid var(--line-color);
+}
+
+.Receiver .Devices .items .item .description .sub {
+    padding: 5px;
+}
+
+.Receiver .Devices .items .item .description .sub p {
+    display: inline;
+    color: var(--secondary-color);
+}
+
+.Receiver .Devices .items .item .description .sub span {
+    color: var(--secondary-text-color);
+}
+
+.Receiver .Devices .items .item .accept {
+    width: calc(100% + 2px);
+    border: 0;
+    height: 35px;
+    border-radius: 0 0 5px 5px;
+    color: #fff;
+    background-color: var(--primary-color);
+    border-top: 1px solid var(--primary-color);
+    position: relative;
+    left: -1px;
+    bottom: -1px;
+}
+
+.Receiver .Devices .items .item .accept > * {
+    transition: 0.5s;
+}
+
+.Receiver .Devices .items .item .accept:hover {
+    background-color: rgba(0, 0, 0, 0);
+    border-top: 1px solid var(--secondary-color);
+}
+
+.Receiver .Devices .items .item .accept .icon {
+    position: relative;
+    z-index: -10;
+    opacity: 0;
+    left: -20px;
+    bottom: -14px;
+}
+
+.Receiver .Devices .items .item .accept span {
+    position: relative;
+    left: -1rem;
+}
+
+.Receiver .Devices .items .item .accept:hover .icon {
+    opacity: 1;
+    z-index: 1;
+    bottom: 0;
+}
+
+.Receiver .Devices .items .item .accept:hover span {
+    left: 0;
+}

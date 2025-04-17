@@ -9,16 +9,16 @@ pub use self::{player::*, receiver::*, sender::*};
 
 pub use capture::{Capture, Source, SourceType};
 pub use common::{
-    codec::*, frame::*, MediaAudioStreamDescription, MediaStreamDescription,
-    MediaVideoStreamDescription, Size, TransportOptions, TransportStrategy,
+    MediaAudioStreamDescription, MediaStreamDescription, MediaVideoStreamDescription, Size,
+    TransportOptions, TransportStrategy, codec::*, frame::*, runtime::*,
 };
 
-pub use discovery::{DiscoveryError, DiscoveryObserver, DiscoveryService};
-pub use renderer::{raw_window_handle, SurfaceTarget};
+pub use discovery::{DiscoveryContext, DiscoveryError, DiscoveryObserver, DiscoveryService};
+pub use renderer::{SurfaceTarget, raw_window_handle};
 
 #[cfg(target_os = "windows")]
 use common::win32::{
-    set_process_priority, shutdown as win32_shutdown, startup as win32_startup, ProcessPriority,
+    ProcessPriority, set_process_priority, shutdown as win32_shutdown, startup as win32_startup,
 };
 
 #[derive(Debug, Error)]

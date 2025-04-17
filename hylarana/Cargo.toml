@@ -1,25 +1,25 @@
 [package]
 name = "hylarana"
 version = "0.4.0"
-edition = "2021"
+edition = "2024"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
 readme = "./README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
-thiserror.workspace = true
-bytes.workspace = true
-log.workspace = true
-parking_lot.workspace = true
-serde.workspace = true
-common.workspace = true
-transport.workspace = true
+log = "0.4"
+bytes = "1.5"
+parking_lot = "0.12"
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+rodio = { version = "0.19", default-features = false }
 renderer.workspace = true
-discovery.workspace = true
 capture.workspace = true
 codec.workspace = true
-rodio.workspace = true
+common.workspace = true
+transport.workspace = true
+discovery.workspace = true
 
 [features]
 serde = ["common/serde", "capture/serde"]

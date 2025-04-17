@@ -2,11 +2,11 @@ use std::{ffi::c_int, io::Error, net::SocketAddr};
 
 use os_socketaddr::OsSocketAddr;
 
-use super::{options::get_sock_opt_str, SRT_SOCKOPT};
+use super::{SRT_SOCKOPT, options::get_sock_opt_str};
 
 use super::{
-    error, options::Options, srt_bstats, srt_close, srt_connect, srt_create_socket, srt_recv,
-    srt_send, TraceStats, SRTSOCKET, SRT_INVALID_SOCK,
+    SRT_INVALID_SOCK, SRTSOCKET, TraceStats, error, options::Options, srt_bstats, srt_close,
+    srt_connect, srt_create_socket, srt_recv, srt_send,
 };
 
 pub struct Socket {

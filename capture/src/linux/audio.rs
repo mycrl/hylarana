@@ -18,10 +18,10 @@ impl CaptureHandler for AudioCapture {
         Ok(Vec::new())
     }
 
-    fn start<S: crate::FrameArrived<Frame = Self::Frame> + 'static>(
+    fn start<S: crate::FrameConsumer<Frame = Self::Frame> + 'static>(
         &self,
         _options: Self::CaptureOptions,
-        _arrived: S,
+        _consumer: S,
     ) -> Result<(), Self::Error> {
         unimplemented!("audio capture is not supported on linux")
     }

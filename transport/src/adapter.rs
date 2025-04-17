@@ -2,7 +2,7 @@ use std::{
     fmt,
     sync::{
         atomic::{AtomicBool, AtomicU8},
-        mpsc::{channel, Receiver, Sender},
+        mpsc::{Receiver, Sender, channel},
     },
 };
 
@@ -38,14 +38,14 @@ struct PacketFilter {
 impl PacketFilter {
     fn filter(&self, flag: i32, keyframe: bool) -> bool {
         // First check whether the decoder has been initialized. Here, it is judged
-        // whether the configuration information has arrived. If the configuration
-        // information has arrived, the decoder initialization is marked as completed.
+        // whether the configuration information has consumer. If the configuration
+        // information has consumer, the decoder initialization is marked as completed.
         if !self.initialized.get() {
             if flag != BufferFlag::Config as i32 {
                 return false;
             }
 
-            self.initialized.update(true);
+            self.initialized.set(true);
             return true;
         }
 
@@ -64,7 +64,7 @@ impl PacketFilter {
             // arrive.
             if !self.readable.get() {
                 if flag == BufferFlag::KeyFrame as i32 {
-                    self.readable.update(true);
+                    self.readable.set(true);
                 } else {
                     return false;
                 }
@@ -75,7 +75,7 @@ impl PacketFilter {
     }
 
     fn loss(&self) {
-        self.readable.update(false);
+        self.readable.set(false);
     }
 }
 
@@ -197,7 +197,7 @@ impl StreamSenderAdapter {
                 let count = self.aioci.audio.get();
                 self.aioci
                     .audio
-                    .update(if count == AutoInsertOfConfigInfo::AUDIO_INTERVAL {
+                    .set(if count == AutoInsertOfConfigInfo::AUDIO_INTERVAL {
                         if let Some(config) = self.config.audio.get() {
                             if !self.channel.send(Some((
                                 config.clone(),
@@ -263,8 +263,7 @@ impl StreamReceiverAdapterAbstract for StreamReceiverAdapter {
         self.filter.video.loss();
 
         log::warn!(
-            "Packet loss has occurred and the data stream is currently \
-            paused, waiting for the key frame to arrive.",
+            "Packet loss has occurred and the data stream is currently paused, waiting for the key frame to arrive.",
         );
     }
 
@@ -323,8 +322,7 @@ impl StreamReceiverAdapterAbstract for StreamMultiReceiverAdapter {
         self.filter.video.loss();
 
         log::warn!(
-            "Packet loss has occurred and the data stream is currently \
-            paused, waiting for the key frame to arrive.",
+            "Packet loss has occurred and the data stream is currently paused, waiting for the key frame to arrive.",
         );
     }
 
