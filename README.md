@@ -17,7 +17,7 @@
 <br/>
 <br/>
 <div align="center">
-    <img src="./app.jpeg"/>
+    <img src="./app.png"/>
     <span>This is a screen cast application implemented using the hylarana SDK.</span>
 </div>
 <div align="center">
