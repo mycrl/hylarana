@@ -73,6 +73,7 @@ impl AppConfig {
             .unwrap()
             .to_str()
             .unwrap()
+            .replace("\\", "/")
             .split("/")
             .last()
             .unwrap()
@@ -84,7 +85,15 @@ fn join_with_current_dir(chlid: &str) -> Option<String> {
     let mut path = current_exe().ok()?;
 
     path.pop();
-    Some(path.join(chlid).canonicalize().ok()?.to_str()?.to_string())
+    Some(
+        path.join(chlid)
+            .canonicalize()
+            .ok()?
+            .to_str()?
+            .to_string()
+            .replace("\\\\?\\", "")
+            .replace("\\", "/"),
+    )
 }
 
 impl Default for AppConfig {
