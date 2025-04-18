@@ -209,7 +209,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
         })
     }
 
-    fn on_frame_consumer(
+    fn on_frame_arrived(
         &mut self,
         frame: &mut Frame,
         control: InternalCaptureControl,

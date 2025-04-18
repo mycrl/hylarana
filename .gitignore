@@ -3,7 +3,6 @@
 *.env
 .vscode
 .vs
-Cargo.lock
 .DS_Store
 /build/
 /doc
