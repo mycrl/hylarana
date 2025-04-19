@@ -60,8 +60,6 @@ impl Receiver {
     }
 
     pub fn close(&self) -> Result<()> {
-        log::info!("=================== native close");
-
         let mut env = get_current_env();
         env.call_method(self.observer.as_obj(), "close", "()V", &[])?;
 
