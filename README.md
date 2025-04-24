@@ -103,4 +103,4 @@ The build product is under the `target/app` directory.
 
 ## License
 
-[LGPL](./LICENSE) Copyright (c) 2024 mycrl.
+[MIT](./LICENSE) Copyright (c) 2024 mycrl.
