@@ -34,7 +34,7 @@ The project is cross-platform, but the prioritized supported platforms are Windo
 
 Unlike traditional screen casting implementations, this project can work in forwarding mode, in which it can support casting to hundreds or thousands of devices at the same time, which can be useful in some specific scenarios (e.g., all advertising screens in a building).
 
-At the heart of hylarana is an SDK that provides rust crate on desktop and a kotlin implementation on android. And, this project uses the hylarana SDK and Electron to create a screen casting application that supports Macos and Windows. So, hylarana is not a mere application project, the main core is the SDK and the development is focused around the SDK.
+At the heart of hylarana is an SDK that provides rust crate on desktop and a kotlin implementation on android. And, this project uses the hylarana SDK and CEF to create a screen casting application that supports Macos and Windows. So, hylarana is not a mere application project, the main core is the SDK and the development is focused around the SDK.
 
 ## Technical overview
 
@@ -78,28 +78,28 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 
 > For Linux, you need to install additional dependencies to build SRT and other.
 
-```sh
+```bash
 sudo apt-get update
 sudo apt-get install unzip tclsh pkg-config cmake libssl-dev build-essential libasound2-dev
 ```
 
 ##### Macos
 
-```sh
+```bash
 brew install cmake ffmpeg@7
 ```
 
 ---
 
-#### Build
+#### Build App
 
-```sh
+```bash
 yarn
 cp app/desktop
 yarn build:release
 ```
 
-The build product is under the `target/app` directory, which provides the installer and the directory after unfolding.
+The build product is under the `target/app` directory.
 
 ## License
 
