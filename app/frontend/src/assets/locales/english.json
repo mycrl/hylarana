@@ -53,8 +53,6 @@
     "SenderStart": "Start",
     "SenderStop": "Stop",
     "ReceiverStop": "Stop",
-    "RendererBackend": "renderer backend",
-    "RendererBackendHelp": "Direct3D11: Backend implemented using D3D11, which is supported on an older device and platform and has better performance performance and memory footprint, but only on windows. \r\nWebGPU: Cross-platform graphics backends implemented using WebGPUs are supported on a number of common platforms or devices.",
     "Accapt": "Accapt",
     "Sendering": "In the screen of casting...",
     "Receivering": "In the screen of receiving...",

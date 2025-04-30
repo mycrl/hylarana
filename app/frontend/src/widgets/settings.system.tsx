@@ -3,8 +3,6 @@ import { Language, LanguageOptions } from "../state";
 
 import Input from "../components/input";
 import Select from "../components/select";
-import { Backend } from "../bridge";
-import { cfg, TargetOs } from "../utils";
 
 export default function ({
     settings,
@@ -31,17 +29,6 @@ export default function ({
                         disabled={disabled}
                     />
                 </div>
-                {cfg(TargetOs.Windows) && (
-                    <div className='item'>
-                        <p>{locales.RendererBackend}:</p>
-                        <sub>{locales.RendererBackendHelp}</sub>
-                        <Select
-                            ref={settings.system.backend as any}
-                            options={Backend}
-                            disabled={disabled}
-                        />
-                    </div>
-                )}
             </div>
         </>
     );

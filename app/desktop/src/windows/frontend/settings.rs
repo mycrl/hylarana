@@ -5,19 +5,19 @@ use std::{
 };
 
 use anyhow::Result;
-use hylarana::{VideoDecoderType, VideoEncoderType, VideoRenderBackend};
+use hylarana::{VideoDecoderType, VideoEncoderType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct System {
     pub name: String,
     pub language: String,
-    pub backend: VideoRenderBackend,
 }
 
 impl Default for System {
     fn default() -> Self {
         Self {
+            language: "english".to_string(),
             name: {
                 dirs::home_dir()
                     .unwrap()
@@ -27,12 +27,6 @@ impl Default for System {
                     .last()
                     .unwrap()
                     .to_string()
-            },
-            language: "english".to_string(),
-            backend: if cfg!(target_os = "windows") {
-                VideoRenderBackend::Direct3D11
-            } else {
-                VideoRenderBackend::WebGPU
             },
         }
     }

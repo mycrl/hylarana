@@ -191,12 +191,6 @@ impl<'a> Renderer<'a> {
         self.config.width = size.width;
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
-
-        log::info!(
-            "resize renderer, size={:?}, viewport={:?}",
-            size,
-            self.viewport
-        );
     }
 
     // Submit the texture to the renderer, it should be noted that the renderer will
@@ -250,191 +244,6 @@ impl<'a> Renderer<'a> {
     }
 }
 
-#[cfg(target_os = "windows")]
-pub mod win32 {
-    use common::{
-        frame::VideoFormat,
-        win32::{
-            Direct3DDevice,
-            windows::Win32::{
-                Foundation::HWND,
-                Graphics::{
-                    Direct3D11::{D3D11_VIEWPORT, ID3D11RenderTargetView, ID3D11Texture2D},
-                    Dxgi::{
-                        Common::DXGI_FORMAT_R8G8B8A8_UNORM, CreateDXGIFactory, DXGI_PRESENT,
-                        DXGI_SWAP_CHAIN_DESC, DXGI_USAGE_RENDER_TARGET_OUTPUT, IDXGIFactory,
-                        IDXGISwapChain,
-                    },
-                },
-            },
-        },
-    };
-
-    use resample::win32::{Resource, VideoResampler, VideoResamplerOptions};
-    use thiserror::Error;
-    use wgpu::SurfaceTarget;
-
-    use crate::{RendererOptions, Texture, Texture2DRaw, Texture2DResource};
-
-    #[derive(Debug, Error)]
-    pub enum D3D11RendererError {
-        #[error(transparent)]
-        WindowsError(#[from] common::win32::windows::core::Error),
-    }
-
-    pub struct D3D11Renderer {
-        direct3d: Direct3DDevice,
-        swap_chain: IDXGISwapChain,
-        render_target_view: ID3D11RenderTargetView,
-        video_processor: VideoResampler,
-    }
-
-    unsafe impl Send for D3D11Renderer {}
-    unsafe impl Sync for D3D11Renderer {}
-
-    impl D3D11Renderer {
-        pub fn new<'a, T: Into<SurfaceTarget<'a>>>(
-            RendererOptions {
-                direct3d,
-                surface,
-                source,
-            }: RendererOptions<T>,
-        ) -> Result<Self, D3D11RendererError> {
-            let viewport = Viewport::new(source.size, surface.size);
-            let swap_chain = unsafe {
-                let dxgi_factory = CreateDXGIFactory::<IDXGIFactory>()?;
-
-                let mut desc = DXGI_SWAP_CHAIN_DESC::default();
-                desc.BufferCount = 1;
-                desc.BufferDesc.Width = surface.size.width;
-                desc.BufferDesc.Height = surface.size.height;
-                desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-                desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-                desc.SampleDesc.Count = 1;
-                desc.Windowed = true.into();
-                desc.OutputWindow = match surface.window.into() {
-                    SurfaceTarget::Window(window) => match window.window_handle().unwrap().as_raw()
-                    {
-                        crate::raw_window_handle::RawWindowHandle::Win32(window) => {
-                            HWND(window.hwnd.get() as _)
-                        }
-                        _ => unimplemented!(
-                            "what happened? why is the dx11 renderer enabled on linux?"
-                        ),
-                    },
-                    _ => {
-                        unimplemented!("the renderer does not support non-windowed render targets")
-                    }
-                };
-
-                let mut swap_chain = None;
-                dxgi_factory
-                    .CreateSwapChain(&direct3d.device, &desc, &mut swap_chain)
-                    .ok()?;
-
-                swap_chain.unwrap()
-            };
-
-            let back_buffer = unsafe { swap_chain.GetBuffer::<ID3D11Texture2D>(0)? };
-            let render_target_view = unsafe {
-                let mut render_target_view = None;
-                direct3d.device.CreateRenderTargetView(
-                    &back_buffer,
-                    None,
-                    Some(&mut render_target_view),
-                )?;
-
-                render_target_view.unwrap()
-            };
-
-            unsafe {
-                direct3d
-                    .context
-                    .OMSetRenderTargets(Some(&[Some(render_target_view.clone())]), None);
-            }
-
-            unsafe {
-                let mut vp = D3D11_VIEWPORT::default();
-                vp.Width = viewport.width;
-                vp.Height = viewport.height;
-                vp.TopLeftX = viewport.x;
-                vp.TopLeftY = viewport.y;
-                vp.MinDepth = 0.0;
-                vp.MaxDepth = 1.0;
-
-                direct3d.context.RSSetViewports(Some(&[vp]));
-            }
-
-            let video_processor = VideoResampler::new(VideoResamplerOptions {
-                direct3d: direct3d.clone(),
-                input: Resource::Default(source.format, source.size),
-                output: Resource::Texture(unsafe { swap_chain.GetBuffer::<ID3D11Texture2D>(0)? }),
-            })?;
-
-            Ok(Self {
-                video_processor,
-                render_target_view,
-                swap_chain,
-                direct3d,
-            })
-        }
-
-        /// Draw this pixel buffer to the configured SurfaceTexture.
-        pub fn submit(&mut self, texture: Texture) -> Result<(), D3D11RendererError> {
-            unsafe {
-                self.direct3d
-                    .context
-                    .ClearRenderTargetView(&self.render_target_view, &[0.0, 0.0, 0.0, 1.0]);
-            }
-
-            let format = match texture {
-                Texture::Nv12(_) => VideoFormat::NV12,
-                Texture::Rgba(_) => VideoFormat::RGBA,
-                Texture::Bgra(_) => VideoFormat::BGRA,
-                Texture::I420(_) => VideoFormat::I420,
-            };
-
-            let view = match texture {
-                Texture::Nv12(resource) | Texture::Rgba(resource) | Texture::Bgra(resource) => {
-                    match resource {
-                        Texture2DResource::Texture(texture) => match texture {
-                            Texture2DRaw::ID3D11Texture2D(texture, index) => {
-                                Some(self.video_processor.create_input_view(&texture, index)?)
-                            }
-                        },
-                        Texture2DResource::Buffer(texture) => {
-                            self.video_processor.update_input_from_buffer(
-                                format,
-                                texture.buffers,
-                                texture.linesize,
-                            )?;
-
-                            None
-                        }
-                    }
-                }
-                Texture::I420(texture) => {
-                    self.video_processor.update_input_from_buffer(
-                        format,
-                        texture.buffers,
-                        texture.linesize,
-                    )?;
-
-                    None
-                }
-            };
-
-            self.video_processor.process(view)?;
-
-            unsafe {
-                self.swap_chain.Present(0, DXGI_PRESENT(0)).ok()?;
-            }
-
-            Ok(())
-        }
-    }
-}
-
 #[derive(Debug)]
 struct Viewport {
     x: f32,
@@ -457,13 +266,11 @@ impl Viewport {
         let surface_ratio = surface_width / surface_height;
 
         let (width, height, x, y) = if texture_ratio > surface_ratio {
-            // 如果纹理更宽，则以宽度为基准
             let width = surface_width;
             let height = surface_width / texture_ratio;
             let y = (surface_height - height) / 2.0;
             (width, height, 0.0, y)
         } else {
-            // 如果纹理更高，则以高度为基准
             let height = surface_height;
             let width = surface_height * texture_ratio;
             let x = (surface_width - width) / 2.0;

@@ -112,7 +112,6 @@ export async function createReceiver(device: Device, settings: Settings) {
 
     return await window.Route.request(Methods.CreateReceiver, {
         codec: settings.codec.decoder,
-        backend: settings.system.backend,
         description,
     });
 }

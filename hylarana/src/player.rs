@@ -1,4 +1,4 @@
-use std::{slice::from_raw_parts, str::FromStr};
+use std::slice::from_raw_parts;
 
 use super::{
     HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink, sender::HylaranaSenderOptions,
@@ -12,9 +12,6 @@ use common::win32::d3d_texture_borrowed_raw;
 
 #[cfg(target_os = "macos")]
 use common::macos::{CVPixelBufferRef, PixelMomeryBuffer};
-
-#[cfg(target_os = "windows")]
-use renderer::win32::D3D11Renderer;
 
 #[cfg(not(target_os = "linux"))]
 use renderer::Texture2DRaw;
@@ -32,21 +29,15 @@ use renderer::{
 
 use parking_lot::Mutex;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum VideoRenderError {
     #[error(transparent)]
-    #[cfg(target_os = "windows")]
-    D3D11RendererError(#[from] renderer::win32::D3D11RendererError),
-    #[error(transparent)]
     GraphicsError(#[from] renderer::GraphicsError),
     #[error("invalid d3d11texture2d texture")]
     #[cfg(target_os = "windows")]
     InvalidD3D11Texture,
-    #[error("invalid backend")]
-    InvalidBackend,
 }
 
 #[derive(Debug, Error)]
@@ -81,40 +72,6 @@ pub enum AVFrameStreamPlayerOptions<T> {
     Quiet,
 }
 
-/// Back-end implementation of graphics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-pub enum VideoRenderBackend {
-    /// Backend implemented using D3D11, which is supported on an older device
-    /// and platform and has better performance performance and memory
-    /// footprint, but only on windows.
-    Direct3D11,
-    /// Cross-platform graphics backends implemented using WebGPUs are supported
-    /// on a number of common platforms or devices.
-    WebGPU,
-}
-
-impl ToString for VideoRenderBackend {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Direct3D11 => "d3d11",
-            Self::WebGPU => "webgpu",
-        }
-        .to_string()
-    }
-}
-
-impl FromStr for VideoRenderBackend {
-    type Err = VideoRenderError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "d3d11" => Self::Direct3D11,
-            "webgpu" => Self::WebGPU,
-            _ => return Err(VideoRenderError::InvalidBackend),
-        })
-    }
-}
-
 #[derive(Debug)]
 pub struct VideoRenderSurfaceOptions<T> {
     pub window: T,
@@ -130,8 +87,6 @@ pub struct VideoRenderSourceOptions {
 
 /// Video renderer configuration.
 pub struct VideoRenderOptions<T> {
-    /// The graphics backend used by the video renderer.
-    pub backend: VideoRenderBackend,
     pub surface: VideoRenderSurfaceOptions<T>,
     pub source: VideoRenderSourceOptions,
 }
@@ -141,7 +96,6 @@ pub struct VideoRenderOptionsBuilder<T>(VideoRenderOptions<T>);
 impl<T> VideoRenderOptionsBuilder<T> {
     pub fn new(surface: VideoRenderSurfaceOptions<T>) -> Self {
         Self(VideoRenderOptions {
-            backend: VideoRenderBackend::WebGPU,
             source: VideoRenderSourceOptions {
                 size: Size::default(),
                 sub_format: VideoSubFormat::SW,
@@ -153,11 +107,6 @@ impl<T> VideoRenderOptionsBuilder<T> {
             },
             surface,
         })
-    }
-
-    pub fn set_backend(mut self, backend: VideoRenderBackend) -> Self {
-        self.0.backend = backend;
-        self
     }
 
     pub fn from_sender(mut self, options: &HylaranaSenderOptions) -> Self {
@@ -366,29 +315,17 @@ impl Drop for AudioRender {
 }
 
 /// Video player that can render video frames to window.
-pub enum VideoRender<'a> {
-    WebGPU(Renderer<'a>),
-    #[cfg(target_os = "windows")]
-    Direct3D11(D3D11Renderer),
-}
+pub struct VideoRender<'a>(Renderer<'a>);
 
 impl<'a> VideoRender<'a> {
     /// Create a video player.
     pub fn new<T>(
-        VideoRenderOptions {
-            backend,
-            surface,
-            source,
-        }: VideoRenderOptions<T>,
+        VideoRenderOptions { surface, source }: VideoRenderOptions<T>,
     ) -> Result<Self, VideoRenderError>
     where
         T: Into<SurfaceTarget<'a>>,
     {
-        log::info!(
-            "create video render, backend={:?}, size={:?}",
-            backend,
-            surface.size
-        );
+        log::info!("create video render, size={:?}", surface.size);
 
         #[cfg(target_os = "windows")]
         let direct3d = get_direct3d();
@@ -407,21 +344,11 @@ impl<'a> VideoRender<'a> {
             },
         };
 
-        Ok(match backend {
-            #[cfg(target_os = "windows")]
-            VideoRenderBackend::Direct3D11 => Self::Direct3D11(D3D11Renderer::new(options)?),
-            VideoRenderBackend::WebGPU => Self::WebGPU(Renderer::new(options)?),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!("not supports the {:?} backend", backend),
-        })
+        Ok(Self(Renderer::new(options)?))
     }
 
     pub fn resize(&mut self, size: Size) {
-        match self {
-            #[cfg(target_os = "windows")]
-            Self::Direct3D11(render) => render.resize(size),
-            Self::WebGPU(render) => render.resize(size),
-        }
+        self.0.resize(size);
     }
 
     /// Push video frames to the queue and the player will render them as
@@ -444,10 +371,7 @@ impl<'a> VideoRender<'a> {
                     VideoFormat::I420 => unimplemented!("no hardware texture for I420"),
                 };
 
-                match self {
-                    Self::Direct3D11(render) => render.submit(texture)?,
-                    Self::WebGPU(render) => render.submit(texture)?,
-                }
+                self.0.submit(texture)?;
             }
             #[cfg(target_os = "macos")]
             VideoSubFormat::CvPixelBufferRef => match self {
@@ -579,11 +503,7 @@ impl<'a> VideoRender<'a> {
                     VideoFormat::I420 => Texture::I420(texture),
                 };
 
-                match self {
-                    #[cfg(target_os = "windows")]
-                    Self::Direct3D11(render) => render.submit(texture)?,
-                    Self::WebGPU(render) => render.submit(texture)?,
-                }
+                self.0.submit(texture)?;
             }
             #[allow(unreachable_patterns)]
             _ => unimplemented!("not suppports the frame format = {:?}", frame.sub_format),

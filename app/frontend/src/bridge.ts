@@ -147,11 +147,6 @@ export enum SourceType {
     Audio = "Audio",
 }
 
-export enum Backend {
-    Direct3D11 = "Direct3D11",
-    WebGPU = "WebGPU",
-}
-
 export enum Status {
     Sending = "Sending",
     Receiving = "Receiving",
@@ -245,7 +240,6 @@ export interface MediaStreamDescription {
 export interface SystemSettings {
     name: string;
     language: "english" | "chinase";
-    backend: Backend;
 }
 
 export interface NetWorkSettings {
@@ -326,7 +320,6 @@ export interface CreateSenderParams {
 
 export interface CreateReceiverParams {
     codec: VideoDecoder;
-    backend: Backend;
     description: MediaStreamDescription;
 }
 

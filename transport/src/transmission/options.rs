@@ -49,7 +49,7 @@ impl Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            fec: "fec,layout:staircase,rows:3,cols:5,arq:onreq".to_string(),
+            fec: "fec,layout:staircase,rows:5,cols:10,arq:onreq".to_string(),
             max_bandwidth: -1,
             stream_id: None,
             timeout: 2000,

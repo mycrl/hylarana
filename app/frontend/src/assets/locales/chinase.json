@@ -53,8 +53,6 @@
     "SenderStart": "开始投屏",
     "SenderStop": "停止投屏",
     "ReceiverStop": "停止接收",
-    "RendererBackend": "渲染器后端",
-    "RendererBackendHelp": "Direct3D11: 使用D3D11实现的后端, 在较老的设备和平台上受支持, 具有更好的性能表现和内存占用, 但仅限于Windows.\r\nWebGPU：使用WebGPU实现的跨平台图形后端, 在许多常见的平台或设备上均受支持.",
     "Accapt": "接受",
     "Sendering": "正在投屏中...",
     "Receivering": "正在接收投屏中...",

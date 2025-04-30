@@ -10,9 +10,9 @@ use hylarana::{
     DiscoveryObserver, DiscoveryService, HylaranaReceiver, HylaranaReceiverOptions, HylaranaSender,
     HylaranaSenderMediaOptions, HylaranaSenderOptions, HylaranaSenderTrackOptions,
     MediaStreamDescription, Size, SourceType, TransportOptions, TransportStrategy,
-    VideoDecoderType, VideoEncoderType, VideoOptions, VideoRenderBackend,
-    VideoRenderOptionsBuilder, VideoRenderSurfaceOptions, create_receiver, create_sender,
-    get_runtime_handle, shutdown, startup,
+    VideoDecoderType, VideoEncoderType, VideoOptions, VideoRenderOptionsBuilder,
+    VideoRenderSurfaceOptions, create_receiver, create_sender, get_runtime_handle, shutdown,
+    startup,
 };
 
 use winit::{
@@ -120,7 +120,6 @@ impl Sender {
                     size: window.size(),
                     window,
                 })
-                .set_backend(configure.backend)
                 .from_sender(&options)
                 .build(),
             ))?,
@@ -169,7 +168,6 @@ impl Receiver {
                     size: window.size(),
                     window,
                 })
-                .set_backend(configure.backend)
                 .from_receiver(&description, &options)
                 .build(),
             ))?,
@@ -336,12 +334,6 @@ struct Configure {
         default_value_t = Self::DEFAULT_DECODER,
     )]
     decoder: VideoDecoderType,
-    #[arg(
-        long,
-        value_parser = clap::value_parser!(VideoRenderBackend),
-        default_value_t = Self::DEFAULT_BACKEND,
-    )]
-    backend: VideoRenderBackend,
 }
 
 impl Configure {
@@ -362,8 +354,6 @@ impl Configure {
 
     #[cfg(target_os = "linux")]
     const DEFAULT_DECODER: VideoDecoderType = VideoDecoderType::H264;
-
-    const DEFAULT_BACKEND: VideoRenderBackend = VideoRenderBackend::WebGPU;
 
     fn get_strategy(&self) -> Option<TransportStrategy> {
         Some(match self.strategy.as_ref()?.as_str() {

@@ -14,7 +14,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use hylarana::{
     HylaranaReceiverOptions, HylaranaSenderOptions, MediaStreamDescription, VideoDecoderType,
-    VideoRenderBackend, get_runtime_handle,
+    get_runtime_handle,
 };
 
 use parking_lot::{Mutex, RwLock};
@@ -124,11 +124,7 @@ impl Frontend {
         bridge.on(
             "CreateReceiver",
             |(events, bridge, core, window),
-             CreateReceiverParams {
-                 codec,
-                 backend,
-                 description,
-             }: CreateReceiverParams| {
+             CreateReceiverParams { codec, description }: CreateReceiverParams| {
                 let window = if let Some(window) = window.read().clone() {
                     window
                 } else {
@@ -151,7 +147,6 @@ impl Frontend {
                                 video_decoder: codec,
                             },
                             window,
-                            backend,
                             move || {
                                 events_.send(
                                     EventTarget::Remote,
@@ -506,6 +501,5 @@ struct CreateSenderParams {
 #[derive(Deserialize)]
 struct CreateReceiverParams {
     codec: VideoDecoderType,
-    backend: VideoRenderBackend,
     description: MediaStreamDescription,
 }

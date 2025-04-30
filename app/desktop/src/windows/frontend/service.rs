@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use hylarana::{
     AVFrameStreamPlayer, AVFrameStreamPlayerOptions, Capture, HylaranaReceiver,
     HylaranaReceiverOptions, HylaranaSender, HylaranaSenderOptions, MediaStreamDescription,
-    MediaStreamObserver, Size, Source, SourceType, VideoRenderBackend, VideoRenderOptionsBuilder,
+    MediaStreamObserver, Size, Source, SourceType, VideoRenderOptionsBuilder,
     VideoRenderSurfaceOptions, shutdown, startup,
 };
 
@@ -87,7 +87,6 @@ impl CoreService {
         description: &MediaStreamDescription,
         options: &HylaranaReceiverOptions,
         window: Arc<Window>,
-        backend: VideoRenderBackend,
         callback: T,
     ) -> Result<()>
     where
@@ -113,7 +112,6 @@ impl CoreService {
                     },
                     window,
                 })
-                .set_backend(backend)
                 .from_receiver(&description, &options)
                 .build(),
             ))?,
