@@ -129,6 +129,12 @@ impl CoreService {
         Ok(())
     }
 
+    pub fn resize_receiver(&self, size: Size) {
+        if let Some(receiver) = self.receiver.lock().as_ref() {
+            receiver.resize(size);
+        }
+    }
+
     pub fn close_receiver(&self) {
         drop(self.receiver.lock().take());
     }

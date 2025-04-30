@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use common::Size;
 use winit::{event_loop::EventLoopProxy, window::Window};
 
 #[derive(Clone)]
@@ -9,6 +10,7 @@ pub enum UserEvents {
     OnRemoteWindowClose,
     OnWebviewAppContextInitialized,
     OnMessagePumpPoll,
+    OnRemoteWindowResized(Size),
 }
 
 pub enum MainEvents {

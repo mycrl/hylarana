@@ -1,3 +1,7 @@
+// Build script for Hylarana desktop application
+// This script handles the build process for both Windows and macOS platforms
+// It builds the frontend, Rust backend, and packages all necessary dependencies
+
 import { cp, readdir, mkdir, rm, readFile, writeFile } from "node:fs/promises";
 import { exec, execSync } from "node:child_process";
 import { join, dirname } from "node:path";
@@ -7,6 +11,8 @@ import { existsSync } from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Parse command line arguments after '--' flag
+// Example: node build.js --release
 const Args = process.argv
     .slice(process.argv.indexOf("--") + 1)
     .map((item) => item.replace("--", ""))
@@ -18,6 +24,8 @@ const Args = process.argv
         {}
     );
 
+// Helper function to execute shell commands with proper error handling
+// Handles both Windows and Unix-like systems
 const Command = (cmd, options = {}, output = true) =>
     new Promise(
         (
@@ -48,6 +56,8 @@ const Command = (cmd, options = {}, output = true) =>
         }
     );
 
+// Helper function to locate Cargo build output directories
+// Used to find compiled binaries and dependencies
 const GetCrateOutdir = async (target, crate, dir) => {
     const build = join(__dirname, target, "./build");
     for (const item of await readdir(build)) {

@@ -109,6 +109,10 @@ pub trait MediaStreamSink: Sync + Send {
     fn audio(&self, frame: &AudioFrame) -> bool {
         true
     }
+
+    /// Callback occurs when the video renderer is resized.
+    #[allow(unused_variables)]
+    fn resize(&self, size: Size) {}
 }
 
 // impl empty type for default

@@ -1,4 +1,4 @@
-mod generator;
+mod backbuffer;
 mod transform;
 mod vertex;
 
@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use self::vertex::Vertex;
 
-pub use self::generator::{
-    GeneratorError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
+pub use self::backbuffer::{
+    BackBufferError, Texture, Texture2DBuffer, Texture2DRaw, Texture2DResource,
 };
 
 use common::{
@@ -16,13 +16,14 @@ use common::{
     runtime::get_runtime_handle,
 };
 
-use generator::{Generator, GeneratorOptions};
+use backbuffer::{BackBuffer, BackBufferOptions};
 use thiserror::Error;
 use wgpu::{
     Backends, Buffer, BufferUsages, Color, CommandEncoderDescriptor, CompositeAlphaMode, Device,
     DeviceDescriptor, IndexFormat, Instance, InstanceDescriptor, LoadOp, MemoryHints, Operations,
     PowerPreference, PresentMode, Queue, RenderPassColorAttachment, RenderPassDescriptor,
-    RequestAdapterOptions, StoreOp, Surface, TextureFormat, TextureUsages, TextureViewDescriptor,
+    RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, TextureFormat, TextureUsages,
+    TextureViewDescriptor,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
@@ -41,7 +42,7 @@ pub enum GraphicsError {
     #[error(transparent)]
     CreateSurfaceError(#[from] wgpu::CreateSurfaceError),
     #[error(transparent)]
-    GeneratorError(#[from] GeneratorError),
+    BackBufferError(#[from] BackBufferError),
 }
 
 #[derive(Debug)]
@@ -74,12 +75,14 @@ pub struct RendererOptions<T> {
 /// uses the underlying GPU device, and the use of software devices is not
 /// currently supported.
 pub struct Renderer<'a> {
+    config: SurfaceConfiguration,
     surface: Surface<'a>,
     device: Arc<Device>,
     queue: Arc<Queue>,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
-    generator: Generator,
+    back_buffer: BackBuffer,
+    viewport: Viewport,
 }
 
 impl<'a> Renderer<'a> {
@@ -91,6 +94,8 @@ impl<'a> Renderer<'a> {
             source,
         }: RendererOptions<T>,
     ) -> Result<Self, GraphicsError> {
+        let viewport = Viewport::new(source.size, size);
+
         log::info!("create renderer, options={:?}", source);
 
         let instance = Instance::new(InstanceDescriptor {
@@ -129,24 +134,22 @@ impl<'a> Renderer<'a> {
 
         // Configure surface as BGRA, BGRA this format compatibility is the best, in
         // order to unnecessary trouble, directly fixed to BGRA is the best.
-        {
-            let mut config = surface
-                .get_default_config(&adapter, size.width, size.height)
-                .ok_or_else(|| GraphicsError::NotFoundSurfaceDefaultConfig)?;
+        let mut config = surface
+            .get_default_config(&adapter, size.width, size.height)
+            .ok_or_else(|| GraphicsError::NotFoundSurfaceDefaultConfig)?;
 
-            config.present_mode = if cfg!(target_os = "windows") {
-                PresentMode::Mailbox
-            } else if cfg!(target_os = "linux") {
-                PresentMode::Fifo
-            } else {
-                PresentMode::Immediate
-            };
-
-            config.format = TextureFormat::Bgra8Unorm;
-            config.alpha_mode = CompositeAlphaMode::Opaque;
-            config.usage = TextureUsages::RENDER_ATTACHMENT;
-            surface.configure(&device, &config);
+        config.present_mode = if cfg!(target_os = "windows") {
+            PresentMode::Mailbox
+        } else if cfg!(target_os = "linux") {
+            PresentMode::Fifo
+        } else {
+            PresentMode::Immediate
         };
+
+        config.format = TextureFormat::Bgra8Unorm;
+        config.alpha_mode = CompositeAlphaMode::Opaque;
+        config.usage = TextureUsages::RENDER_ATTACHMENT;
+        surface.configure(&device, &config);
 
         let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
@@ -160,22 +163,40 @@ impl<'a> Renderer<'a> {
             usage: BufferUsages::INDEX,
         });
 
+        let back_buffer = BackBuffer::new(BackBufferOptions {
+            device: device.clone(),
+            queue: queue.clone(),
+            size: source.size,
+            format: source.format,
+            sub_format: source.sub_format,
+            #[cfg(target_os = "windows")]
+            direct3d,
+        })?;
+
         Ok(Self {
-            generator: Generator::new(GeneratorOptions {
-                device: device.clone(),
-                queue: queue.clone(),
-                size: source.size,
-                format: source.format,
-                sub_format: source.sub_format,
-                #[cfg(target_os = "windows")]
-                direct3d,
-            })?,
+            viewport,
+            back_buffer,
             vertex_buffer,
             index_buffer,
             surface,
             device,
             queue,
+            config,
         })
+    }
+
+    pub fn resize(&mut self, size: Size) {
+        self.viewport.resize(size);
+
+        self.config.width = size.width;
+        self.config.height = size.height;
+        self.surface.configure(&self.device, &self.config);
+
+        log::info!(
+            "resize renderer, size={:?}, viewport={:?}",
+            size,
+            self.viewport
+        );
     }
 
     // Submit the texture to the renderer, it should be noted that the renderer will
@@ -187,7 +208,7 @@ impl<'a> Renderer<'a> {
             .device
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
-        let (pipeline, bind_group) = self.generator.get_view(&mut encoder, texture)?;
+        let (pipeline, bind_group) = self.back_buffer.get_view(&mut encoder, texture)?;
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -205,6 +226,15 @@ impl<'a> Renderer<'a> {
                 })],
                 ..Default::default()
             });
+
+            render_pass.set_viewport(
+                self.viewport.x,
+                self.viewport.y,
+                self.viewport.width,
+                self.viewport.height,
+                0.0,
+                1.0,
+            );
 
             render_pass.set_pipeline(pipeline);
             render_pass.set_bind_group(0, Some(&bind_group), &[]);
@@ -270,6 +300,7 @@ pub mod win32 {
                 source,
             }: RendererOptions<T>,
         ) -> Result<Self, D3D11RendererError> {
+            let viewport = Viewport::new(source.size, surface.size);
             let swap_chain = unsafe {
                 let dxgi_factory = CreateDXGIFactory::<IDXGIFactory>()?;
 
@@ -324,8 +355,10 @@ pub mod win32 {
 
             unsafe {
                 let mut vp = D3D11_VIEWPORT::default();
-                vp.Width = surface.size.width as f32;
-                vp.Height = surface.size.height as f32;
+                vp.Width = viewport.width;
+                vp.Height = viewport.height;
+                vp.TopLeftX = viewport.x;
+                vp.TopLeftY = viewport.y;
                 vp.MinDepth = 0.0;
                 vp.MaxDepth = 1.0;
 
@@ -399,5 +432,54 @@ pub mod win32 {
 
             Ok(())
         }
+    }
+}
+
+#[derive(Debug)]
+struct Viewport {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    texture: Size,
+}
+
+impl Viewport {
+    fn new(texture: Size, surface: Size) -> Self {
+        let (texture_width, texture_height, surface_width, surface_height) = (
+            texture.width as f32,
+            texture.height as f32,
+            surface.width as f32,
+            surface.height as f32,
+        );
+
+        let texture_ratio = texture_width / texture_height;
+        let surface_ratio = surface_width / surface_height;
+
+        let (width, height, x, y) = if texture_ratio > surface_ratio {
+            // 如果纹理更宽，则以宽度为基准
+            let width = surface_width;
+            let height = surface_width / texture_ratio;
+            let y = (surface_height - height) / 2.0;
+            (width, height, 0.0, y)
+        } else {
+            // 如果纹理更高，则以高度为基准
+            let height = surface_height;
+            let width = surface_height * texture_ratio;
+            let x = (surface_width - width) / 2.0;
+            (width, height, x, 0.0)
+        };
+
+        Self {
+            texture,
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    fn resize(&mut self, surface: Size) {
+        *self = Self::new(self.texture, surface);
     }
 }

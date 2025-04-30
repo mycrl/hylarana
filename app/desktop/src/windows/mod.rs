@@ -4,7 +4,7 @@ pub mod remote;
 use std::sync::Arc;
 
 use anyhow::Result;
-use winit::{event::WindowEvent, event_loop::ActiveEventLoop};
+use winit::{event::WindowEvent, event_loop::ActiveEventLoop, window::WindowId};
 
 use self::{frontend::Frontend, remote::Remote};
 
@@ -30,14 +30,19 @@ impl WindowManager {
         Ok(())
     }
 
-    pub fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        id: winit::window::WindowId,
-        event: WindowEvent,
-    ) {
-        self.frontend.window_event(event_loop, &id, &event);
-        self.remote.window_event(event_loop, &id, &event);
+    pub fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+        if self
+            .frontend
+            .window_id()
+            .map(|it| it == id)
+            .unwrap_or(false)
+        {
+            self.frontend.window_event(event_loop, &event);
+        }
+
+        if self.remote.window_id().map(|it| it == id).unwrap_or(false) {
+            self.remote.window_event(event_loop, &event);
+        }
     }
 
     pub fn user_event(&mut self, target: EventTarget, event: UserEvents) -> Result<()> {

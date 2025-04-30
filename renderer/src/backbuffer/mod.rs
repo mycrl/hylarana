@@ -38,7 +38,7 @@ use wgpu::{
 };
 
 #[derive(Debug, Error)]
-pub enum GeneratorError {
+pub enum BackBufferError {
     #[error(transparent)]
     TransformError(#[from] TransformError),
 }
@@ -228,7 +228,7 @@ enum Texture2DSourceSample {
     I420(I420),
 }
 
-pub struct GeneratorOptions {
+pub struct BackBufferOptions {
     #[cfg(target_os = "windows")]
     pub direct3d: Direct3DDevice,
     pub device: Arc<Device>,
@@ -238,7 +238,7 @@ pub struct GeneratorOptions {
     pub size: Size,
 }
 
-pub struct Generator {
+pub struct BackBuffer {
     device: Arc<Device>,
     queue: Arc<Queue>,
     sampler: Sampler,
@@ -249,9 +249,9 @@ pub struct Generator {
     transformer: Option<Transformer>,
 }
 
-impl Generator {
+impl BackBuffer {
     pub fn new(
-        GeneratorOptions {
+        BackBufferOptions {
             device,
             queue,
             format,
@@ -259,8 +259,8 @@ impl Generator {
             size,
             #[cfg(target_os = "windows")]
             direct3d,
-        }: GeneratorOptions,
-    ) -> Result<Self, GeneratorError> {
+        }: BackBufferOptions,
+    ) -> Result<Self, BackBufferError> {
         #[cfg(not(target_os = "linux"))]
         let transformer = {
             if sub_format != VideoSubFormat::SW {
@@ -366,7 +366,7 @@ impl Generator {
         &mut self,
         encoder: &mut CommandEncoder,
         texture: Texture,
-    ) -> Result<(&RenderPipeline, BindGroup), GeneratorError> {
+    ) -> Result<(&RenderPipeline, BindGroup), BackBufferError> {
         // Only software textures need to be updated to the sample via update.
         #[allow(unreachable_patterns)]
         match &texture {

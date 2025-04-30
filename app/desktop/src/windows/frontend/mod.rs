@@ -27,7 +27,7 @@ use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
     event_loop::ActiveEventLoop,
-    window::{Window, WindowAttributes},
+    window::{Window, WindowAttributes, WindowId},
 };
 
 use self::{discovery::Discovery, service::CoreService, settings::Settings};
@@ -242,8 +242,15 @@ impl Frontend {
         Ok(())
     }
 
+    pub fn window_id(&self) -> Option<WindowId> {
+        self.window.as_ref().map(|window| window.id())
+    }
+
     pub fn user_event(&mut self, event: &UserEvents) -> Result<()> {
         match event {
+            UserEvents::OnRemoteWindowResized(size) => {
+                self.core.resize_receiver(*size);
+            }
             UserEvents::OnRemoteWindowView(window) => {
                 self.remote_window.write().replace(window.clone());
             }
@@ -296,25 +303,14 @@ impl Frontend {
         Ok(())
     }
 
-    pub fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        id: &winit::window::WindowId,
-        event: &WindowEvent,
-    ) {
+    pub fn window_event(&mut self, event_loop: &ActiveEventLoop, event: &WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
-                if let Some(window) = &self.window {
-                    if id == &window.id() {
-                        event_loop.exit();
-                    }
-                }
+                event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
                 if let Some(window) = &self.window {
-                    if id == &window.id() {
-                        window.request_redraw();
-                    }
+                    window.request_redraw();
                 }
             }
             _ => (),

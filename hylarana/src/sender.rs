@@ -464,6 +464,11 @@ where
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
     }
+
+    /// Resize the video renderer.
+    pub fn resize(&self, size: Size) {
+        self.sink.resize(size);
+    }
 }
 
 impl<S, O> Drop for HylaranaSender<S, O>

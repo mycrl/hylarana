@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+use common::Size;
 use winit::{
     event::WindowEvent,
     event_loop::ActiveEventLoop,
-    window::{Window, WindowAttributes},
+    window::{Window, WindowAttributes, WindowId},
 };
 
 use crate::events::{EventChannel, EventTarget, UserEvents};
@@ -23,15 +24,10 @@ impl Remote {
     }
 
     pub fn create(&mut self, event_loop: &ActiveEventLoop) -> Result<()> {
-        let primary_monitor = event_loop
-            .primary_monitor()
-            .ok_or_else(|| anyhow!("not found a primary_monitor"))?;
-
         let window = Arc::new(
             event_loop.create_window(
                 WindowAttributes::default()
                     .with_title("Hylarana Remote View")
-                    .with_inner_size(primary_monitor.size())
                     .with_visible(false),
             )?,
         );
@@ -62,20 +58,24 @@ impl Remote {
         Ok(())
     }
 
-    pub fn window_event(
-        &mut self,
-        _event_loop: &ActiveEventLoop,
-        id: &winit::window::WindowId,
-        event: &WindowEvent,
-    ) {
+    pub fn window_id(&self) -> Option<WindowId> {
+        self.window.as_ref().map(|window| window.id())
+    }
+
+    pub fn window_event(&mut self, _event_loop: &ActiveEventLoop, event: &WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
-                if let Some(window) = &self.window {
-                    if id == &window.id() {
-                        self.events
-                            .send(EventTarget::Frontend, UserEvents::OnRemoteWindowClose);
-                    }
-                }
+                self.events
+                    .send(EventTarget::Frontend, UserEvents::OnRemoteWindowClose);
+            }
+            WindowEvent::Resized(size) => {
+                self.events.send(
+                    EventTarget::Frontend,
+                    UserEvents::OnRemoteWindowResized(Size {
+                        width: size.width,
+                        height: size.height,
+                    }),
+                );
             }
             _ => (),
         }

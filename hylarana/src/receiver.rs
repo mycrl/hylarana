@@ -6,7 +6,7 @@ use std::{
 };
 
 use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings};
-use common::{atomic::EasyAtomic, codec::VideoDecoderType};
+use common::{Size, atomic::EasyAtomic, codec::VideoDecoderType};
 use thiserror::Error;
 use transport::{StreamKind, StreamMultiReceiverAdapter, TransportReceiver};
 
@@ -218,6 +218,11 @@ where
     /// Get the media description information of the current receiver.
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
+    }
+
+    /// Resize the video renderer.
+    pub fn resize(&self, size: Size) {
+        self.sink.resize(size);
     }
 }
 

@@ -251,26 +251,30 @@ impl<'a> MediaStreamSink for AVFrameStreamPlayer<'a> {
             if let Err(e) = player.send(frame) {
                 log::error!("AVFrameStreamPlayer sink audio error={:?}", e);
 
-                false
-            } else {
-                true
+                return false;
             }
-        } else {
-            true
         }
+
+        true
     }
 
     fn video(&self, frame: &VideoFrame) -> bool {
         if let Some(player) = &self.video {
-            if let Err(e) = player.lock().send(frame) {
-                log::error!("AVFrameStreamPlayer sink video error={:?}", e);
+            if let Some(mut player) = player.try_lock() {
+                if let Err(e) = player.send(frame) {
+                    log::error!("AVFrameStreamPlayer sink video error={:?}", e);
 
-                false
-            } else {
-                true
+                    return false;
+                }
             }
-        } else {
-            true
+        }
+
+        true
+    }
+
+    fn resize(&self, size: Size) {
+        if let Some(player) = &self.video {
+            player.lock().resize(size);
         }
     }
 }
@@ -410,6 +414,14 @@ impl<'a> VideoRender<'a> {
             #[allow(unreachable_patterns)]
             _ => unimplemented!("not supports the {:?} backend", backend),
         })
+    }
+
+    pub fn resize(&mut self, size: Size) {
+        match self {
+            #[cfg(target_os = "windows")]
+            Self::Direct3D11(render) => render.resize(size),
+            Self::WebGPU(render) => render.resize(size),
+        }
     }
 
     /// Push video frames to the queue and the player will render them as
