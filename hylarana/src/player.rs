@@ -374,15 +374,15 @@ impl<'a> VideoRender<'a> {
                 self.0.submit(texture)?;
             }
             #[cfg(target_os = "macos")]
-            VideoSubFormat::CvPixelBufferRef => match self {
-                Self::WebGPU(render) => match frame.format {
+            VideoSubFormat::CvPixelBufferRef => {
+                match frame.format {
                     VideoFormat::BGRA => {
-                        render.submit(Texture::Bgra(Texture2DResource::Texture(
+                        self.0.submit(Texture::Bgra(Texture2DResource::Texture(
                             Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
                         )))?;
                     }
                     VideoFormat::RGBA => {
-                        render.submit(Texture::Rgba(Texture2DResource::Texture(
+                        self.0.submit(Texture::Rgba(Texture2DResource::Texture(
                             Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
                         )))?;
                     }
@@ -401,13 +401,13 @@ impl<'a> VideoRender<'a> {
                             linesize: &frame.linesize,
                         };
 
-                        render.submit(match frame.format {
+                        self.0.submit(match frame.format {
                             VideoFormat::NV12 => Texture::Nv12(Texture2DResource::Buffer(buffer)),
                             VideoFormat::I420 => Texture::I420(buffer),
                             _ => unreachable!(),
                         })?;
                     }
-                },
+                }
             },
             VideoSubFormat::SW => {
                 let buffers = match frame.format {

@@ -404,7 +404,6 @@ class Bridge {
     @Serializable
     data class CreateReceiverParams(
         val codec: String,
-        val backend: String,
         val description: MediaStreamDescription,
     )
 }

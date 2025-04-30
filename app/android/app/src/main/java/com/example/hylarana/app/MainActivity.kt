@@ -216,7 +216,7 @@ class MainActivity : ComponentActivity() {
         }
 
         bridge.on<Bridge.CreateReceiverParams, Unit>(Bridge.Method.CREATE_RECEIVER) {
-            val (_, _, description) = it
+            val (_, description) = it
 
             Handler(Looper.getMainLooper()).post {
                 // Creation is only allowed when it is free.

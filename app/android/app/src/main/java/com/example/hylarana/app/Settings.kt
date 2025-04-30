@@ -83,14 +83,6 @@ class Settings(private val context: Context) {
     data class System(
         var name: String,
         var language: String,
-        /**
-         * Direct3D11: Backend implemented using D3D11, which is supported on an older device and
-         * platform and has better performance performance and memory footprint, but only on windows.
-         *
-         * WebGPU: Cross-platform graphics backends implemented using WebGPUs are supported on a
-         * number of common platforms or devices.
-         */
-        var backend: String
     )
 
     @Serializable

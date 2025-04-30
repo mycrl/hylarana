@@ -1,8 +1,7 @@
 {
     "system": {
         "name": "",
-        "language": "english",
-        "backend": "WebGPU"
+        "language": "english"
     },
     "network": {
         "interface": "0.0.0.0",
