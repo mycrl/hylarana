@@ -238,7 +238,7 @@ where
         );
 
         Ok(AudioSender {
-            chunk_count: settings.sample_rate as usize / 1000 * 100 * 2,
+            chunk_count: settings.sample_rate as usize / 1000 * 20 * 2,
             encoder: AudioEncoder::new(settings)?,
             buffer: BytesMut::with_capacity(48000 * 2),
             observer: Arc::downgrade(observer),

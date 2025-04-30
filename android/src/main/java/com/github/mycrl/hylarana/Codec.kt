@@ -391,7 +391,7 @@ class Audio {
             format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, minBufferSize);
             format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 2)
             format.setInteger(MediaFormat.KEY_BIT_RATE, 64000)
-            format.setInteger(MediaFormat.KEY_DURATION, 100000)
+            format.setLong(MediaFormat.KEY_DURATION, 1000 * 20)
             format.setInteger(MediaFormat.KEY_COMPLEXITY, 0)
 
             codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_OPUS)
