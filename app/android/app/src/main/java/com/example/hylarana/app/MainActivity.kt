@@ -16,29 +16,32 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
 import android.view.Surface
 import android.view.SurfaceView
 import android.view.WindowManager
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -57,6 +60,8 @@ class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private var isSurfaceShow by mutableStateOf(false)
+    private var remoteVideoWidth by mutableIntStateOf(1280)
+    private var remoteVideoHeight by mutableIntStateOf(720)
 
     private lateinit var settings: Settings
     private lateinit var service: Intent
@@ -96,6 +101,7 @@ class MainActivity : ComponentActivity() {
         settings = Settings(this)
         deviceManager = DeviceManager(settings, scope)
 
+        // Create Service
         service = run {
             val intent = Intent(this, HylaranaCoreService::class.java)
             bindService(intent, serviceConnection, BIND_AUTO_CREATE)
@@ -104,16 +110,6 @@ class MainActivity : ComponentActivity() {
 
         bridge.on<Unit, Bridge.Status>(Bridge.Method.GET_STATUS) {
             status
-        }
-
-        bridge.on<String, Unit>(Bridge.Method.SET_NAME) {
-            run {
-                val value = settings.value
-                value.system.name = it
-                settings.value = value
-            }
-
-            deviceManager.send(listOf(), null)
         }
 
         bridge.on<Unit, List<DeviceManager.Device>>(Bridge.Method.GET_DEVICES) {
@@ -125,10 +121,17 @@ class MainActivity : ComponentActivity() {
         }
 
         bridge.on<Settings.Model, Unit>(Bridge.Method.SET_SETTINGS) {
-            settings.value = it;
+            val oldName = settings.value.system.name
+            settings.value = it
+
+            // You need to broadcast to other devices when you change the name.
+            if (oldName != it.system.name) {
+                deviceManager.send(listOf(), null)
+            }
         }
 
         bridge.on<String, Array<Bridge.Source>>(Bridge.Method.GET_CAPTURE_SOURCES) {
+            // android is unable to select a device and returns a fixed virtual device.
             when (it) {
                 "Screen" -> {
                     arrayOf(
@@ -162,11 +165,13 @@ class MainActivity : ComponentActivity() {
             val (targets, options) = it
 
             Handler(Looper.getMainLooper()).post {
+                // Creation is only allowed when it is free.
                 if (status == Bridge.Status.Idle &&
                     serviceBinder != null &&
                     options.media.video != null
                 ) {
 
+                    // Request screen recording permission first.
                     permissions.request { intent ->
                         if (ContextCompat.checkSelfPermission(
                                 this,
@@ -185,6 +190,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 ), object : HylaranaCoreService.Observer() {
                                     override fun onClosed() {
+                                        // You need to notify other devices when you stop screen casting.
                                         deviceManager.send(listOf(), null)
 
                                         status = Bridge.Status.Idle
@@ -193,6 +199,7 @@ class MainActivity : ComponentActivity() {
                                 })
 
                             description?.let {
+                                // Notification to other devices when screen casting starts.
                                 deviceManager.send(targets, description)
 
                                 status = Bridge.Status.Sending
@@ -212,8 +219,12 @@ class MainActivity : ComponentActivity() {
             val (_, _, description) = it
 
             Handler(Looper.getMainLooper()).post {
+                // Creation is only allowed when it is free.
                 if (status == Bridge.Status.Idle && serviceBinder != null) {
                     isSurfaceShow = true
+
+                    remoteVideoWidth = description.video?.size?.width ?: 1280
+                    remoteVideoHeight = description.video?.size?.height ?: 720
 
                     serviceBinder!!.createReceiver(
                         surface,
@@ -235,8 +246,14 @@ class MainActivity : ComponentActivity() {
 
         bridge.on<Unit, Unit>(Bridge.Method.CLOSE_RECEIVER) {
             serviceBinder?.stopReceiver()
+
+            Handler(Looper.getMainLooper()).post {
+                remoteVideoWidth = 1280
+                remoteVideoHeight = 720
+            }
         }
 
+        // Listen for device list change notifications to the front end.
         scope.launch {
             for (x in deviceManager.watcher) {
                 Log.i("hylarana", "device manager change event, send notify to webview")
@@ -248,38 +265,43 @@ class MainActivity : ComponentActivity() {
         bridge.emit(Bridge.Event.READY)
     }
 
-    @SuppressLint("ClickableViewAccessibility")
+    @SuppressLint("ClickableViewAccessibility", "UnusedBoxWithConstraintsScope")
     @Composable
     fun Activity() {
         var isSurfaceCloseButtonShow by remember { mutableStateOf(false) }
+        val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
 
-        DisposableEffect(isSurfaceShow) {
-            if (isSurfaceShow) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
-
-            onDispose {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
+        // Receiving the cast goes to full screen and prevents the screen from going off automatically,
+        // which is consistent with the video player's performance.
+        if (isSurfaceShow) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+            windowInsetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
         }
 
-        LaunchedEffect(isSurfaceShow) {
-            val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // The actual size of the surface is automatically calculated based on the size of the
+            // cast screen.
+            val (width, height) = with(LocalDensity.current) {
+                val pxWidth =
+                    remoteVideoWidth.toFloat() / remoteVideoHeight.toFloat() * constraints.maxHeight
 
-            if (isSurfaceShow) {
-                WindowCompat.setDecorFitsSystemWindows(window, false)
-                windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-                windowInsetsController.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else {
-                WindowCompat.setDecorFitsSystemWindows(window, true)
-                windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
+                val pxHeight =
+                    remoteVideoHeight.toFloat() / remoteVideoWidth.toFloat() * constraints.maxWidth
+
+                if (pxHeight > constraints.maxHeight) {
+                    pxWidth.toInt().toDp() to constraints.maxHeight.toDp()
+                } else {
+                    constraints.maxWidth.toDp() to pxHeight.toInt().toDp()
+                }
             }
-        }
 
-        Box(modifier = Modifier.fillMaxSize()) {
             AndroidView(
                 modifier = Modifier
                     .fillMaxSize()
@@ -287,29 +309,38 @@ class MainActivity : ComponentActivity() {
                 factory = { Frontend(it, bridge) }
             )
 
-            AndroidView(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .zIndex(if (isSurfaceShow) 1f else 0f),
-                factory = {
-                    SurfaceView(it).apply {
-                        surface = holder.surface
+                    .background(Color.Black)
+                    .zIndex(if (isSurfaceShow) 1f else 0f)
+            ) {
+                AndroidView(
+                    modifier = Modifier
+                        .size(width, height)
+                        .align(alignment = Alignment.Center),
+                    factory = {
+                        SurfaceView(it).apply {
+                            surface = holder.surface
 
-                        holder.setFormat(PixelFormat.TRANSLUCENT)
+                            holder.setFormat(PixelFormat.TRANSLUCENT)
 
-                        setOnTouchListener { _, _ ->
-                            if (!isSurfaceCloseButtonShow) {
-                                isSurfaceCloseButtonShow = true
-                                Handler(Looper.getMainLooper()).postDelayed({
-                                    isSurfaceCloseButtonShow = false
-                                }, 5000)
+                            layoutParams = FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                Gravity.CENTER
+                            )
+
+                            // Show close button when clicked.
+                            setOnTouchListener { _, _ ->
+                                isSurfaceCloseButtonShow = !isSurfaceCloseButtonShow
+
+                                false
                             }
-
-                            false
                         }
                     }
-                }
-            )
+                )
+            }
 
             if (isSurfaceShow && isSurfaceCloseButtonShow) {
                 Box(
@@ -322,6 +353,8 @@ class MainActivity : ComponentActivity() {
                     IconButton(
                         onClick = {
                             serviceBinder?.stopReceiver()
+
+                            isSurfaceCloseButtonShow = false
                         },
                         modifier = Modifier
                             .zIndex(3f)

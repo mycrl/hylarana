@@ -181,7 +181,6 @@ class Bridge {
     }
 
     enum class Method(val type: String) {
-        SET_NAME("SetName"),
         GET_DEVICES("GetDevices"),
         GET_CAPTURE_SOURCES("GetCaptureSources"),
         CREATE_SENDER("CreateSender"),
