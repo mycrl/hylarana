@@ -54,7 +54,6 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 -   [codec](./codec) - Codec implementation that handles H264 and Opus.
 -   [common](./common) - The public section, which contains public types, runtime, atomic operations, strings, logging, platform API wrappers, and more.
 -   [discovery](./discovery) - LAN discovery implementation using MDNS.
--   [ffi](./ffi) - Cross-language related, providing SDK to different language packaging.
 -   [hylarana](./hylarana) - Rust crate, the core SDK implementation used on desktop systems.
 -   [renderer](./renderer) - Cross-platform graphics renderer responsible for rendering video frames to the window.
 -   [resample](./resample) - Resampling module, responsible for resampling audio, as well as scaling and converting texture formats using D3D11.
