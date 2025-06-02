@@ -1,8 +1,10 @@
 name: publish release
 on:
     push:
+        branches:
+            - main
         tags:
-            - v*
+            - "*"
 jobs:
     build:
         runs-on: "${{ matrix.os }}"
@@ -25,17 +27,28 @@ jobs:
                   key: "${{ matrix.os }}-cargo"
 
             - name: Set up JDK
+              if: runner.os == 'Macos'
               uses: actions/setup-java@v3
               with:
                   distribution: "temurin"
                   java-version: "17"
 
+            - name: Set up Android SDK and NDK
+              if: runner.os == 'Macos'
+              uses: android-actions/setup-android@v2
+              with:
+                  sdk-version: 35
+                  ndk-version: 27.0.12077973
+
             # installation of dependencies
             - name: Installation of dependencies
+              id: dependencies
               if: runner.os == 'Macos'
               run: |
                   brew install ffmpeg@7 cmake wget
                   echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
+                  apk_release_key_file=$(pwd)/apk-release-key.jks
+                  echo "apk_release_key_file=$apk_release_key_file" >> $GITHUB_OUTPUT
 
             # use auto build script
             - name: Build distributions (Windows)
@@ -48,13 +61,12 @@ jobs:
             - name: Build distributions (Macos)
               if: runner.os == 'Macos'
               env:
+                  ANDROID_RELEASE_KEY_FILE: ${{ steps.dependencies.outputs.apk_release_key_file }}
                   ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
               run: |
-                  export ANDROID_RELEASE_KEY_FILE=$(pwd)/apk-release-key.jks
                   npm i -g yarn
                   yarn
                   yarn build:app:release
-                  sdkmanager --install "ndk;27.0.12077973"
                   yarn build:android
 
             # compress shared libraries
@@ -96,6 +108,17 @@ jobs:
               uses: actions/download-artifact@v4
               with:
                   path: artifacts
+            - name: Set release name
+              id: set_name
+              run: |
+                  if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+                    release_name=$(date +"%Y-%m-%d_%H-%M-%S")
+                  elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+                    release_name=${GITHUB_REF#refs/tags/}
+                  else
+                    release_name="release"
+                  fi
+                  echo "release_name=$release_name" >> $GITHUB_OUTPUT
             - name: Create release
               id: create_release
               uses: softprops/action-gh-release@v1
@@ -103,7 +126,7 @@ jobs:
                   GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
               with:
                   tag_name: ${{ github.ref_name }}
-                  name: ${{ github.ref_name }}
+                  name: ${{ steps.set_name.outputs.release_name }}
                   draft: false
                   prerelease: false
                   files: artifacts/**/*
