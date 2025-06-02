@@ -33,7 +33,9 @@ jobs:
             # installation of dependencies
             - name: Installation of dependencies
               if: runner.os == 'Macos'
-              run: brew install ffmpeg@7 cmake wget
+              run: |
+                  brew install ffmpeg@7 cmake wget
+                  echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
 
             # use auto build script
             - name: Build distributions (Windows)
@@ -45,7 +47,10 @@ jobs:
 
             - name: Build distributions (Macos)
               if: runner.os == 'Macos'
+              env:
+                  ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
               run: |
+                  export ANDROID_RELEASE_KEY_FILE=$(pwd)/apk-release-key.jks
                   npm i -g yarn
                   yarn
                   yarn build:app:release
