@@ -24,18 +24,32 @@ jobs:
                       target/
                   key: "${{ matrix.os }}-cargo"
 
+            - name: Set up JDK
+              uses: actions/setup-java@v3
+              with:
+                  distribution: "temurin"
+                  java-version: "17"
+
             # installation of dependencies
             - name: Installation of dependencies
               if: runner.os == 'Macos'
               run: brew install ffmpeg@7 cmake wget
 
             # use auto build script
-            - name: Build application
+            - name: Build distributions (Windows)
+              if: runner.os == 'Windows'
               run: |
-                  npm i yarn -g
+                  npm i -g yarn
                   yarn
-                  cd app/desktop
-                  yarn build:release
+                  yarn build:app:release
+
+            - name: Build distributions (Macos)
+              if: runner.os == 'Macos'
+              run: |
+                  npm i -g yarn
+                  yarn
+                  yarn build:app:release
+                  yarn build:android
 
             # compress shared libraries
             - name: Compress distributions (Windows)
@@ -44,7 +58,7 @@ jobs:
 
             - name: Compress distributions (Macos)
               if: runner.os == 'Macos'
-              run: tar -czvf hylarana-macos-arm64.tar.gz -C ./target/app .
+              run: tar -czvf hylarana-darwin-arm64.tar.gz -C ./target/app .
 
             # upload to artifact
             - name: Upload artifact (Windows)
@@ -52,14 +66,21 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: hylarana-windows-x64
-                  path: ./hylarana-windows-x64.zip
+                  path: ./hylarana-windows-x64-.zip
 
             - name: Upload artifact (Macos)
               if: runner.os == 'Macos'
               uses: actions/upload-artifact@v4
               with:
-                  name: hylarana-macos-arm64
-                  path: ./hylarana-macos-arm64.tar.gz
+                  name: hylarana-darwin-arm64
+                  path: ./hylarana-darwin-arm64.tar.gz
+
+            - name: Upload artifact (Android)
+              if: runner.os == 'Macos'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: android-apk
+                  path: ./target/app/Hylarana.apk
 
     deploy:
         needs: build
