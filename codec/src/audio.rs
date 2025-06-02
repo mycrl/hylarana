@@ -1,7 +1,4 @@
-use crate::{
-    AudioEncoderSettings,
-    codec::{set_option, set_str_option},
-};
+use crate::{AudioEncoderSettings, set_option, set_str_option};
 
 use std::{ffi::c_int, ptr::null_mut};
 

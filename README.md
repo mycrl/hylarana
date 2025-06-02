@@ -38,7 +38,7 @@ At the heart of hylarana is an SDK that provides rust crate on desktop and a kot
 
 ## Technical overview
 
-The first is screen capture, this part of each platform independently separate implementation, but all use hardware accelerated texture, Android use virtual display, Windows use WGC, and Macos use screencapturekit.
+The first is screen capture, this part of each platform independently separate implementation, but all use hardware accelerated texture, Android use virtual display, Windows use WGC, and Macos use screenshencapturekit.
 
 In terms of audio and video codecs, H264 is used for video and Opus is used for audio. Similarly, Windows, Android and Macos all provide hardware accelerated codecs, and the current hardware codecs on Windows are adapted to Qsv and D3D11VA, Android is adapted to Qualcomm, Kirin, and RK series of socs, while Macos uses the Video Toolbox.
 
@@ -54,6 +54,7 @@ The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is
 -   [codec](./codec) - Codec implementation that handles H264 and Opus.
 -   [common](./common) - The public section, which contains public types, runtime, atomic operations, strings, logging, platform API wrappers, and more.
 -   [discovery](./discovery) - LAN discovery implementation using MDNS.
+-   [ffi](./ffi) - Cross-language related, providing SDK to different language packaging.
 -   [hylarana](./hylarana) - Rust crate, the core SDK implementation used on desktop systems.
 -   [renderer](./renderer) - Cross-platform graphics renderer responsible for rendering video frames to the window.
 -   [resample](./resample) - Resampling module, responsible for resampling audio, as well as scaling and converting texture formats using D3D11.
@@ -85,7 +86,7 @@ sudo apt-get install unzip tclsh pkg-config cmake libssl-dev build-essential lib
 ##### Macos
 
 ```bash
-brew install cmake ffmpeg@7
+brew install cmake ffmpeg@7 wget
 ```
 
 ---

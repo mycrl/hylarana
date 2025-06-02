@@ -1,0 +1,66 @@
+.Header {
+    user-select: none;
+    position: relative;
+    margin-top: 20px;
+    margin-left: 20px;
+    height: 50px;
+    width: calc(100vw / 2 - 20px + 106px);
+    z-index: 10;
+    display: flex;
+}
+
+.Header .Navigation .icon {
+    color: var(--primary-color);
+    font-size: 17px;
+    transform: rotate(0deg);
+    transition: 0.3s;
+}
+
+.Header .Navigation .icon:hover {
+    color: #fff;
+}
+
+.Header .Navigation span {
+    color: var(--primary-text-color);
+    margin-left: 5px;
+    position: relative;
+    top: -2px;
+}
+
+.Header .Toggle {
+    background-color: var(--primary-color);
+    width: 212px;
+    height: 44px;
+    border-radius: 44px;
+    position: absolute;
+    right: 0;
+    transition: 0.3s;
+    display: flex;
+}
+
+.Header .Toggle .item {
+    height: 44px;
+    flex: 1;
+}
+
+.Header #slider {
+    width: 106px;
+    height: 44px;
+    position: absolute;
+    z-index: 1;
+    background-color: var(--secondary-color);
+    border-radius: 44px;
+    transition: 0.3s;
+}
+
+.Header .Toggle .item {
+    z-index: 2;
+    display: grid;
+    place-items: center;
+}
+
+.Header .Toggle .item p {
+    text-align: center;
+    color: #fff;
+    transition: 0.3s;
+}

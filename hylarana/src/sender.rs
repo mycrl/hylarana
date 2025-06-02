@@ -7,19 +7,20 @@ use super::{
 use super::util::get_direct3d;
 
 use std::{
-    mem::size_of,
-    sync::{Arc, Weak, atomic::AtomicBool},
+    net::SocketAddr,
+    sync::{
+        Arc, Weak,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
-use bytes::BytesMut;
 use capture::{
     AudioCaptureSourceDescription, Capture, CaptureOptions, FrameConsumer, Source,
     SourceCaptureOptions, VideoCaptureSourceDescription,
 };
 
 use common::{
-    Size, TransportOptions,
-    atomic::EasyAtomic,
+    Size,
     codec::VideoEncoderType,
     frame::{AudioFrame, VideoFormat, VideoFrame},
 };
@@ -30,10 +31,7 @@ use codec::{
 };
 
 use thiserror::Error;
-use transport::{
-    BufferFlag, StreamBufferInfo, StreamSenderAdapter, TransportSender,
-    copy_from_slice as package_copy_from_slice,
-};
+use transport::{Buffer, BufferType, StreamType, TransportOptions, TransportSender};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -94,71 +92,82 @@ pub struct HylaranaSenderOptions {
     pub transport: TransportOptions,
 }
 
-struct VideoSender<S, O> {
-    adapter: Arc<StreamSenderAdapter>,
-    status: Arc<AtomicBool>,
-    encoder: VideoEncoder,
-    sink: Weak<S>,
-    observer: Weak<O>,
-}
-
 // Encoding is a relatively complex task. If you add encoding tasks to the
 // pipeline that pushes frames, it will slow down the entire pipeline.
 //
 // Here, the tasks are separated, and the encoding tasks are separated into
 // independent threads. The encoding thread is notified of task updates through
 // the optional lock.
-impl<S, O> VideoSender<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
+struct VideoSender<S> {
+    callback: Arc<dyn Fn() + Send + Sync + 'static>,
+    transport: Weak<TransportSender>,
+    encoder: VideoEncoder,
+    sink: Arc<S>,
+}
+
+impl<S> VideoSender<S> {
     fn new(
-        status: Arc<AtomicBool>,
-        transport: &TransportSender,
-        settings: VideoEncoderSettings,
-        sink: &Arc<S>,
-        observer: &Arc<O>,
+        options: &VideoOptions,
+        transport: &Arc<TransportSender>,
+        sink: Arc<S>,
+        callback: Arc<dyn Fn() + Send + Sync + 'static>,
     ) -> Result<Self, HylaranaSenderError> {
-        Ok(Self {
-            adapter: transport.get_adapter(),
-            sink: Arc::downgrade(sink),
-            observer: Arc::downgrade(observer),
-            encoder: VideoEncoder::new(settings)?,
-            status,
+        Ok(VideoSender {
+            encoder: VideoEncoder::new(VideoEncoderSettings {
+                codec: options.codec,
+                key_frame_interval: options.key_frame_interval,
+                frame_rate: options.frame_rate,
+                width: options.width,
+                height: options.height,
+                bit_rate: options.bit_rate,
+                #[cfg(target_os = "windows")]
+                direct3d: Some(get_direct3d()),
+            })?,
+            transport: Arc::downgrade(&transport),
+            callback,
+            sink,
         })
     }
+}
 
-    fn send(&mut self, frame: &VideoFrame) -> bool {
-        // Push the audio and video frames into the encoder.
-        if self.encoder.update(frame) {
-            // Try to get the encoded data packets. The audio and video frames do not
-            // correspond to the data packets one by one, so you need to try to get
-            // multiple packets until they are empty.
-            if let Err(e) = self.encoder.encode() {
-                log::error!("video encode error={:?}", e);
+impl<S> FrameConsumer for VideoSender<S>
+where
+    S: MediaStreamSink + 'static,
+{
+    type Frame = VideoFrame;
 
-                return false;
-            } else {
-                while let Some((buffer, flags, timestamp)) = self.encoder.read() {
-                    if !self.adapter.send(
-                        package_copy_from_slice(buffer),
-                        StreamBufferInfo::Video(flags, timestamp),
-                    ) {
-                        log::warn!("video send packet to adapter failed");
+    fn sink(&mut self, frame: &Self::Frame) -> bool {
+        if let Some(transport) = self.transport.upgrade() {
+            // Push the audio and video frames into the encoder.
+            if self.encoder.update(frame) {
+                // Try to get the encoded data packets. The audio and video frames do not
+                // correspond to the data packets one by one, so you need to try to get
+                // multiple packets until they are empty.
+                if let Err(e) = self.encoder.encode() {
+                    log::error!("video encode error={:?}", e);
 
-                        return false;
+                    return false;
+                } else {
+                    while let Some((buffer, flags, timestamp)) = self.encoder.read() {
+                        if let Err(e) = transport.send(Buffer {
+                            data: Buffer::<()>::copy_from_slice(buffer),
+                            ty: BufferType::try_from(flags as u8).unwrap(),
+                            stream: StreamType::Video,
+                            timestamp,
+                        }) {
+                            log::warn!("video send packet to transport failed, err={:?}", e);
+
+                            return false;
+                        }
                     }
                 }
+            } else {
+                log::warn!("video encoder update frame failed");
+
+                return false;
             }
-        } else {
-            log::warn!("video encoder update frame failed");
 
-            return false;
-        }
-
-        if let Some(sink) = self.sink.upgrade() {
-            if sink.video(frame) {
+            if self.sink.video(frame) {
                 true
             } else {
                 log::warn!("video sink on frame return false");
@@ -166,44 +175,17 @@ where
                 false
             }
         } else {
-            log::warn!("video sink weak upgrade failed, maybe is drop");
+            log::warn!("transport weak upgrade failed, maybe is drop");
 
             false
         }
     }
-}
 
-impl<S, O> FrameConsumer for VideoSender<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
-    type Frame = VideoFrame;
+    fn close(&mut self) {
+        log::info!("video sender is closed");
 
-    fn sink(&mut self, frame: &Self::Frame) -> bool {
-        if self.send(frame) {
-            true
-        } else {
-            if let Some(observer) = self.observer.upgrade() {
-                if !self.status.get() {
-                    self.status.set(true);
-                    observer.close();
-                }
-            }
-
-            false
-        }
+        (self.callback)();
     }
-}
-
-struct AudioSender<S, O> {
-    adapter: Arc<StreamSenderAdapter>,
-    status: Arc<AtomicBool>,
-    encoder: AudioEncoder,
-    chunk_count: usize,
-    buffer: BytesMut,
-    sink: Weak<S>,
-    observer: Weak<O>,
 }
 
 // Encoding is a relatively complex task. If you add encoding tasks to the
@@ -212,217 +194,189 @@ struct AudioSender<S, O> {
 // Here, the tasks are separated, and the encoding tasks are separated into
 // independent threads. The encoding thread is notified of task updates through
 // the optional lock.
-impl<S, O> AudioSender<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
-    fn new(
-        status: Arc<AtomicBool>,
-        transport: &TransportSender,
-        settings: AudioEncoderSettings,
-        sink: &Arc<S>,
-        observer: &Arc<O>,
-    ) -> Result<Self, HylaranaSenderError> {
-        let adapter = transport.get_adapter();
+struct AudioSender<S> {
+    callback: Arc<dyn Fn() + Send + Sync + 'static>,
+    transport: Weak<TransportSender>,
+    encoder: AudioEncoder,
+    sink: Arc<S>,
+}
 
+impl<S> AudioSender<S> {
+    fn new(
+        options: &AudioOptions,
+        transport: &Arc<TransportSender>,
+        sink: Arc<S>,
+        callback: Arc<dyn Fn() + Send + Sync + 'static>,
+    ) -> Result<Self, HylaranaSenderError> {
         // Create an opus header data. The opus decoder needs this data to obtain audio
         // information. Here, actively add an opus header information to the queue, and
         // the adapter layer will automatically cache it.
-        adapter.send(
-            package_copy_from_slice(&create_opus_identification_header(
+        transport.send(Buffer {
+            stream: StreamType::Audio,
+            ty: BufferType::Config,
+            timestamp: 0,
+            data: Buffer::<()>::copy_from_slice(&create_opus_identification_header(
                 2,
-                settings.sample_rate as u32,
+                options.sample_rate as u32,
             )),
-            StreamBufferInfo::Audio(BufferFlag::Config as i32, 0),
-        );
+        })?;
 
-        Ok(AudioSender {
-            chunk_count: settings.sample_rate as usize / 1000 * 20 * 2,
-            encoder: AudioEncoder::new(settings)?,
-            buffer: BytesMut::with_capacity(48000 * 2),
-            observer: Arc::downgrade(observer),
-            sink: Arc::downgrade(sink),
-            adapter,
-            status,
+        Ok(Self {
+            encoder: AudioEncoder::new(AudioEncoderSettings {
+                sample_rate: options.sample_rate,
+                bit_rate: options.bit_rate,
+            })?,
+            transport: Arc::downgrade(&transport),
+            callback,
+            sink,
         })
-    }
-
-    fn send(&mut self, frame: &AudioFrame) -> bool {
-        self.buffer.extend_from_slice(unsafe {
-            std::slice::from_raw_parts(
-                frame.data as *const _,
-                frame.frames as usize * 2 * size_of::<i16>(),
-            )
-        });
-
-        if self.buffer.len() >= self.chunk_count * size_of::<i16>() {
-            let payload = self.buffer.split_to(self.chunk_count * size_of::<i16>());
-            let frame = AudioFrame {
-                data: payload.as_ptr() as *const _,
-                frames: self.chunk_count as u32 / 2,
-                sample_rate: 0,
-            };
-
-            if self.encoder.update(&frame) {
-                // Push the audio and video frames into the encoder.
-                if let Err(e) = self.encoder.encode() {
-                    log::error!("audio encode error={:?}", e);
-
-                    return false;
-                } else {
-                    // Try to get the encoded data packets. The audio and video frames
-                    // do not correspond to the data
-                    // packets one by one, so you need to try to get
-                    // multiple packets until they are empty.
-                    while let Some((buffer, flags, timestamp)) = self.encoder.read() {
-                        if !self.adapter.send(
-                            package_copy_from_slice(buffer),
-                            StreamBufferInfo::Audio(flags, timestamp),
-                        ) {
-                            log::warn!("audio send packet to adapter failed");
-
-                            return false;
-                        }
-                    }
-                }
-            } else {
-                log::warn!("audio encoder update frame failed");
-
-                return false;
-            }
-        }
-
-        if let Some(sink) = self.sink.upgrade() {
-            if sink.audio(frame) {
-                true
-            } else {
-                log::warn!("audio sink on frame return false");
-
-                false
-            }
-        } else {
-            log::warn!("audio sink weak upgrade failed, maybe is drop");
-
-            false
-        }
     }
 }
 
-impl<S, O> FrameConsumer for AudioSender<S, O>
+impl<S> FrameConsumer for AudioSender<S>
 where
     S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
 {
     type Frame = AudioFrame;
 
     fn sink(&mut self, frame: &Self::Frame) -> bool {
-        if self.send(frame) {
-            true
-        } else {
-            if let Some(observer) = self.observer.upgrade() {
-                if !self.status.get() {
-                    self.status.set(true);
-                    observer.close();
+        if self.encoder.update(&frame) {
+            // Push the audio and video frames into the encoder.
+            if let Err(e) = self.encoder.encode() {
+                log::error!("audio encode error={:?}", e);
+
+                return false;
+            } else {
+                // Try to get the encoded data packets. The audio and video frames
+                // do not correspond to the data
+                // packets one by one, so you need to try to get
+                // multiple packets until they are empty.
+                while let Some((buffer, _, timestamp)) = self.encoder.read() {
+                    if let Some(transport) = self.transport.upgrade() {
+                        if let Err(e) = transport.send(Buffer {
+                            data: Buffer::<()>::copy_from_slice(buffer),
+                            ty: BufferType::Partial,
+                            stream: StreamType::Audio,
+                            timestamp,
+                        }) {
+                            log::warn!("audio send packet to transport failed, err={:?}", e);
+
+                            return false;
+                        }
+                    } else {
+                        log::warn!("transport weak upgrade failed, maybe is drop");
+
+                        return false;
+                    }
                 }
             }
+        } else {
+            log::warn!("audio encoder update frame failed");
+
+            return false;
+        }
+
+        if self.sink.audio(frame) {
+            true
+        } else {
+            log::warn!("audio sink on frame return false");
 
             false
         }
     }
+
+    fn close(&mut self) {
+        log::info!("audio sender is closed");
+
+        (self.callback)();
+    }
 }
 
 /// Screen casting sender.
-pub struct HylaranaSender<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
+pub struct HylaranaSender {
+    callback: Arc<dyn Fn() + Send + Sync + 'static>,
     description: MediaStreamDescription,
+    transport: Arc<TransportSender>,
     #[allow(unused)]
-    transport: TransportSender,
-    status: Arc<AtomicBool>,
     capture: Capture,
-    #[allow(unused)]
-    sink: Arc<S>,
-    observer: Arc<O>,
 }
 
-impl<S, O> HylaranaSender<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
+impl HylaranaSender {
     // Create a sender. The capture of the sender is started following the sender,
     // but both video capture and audio capture can be empty, which means you can
     // create a sender that captures nothing.
-    pub(crate) fn new(
+    pub(crate) fn new<S, O>(
+        bind: SocketAddr,
         options: &HylaranaSenderOptions,
         sink: S,
         observer: O,
-    ) -> Result<Self, HylaranaSenderError> {
+    ) -> Result<Self, HylaranaSenderError>
+    where
+        S: MediaStreamSink + 'static,
+        O: MediaStreamObserver + 'static,
+    {
         log::info!("create sender");
 
-        let mut capture_options = CaptureOptions::default();
-        let transport = transport::create_sender(options.transport)?;
-        let status = Arc::new(AtomicBool::new(false));
-        let observer = Arc::new(observer);
-        let sink = Arc::new(sink);
+        let transport = Arc::new(TransportSender::new(bind, options.transport.clone())?);
 
-        if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.audio {
-            capture_options.audio = Some(SourceCaptureOptions {
-                consumer: AudioSender::new(
-                    status.clone(),
-                    &transport,
-                    AudioEncoderSettings {
-                        sample_rate: options.sample_rate,
-                        bit_rate: options.bit_rate,
-                    },
-                    &sink,
-                    &observer,
-                )?,
-                description: AudioCaptureSourceDescription {
-                    sample_rate: options.sample_rate as u32,
-                    source: source.clone(),
-                },
-            });
-        }
+        let callback = {
+            let working = AtomicBool::new(true);
 
-        if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.video {
-            capture_options.video = Some(SourceCaptureOptions {
-                description: VideoCaptureSourceDescription {
-                    hardware: CodecType::from(options.codec).is_hardware(),
-                    fps: options.frame_rate,
-                    size: Size {
-                        width: options.width,
-                        height: options.height,
+            Arc::new(move || {
+                if working.load(Ordering::Relaxed) {
+                    working.store(false, Ordering::Relaxed);
+                    observer.close();
+
+                    log::info!("sender is closed");
+                }
+            })
+        };
+
+        let capture_options = {
+            let sink = Arc::new(sink);
+            let mut opt = CaptureOptions::default();
+
+            if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.audio {
+                opt.audio = Some(SourceCaptureOptions {
+                    consumer: AudioSender::new(
+                        &options,
+                        &transport,
+                        sink.clone(),
+                        callback.clone(),
+                    )?,
+                    description: AudioCaptureSourceDescription {
+                        sample_rate: options.sample_rate as u32,
+                        source: source.clone(),
                     },
-                    source: source.clone(),
-                    #[cfg(target_os = "windows")]
-                    direct3d: get_direct3d(),
-                },
-                consumer: VideoSender::new(
-                    status.clone(),
-                    &transport,
-                    VideoEncoderSettings {
-                        codec: options.codec,
-                        key_frame_interval: options.key_frame_interval,
-                        frame_rate: options.frame_rate,
-                        width: options.width,
-                        height: options.height,
-                        bit_rate: options.bit_rate,
+                });
+            }
+
+            if let Some(HylaranaSenderTrackOptions { source, options }) = &options.media.video {
+                opt.video = Some(SourceCaptureOptions {
+                    consumer: VideoSender::new(
+                        options,
+                        &transport,
+                        sink.clone(),
+                        callback.clone(),
+                    )?,
+                    description: VideoCaptureSourceDescription {
+                        hardware: CodecType::from(options.codec).is_hardware(),
+                        fps: options.frame_rate,
+                        size: Size {
+                            width: options.width,
+                            height: options.height,
+                        },
+                        source: source.clone(),
                         #[cfg(target_os = "windows")]
-                        direct3d: Some(get_direct3d()),
+                        direct3d: get_direct3d(),
                     },
-                    &sink,
-                    &observer,
-                )?,
-            });
-        }
+                });
+            }
+
+            opt
+        };
 
         let description = MediaStreamDescription {
-            id: transport.get_id().to_string(),
-            transport: options.transport,
             video: options
                 .media
                 .video
@@ -453,9 +407,7 @@ where
             capture: Capture::start(capture_options)?,
             description,
             transport,
-            observer,
-            status,
-            sink,
+            callback,
         })
     }
 
@@ -465,33 +417,13 @@ where
         &self.description
     }
 
-    /// Resize the video renderer.
-    pub fn resize(&self, size: Size) {
-        self.sink.resize(size);
+    pub fn local_addr(&self) -> SocketAddr {
+        self.transport.local_addr()
     }
 }
 
-impl<S, O> Drop for HylaranaSender<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
+impl Drop for HylaranaSender {
     fn drop(&mut self) {
-        log::info!("sender drop");
-
-        if !self.status.get() {
-            self.status.set(true);
-
-            // When the sender releases, the cleanup work should be done, but there is a
-            // more troublesome point here. If it is actively released by the outside, it
-            // will also call back to the external closing event. It stands to reason that
-            // it should be distinguished whether it is an active closure, but in order to
-            // make it simpler to implement, let's do it this way first.
-            if let Err(e) = self.capture.close() {
-                log::warn!("hylarana sender capture close error={:?}", e);
-            }
-
-            self.observer.close();
-        }
+        (self.callback)();
     }
 }

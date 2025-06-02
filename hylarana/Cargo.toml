@@ -1,10 +1,10 @@
 [package]
 name = "hylarana"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
-readme = "./README.md"
+readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
@@ -22,4 +22,4 @@ transport.workspace = true
 discovery.workspace = true
 
 [features]
-serde = ["common/serde", "capture/serde"]
+serde = ["common/serde", "capture/serde", "transport/serde"]

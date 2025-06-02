@@ -15,13 +15,11 @@ use objc2_core_media::{
 };
 
 use objc2_core_video::{
-    CVMetalTexture, CVMetalTextureCache, CVMetalTextureCacheCreate,
-    CVMetalTextureCacheCreateTextureFromImage, CVMetalTextureCacheFlush, CVMetalTextureGetTexture,
-    CVPixelBuffer, CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane,
-    CVPixelBufferGetHeight, CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth,
-    CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
-    kCVPixelFormatType_32BGRA, kCVPixelFormatType_32RGBA,
-    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+    CVMetalTexture, CVMetalTextureCache, CVMetalTextureGetTexture, CVPixelBuffer,
+    CVPixelBufferGetBaseAddressOfPlane, CVPixelBufferGetBytesPerRowOfPlane, CVPixelBufferGetHeight,
+    CVPixelBufferGetPixelFormatType, CVPixelBufferGetWidth, CVPixelBufferLockBaseAddress,
+    CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress, kCVPixelFormatType_32BGRA,
+    kCVPixelFormatType_32RGBA, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
     kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8Planar,
     kCVReturnSuccess,
 };
@@ -206,7 +204,7 @@ impl MetalTextureCache {
 
         let mut cache = null_mut();
         let code = unsafe {
-            CVMetalTextureCacheCreate(
+            CVMetalTextureCache::create(
                 kCFAllocatorDefault,
                 None,
                 device.as_ref(),
@@ -227,7 +225,7 @@ impl MetalTextureCache {
 
         let mut texture = null_mut();
         let code = unsafe {
-            CVMetalTextureCacheCreateTextureFromImage(
+            CVMetalTextureCache::create_texture_from_image(
                 kCFAllocatorDefault,
                 &self.0,
                 buffer.as_ref(),
@@ -255,7 +253,7 @@ impl MetalTextureCache {
 
     pub fn flush(&self) {
         unsafe {
-            CVMetalTextureCacheFlush(&self.0, 0);
+            CVMetalTextureCache::flush(&self.0, 0);
         }
     }
 }

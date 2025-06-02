@@ -60,7 +60,25 @@ fn main() -> Result<()> {
         #[cfg(not(target_os = "windows"))]
         use_android_library(&srt_dir)?;
     } else {
-        use_library(srt_dir)?;
+        use_library(&srt_dir)?;
+    }
+
+    {
+        bindgen::Builder::default()
+            .default_enum_style(bindgen::EnumVariation::Rust {
+                non_exhaustive: false,
+            })
+            .allowlist_function("srt_.*")
+            .allowlist_item("SRT_.*")
+            .generate_comments(false)
+            .prepend_enum_name(false)
+            .derive_eq(true)
+            .size_t_is_usize(true)
+            .clang_arg(format!("-I{}", &srt_dir))
+            .clang_arg(format!("-I{}/common", &srt_dir))
+            .header(join(&srt_dir, "./srtcore/srt.h"))
+            .generate()?
+            .write_to_file(&join(&out_dir, "bindings.rs"))?;
     }
 
     Ok(())
@@ -93,6 +111,7 @@ fn use_android_library(srt_dir: &str) -> Result<()> {
         "cargo:rustc-link-search=all={}/scripts/build-android/arm64-v8a/lib",
         srt_dir
     );
+
     println!("cargo:rustc-link-lib=static=srt");
     println!("cargo:rustc-link-lib=static=ssl");
     println!("cargo:rustc-link-lib=static=crypto");
@@ -101,10 +120,10 @@ fn use_android_library(srt_dir: &str) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn use_library(srt_dir: String) -> Result<()> {
-    if !is_exsit(&join(&srt_dir, "./Release/srt_static.lib")) {
+fn use_library(srt_dir: &str) -> Result<()> {
+    if !is_exsit(&join(srt_dir, "./Release/srt_static.lib")) {
         {
-            let cmake = join(&srt_dir, "CMakeLists.txt");
+            let cmake = join(srt_dir, "CMakeLists.txt");
             fs::write(
                 &cmake,
                 fs::read_to_string(&cmake)?.replace(
@@ -126,45 +145,42 @@ fn use_library(srt_dir: String) -> Result<()> {
             -DENABLE_UNITTESTS=OFF \
             -DENABLE_STDCXX_SYNC=ON \
             .",
-            &srt_dir,
+            srt_dir,
         )?;
 
         // use MultiThreaded
-        for vcxproj in ["srt_static.vcxproj", "srt_virtual.vcxproj"].map(|it| join(&srt_dir, it)) {
+        for vcxproj in ["srt_static.vcxproj", "srt_virtual.vcxproj"].map(|it| join(srt_dir, it)) {
             fs::write(
                 &vcxproj,
                 fs::read_to_string(&vcxproj)?.replace("MultiThreadedDLL", "MultiThreaded"),
             )?;
         }
 
-        exec("cmake --build . --config Release", &srt_dir)?;
+        exec("cmake --build . --config Release", srt_dir)?;
     }
 
-    println!(
-        "cargo:rustc-link-search=all={}",
-        join(&srt_dir, "./Release")
-    );
+    println!("cargo:rustc-link-search=all={}", join(srt_dir, "./Release"));
 
     println!("cargo:rustc-link-lib=srt_static");
     Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn use_library(srt_dir: String) -> Result<()> {
-    if !is_exsit(&join(&srt_dir, "./libsrt.a")) {
+fn use_library(srt_dir: &str) -> Result<()> {
+    if !is_exsit(&join(srt_dir, "./libsrt.a")) {
         // linux patch
         #[cfg(target_os = "linux")]
-        if !fs::read_to_string(join(&srt_dir, "CMakeLists.txt"))?
+        if !fs::read_to_string(join(srt_dir, "CMakeLists.txt"))?
             .contains("set(CMAKE_CXX_FLAGS \"-fPIC\")")
         {
             exec(
                 "sed -i '12i set(CMAKE_CXX_FLAGS \"-fPIC\")' CMakeLists.txt",
-                &srt_dir,
+                srt_dir,
             )?;
         }
 
         {
-            let cmake = join(&srt_dir, "CMakeLists.txt");
+            let cmake = join(srt_dir, "CMakeLists.txt");
             fs::write(
                 &cmake,
                 fs::read_to_string(&cmake)?.replace(
@@ -181,10 +197,10 @@ fn use_library(srt_dir: String) -> Result<()> {
             --enable-apps=OFF \
             --enable-debug=0 \
             --enable-encryption=OFF",
-            &srt_dir,
+            srt_dir,
         )?;
 
-        exec("make", &srt_dir)?;
+        exec("make", srt_dir)?;
     }
 
     println!("cargo:rustc-link-search=all={}", srt_dir);

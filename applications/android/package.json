@@ -1,0 +1,21 @@
+{
+    "name": "hylarana-app-android",
+    "version": "1.0.0",
+    "description": "",
+    "type": "module",
+    "main": "build.js",
+    "private": true,
+    "scripts": {
+        "build": "node ./build.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/mycrl/hylarana.git"
+    },
+    "author": "Mr.Panda",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/mycrl/hylarana/issues"
+    },
+    "homepage": "https://github.com/mycrl/hylarana#readme"
+}

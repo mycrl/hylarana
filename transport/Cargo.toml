@@ -1,6 +1,6 @@
 [package]
 name = "hylarana-transport"
-version = "0.3.1"
+version = "0.5.0"
 edition = "2024"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
@@ -8,18 +8,21 @@ readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
+arc-swap = "1.7.1"
 bytes = "1.5"
 log = "0.4"
-crossbeam = "0.8"
 common.workspace = true
-xxhash-rust = { version = "0.8", features = ["xxh3", "xxh64"] }
 parking_lot = "0.12"
 libc = "0.2"
-uuid = { version = "1.11", features = ["v4"] }
 os_socketaddr = "0.2"
 socket2 = "0.5"
-tokio = { version = "1", features = ["net", "sync", "macros"] }
+smallvec = "1.13"
+serde = { version = "1.0", features = ["derive"] }
 
 [build-dependencies]
 anyhow = "1.0"
 which = "6.0"
+bindgen = "0.71.1"
+
+[features]
+serde = []

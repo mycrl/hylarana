@@ -33,12 +33,6 @@ enum class StreamType(val flag: Int) {
     AUDIO(1),
 }
 
-enum class TransportStrategyType(val type: String) {
-    DIRECT("Direct"),
-    RELAY("Relay"),
-    MULTICAST("Multicast"),
-}
-
 enum class VideoFormat(val flag: Int) {
     BGRA(0),
     RGBA(1),
@@ -46,33 +40,33 @@ enum class VideoFormat(val flag: Int) {
     I420(3),
 }
 
-data class StreamBufferInfo(/* StreamType */ val type: Int) {
-    var flags: Int = 0
-    var timestamp: Long = 0
-}
-
-/**
- * transport strategy
- */
-@Serializable
-data class TransportStrategy(
-    /**
-     * TransportStrategyType
-     */
-    val ty: String,
-    /**
-     * socket address
-     */
-    var address: String
-)
-
 @Serializable
 data class TransportOptions(
-    val strategy: TransportStrategy,
     /**
-     * see: [Maximum_transmission_unit](https://en.wikipedia.org/wiki/Maximum_transmission_unit)
+     * Maximum Transmission Unit size
      */
-    val mtu: Int
+    val mtu: Int,
+    /**
+     * Maximum bandwidth in bytes per second
+     */
+    @SerialName("max_bandwidth")
+    val maxBandwidth: Long,
+    /**
+     * Latency in milliseconds
+     */
+    val latency: Int,
+    /**
+     * Connection timeout in milliseconds
+     */
+    val timeout: Int,
+    /**
+     * Forward Error Correction configuration
+     */
+    val fec: String,
+    /**
+     * Flow control window size
+     */
+    val fc: Int,
 )
 
 @Serializable
@@ -101,29 +95,28 @@ data class MediaAudioStreamDescription(
 
 @Serializable
 data class MediaStreamDescription(
-    val id: String,
-    val transport: TransportOptions,
     val video: MediaVideoStreamDescription?,
     val audio: MediaAudioStreamDescription?,
 )
 
 class HylaranaSenderAdapter(
-    private val id: String,
-    private val sendHandle: (StreamBufferInfo, ByteArray) -> Boolean,
+    private val getPortHandle: () -> Int,
+    private val sendHandle: (Int, Int, Long, ByteArray) -> Boolean,
     private val releaseHandle: () -> Unit,
 ) {
-    /**
-     * get sender stream id.
-     */
-    fun getId(): String {
-        return id
+    fun getPort(): Int {
+        return getPortHandle()
     }
 
     /**
      * send stream buffer to sender.
      */
-    fun send(info: StreamBufferInfo, bytes: ByteArray): Boolean {
-        return sendHandle(info, bytes)
+    fun send(
+        kind: Int,
+        flags: Int,
+        timestamp: Long, bytes: ByteArray
+    ): Boolean {
+        return sendHandle(kind, flags, timestamp, bytes)
     }
 
     /**
@@ -151,44 +144,53 @@ internal class Hylarana {
     }
 
     fun createSender(
+        bind: String,
         options: TransportOptions
     ): HylaranaSenderAdapter {
-        var ptr = createTransportSender(Json.encodeToString(options))
-        if (ptr == 0L) {
+        var sender = senderCreate(bind, Json.encodeToString(options))
+        if (sender == 0L) {
             throw Exception("failed to create transport sender")
         }
 
-        val id = getTransportSenderId(ptr)
         return HylaranaSenderAdapter(
-            id,
-            { info, bytes ->
-                if (ptr != 0L) sendStreamBufferToTransportSender(ptr, info, bytes) else false
+            {
+                if (sender != 0L) senderGetPort(sender) else 0
+            },
+            { kind, flags, timestamp, bytes ->
+                if (sender != 0L) senderWrite(
+                    sender,
+                    kind,
+                    flags,
+                    timestamp,
+                    bytes
+                ) else false
             },
             {
-                if (ptr != 0L) {
-                    val copyPtr = ptr
-                    ptr = 0L
+                if (sender != 0L) {
+                    val ptr = sender
+                    sender = 0L
 
-                    releaseTransportSender(copyPtr)
+                    senderRelease(ptr)
                 }
             },
         )
     }
 
     fun createReceiver(
-        id: String, options: TransportOptions, observer: HylaranaReceiverAdapterObserver
+        addr: String,
+        options: TransportOptions, observer: HylaranaReceiverAdapterObserver
     ): HylaranaReceiverAdapter {
-        var ptr = createTransportReceiver(id, Json.encodeToString(options), observer)
-        if (ptr == 0L) {
+        var receiver = receiverCreate(addr, Json.encodeToString(options), observer)
+        if (receiver == 0L) {
             throw Exception("failed to create transport receiver")
         }
 
         return HylaranaReceiverAdapter {
-            if (ptr != 0L) {
-                val copyPtr = ptr
-                ptr = 0L
+            if (receiver != 0L) {
+                val ptr = receiver
+                receiver = 0L
 
-                releaseTransportReceiver(copyPtr)
+                receiverRelease(ptr)
             }
         }
     }
@@ -197,37 +199,47 @@ internal class Hylarana {
      * Creates the sender, the return value indicates whether the creation
      * was successful or not.
      */
-    private external fun createTransportSender(
+    private external fun senderCreate(
+        bind: String,
         options: String,
     ): Long
 
     /**
-     * get transport sender id.
+     * get transport sender pkt lose reate.
      */
-    private external fun getTransportSenderId(
+    private external fun senderGetPktLoseRate(
         sender: Long
-    ): String
+    ): Long
+
+    /**
+     * get transport sender port.
+     */
+    private external fun senderGetPort(
+        sender: Long
+    ): Int
 
     /**
      * Sends the packet to the sender instance.
      */
-    private external fun sendStreamBufferToTransportSender(
+    private external fun senderWrite(
         sender: Long,
-        info: StreamBufferInfo,
+        kind: Int,
+        flags: Int,
+        timestamp: Long,
         bytes: ByteArray,
     ): Boolean
 
     /**
      * release transport sender.
      */
-    private external fun releaseTransportSender(sender: Long)
+    private external fun senderRelease(sender: Long)
 
     /**
      * Creates the receiver, the return value indicates whether the creation
      * was successful or not.
      */
-    private external fun createTransportReceiver(
-        id: String,
+    private external fun receiverCreate(
+        addr: String,
         options: String,
         observer: HylaranaReceiverAdapterObserver,
     ): Long
@@ -235,5 +247,5 @@ internal class Hylarana {
     /**
      * release transport receiver.
      */
-    private external fun releaseTransportReceiver(sender: Long)
+    private external fun receiverRelease(sender: Long)
 }

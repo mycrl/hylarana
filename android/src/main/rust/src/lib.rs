@@ -2,7 +2,7 @@ mod discovery;
 mod receiver;
 mod sender;
 
-use std::{cell::RefCell, ffi::c_void, ptr::null_mut, sync::Arc, thread};
+use std::{cell::RefCell, ffi::c_void, ptr::null_mut, sync::Arc};
 
 use anyhow::Result;
 use common::{logger, runtime::get_runtime_handle};
@@ -90,9 +90,8 @@ pub(crate) fn get_current_env<'local>() -> JNIEnv<'local> {
 /// LINKAGE:
 /// Exported from native libraries that contain native method
 /// implementation.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> i32 {
+#[unsafe(export_name = "JNI_OnLoad")]
+extern "system" fn load(vm: JavaVM, _: *mut c_void) -> i32 {
     logger::android::init_logger("com.github.mycrl.hylarana", log::LevelFilter::Info);
     logger::enable_panic_logger();
 
@@ -142,9 +141,8 @@ extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> i32 {
 /// LINKAGE:
 /// Exported from native libraries that contain native method
 /// implementation.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn JNI_OnUnload(_: JavaVM, _: *mut c_void) {
+#[unsafe(export_name = "JNI_OnUnload")]
+extern "system" fn unload(_: JavaVM, _: *mut c_void) {
     transport::shutdown();
 }
 
@@ -163,61 +161,61 @@ where
 
 /// Creates the sender, the return value indicates whether the creation was
 /// successful or not.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportSender(
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_senderCreate")]
+extern "system" fn sender_create(
     mut env: JNIEnv,
     _this: JClass,
+    bind: JString,
     options: JString,
 ) -> *const Sender {
     ok_or_check(&mut env, |env| {
-        Ok(Box::into_raw(Box::new(Sender::new(env, &options)?)))
+        Ok(Box::into_raw(Box::new(Sender::new(env, &bind, &options)?)))
     })
     .unwrap_or_else(|| null_mut())
 }
 
-/// get transport sender id.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_getTransportSenderId<'a>(
-    mut env: JNIEnv<'a>,
+/// get transport sender pkt lose rate.
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_senderGetPktLoseRate")]
+extern "system" fn sender_get_pkt_lose_rate(
+    _env: JNIEnv,
     _this: JClass,
     sender: *const Sender,
-) -> JString<'a> {
+) -> f64 {
     assert!(!sender.is_null());
 
-    ok_or_check(&mut env, |env| {
-        Ok(env.new_string(unsafe { &*sender }.get_id())?)
-    })
-    .unwrap()
+    unsafe { &*sender }.get_pkt_lose_rate()
+}
+
+/// get transport sender port.
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_senderGetPort")]
+extern "system" fn sender_get_port(_env: JNIEnv, _this: JClass, sender: *const Sender) -> i32 {
+    assert!(!sender.is_null());
+
+    unsafe { &*sender }.get_port() as i32
 }
 
 /// Sends the packet to the sender instance.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_sendStreamBufferToTransportSender(
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_senderWrite")]
+extern "system" fn sender_write(
     mut env: JNIEnv,
     _this: JClass,
     sender: *const Sender,
-    info: JObject,
+    ty: i32,
+    flags: i32,
+    timestamp: i64,
     buf: JByteArray,
 ) -> bool {
     assert!(!sender.is_null());
 
     ok_or_check(&mut env, |mut env| {
-        unsafe { &*sender }.sink(&mut env, info, buf)
+        unsafe { &*sender }.sink(&mut env, ty, flags, timestamp, buf)
     })
     .unwrap_or(false)
 }
 
 /// release transport sender.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportSender(
-    _env: JNIEnv,
-    _this: JClass,
-    sender: *mut Sender,
-) {
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_senderRelease")]
+extern "system" fn sender_release(_env: JNIEnv, _this: JClass, sender: *mut Sender) {
     assert!(!sender.is_null());
 
     drop(unsafe { Box::from_raw(sender) });
@@ -225,39 +223,16 @@ extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportSende
 
 /// Creates the receiver, the return value indicates whether the creation was
 /// successful or not.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportReceiver(
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_receiverCreate")]
+extern "system" fn receiver_create(
     mut env: JNIEnv,
     _this: JClass,
-    id: JString,
+    addr: JString,
     options: JString,
     observer: JObject,
 ) -> *const Arc<Receiver> {
     ok_or_check(&mut env, |env| {
-        let receiver = Arc::new(Receiver::new(env, &id, &options, &observer)?);
-
-        let adapter = receiver.get_adapter();
-        let receiver_ = Arc::downgrade(&receiver);
-        thread::Builder::new()
-            .name("HylaranaJniStreamReceiverThread".to_string())
-            .spawn(move || {
-                while let Some(receiver) = receiver_.upgrade() {
-                    if let Some((buf, kind, flags, timestamp)) = adapter.next() {
-                        if receiver.sink(buf, kind, flags, timestamp).is_err() {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-
-                log::info!("HylaranaJniStreamReceiverThread is closed");
-
-                if let Some(receiver) = receiver_.upgrade() {
-                    let _ = receiver.close();
-                }
-            })?;
+        let receiver = Arc::new(Receiver::new(env, &addr, &options, &observer)?);
 
         Ok(Box::into_raw(Box::new(receiver)))
     })
@@ -265,46 +240,37 @@ extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_createTransportReceiv
 }
 
 /// release transport receiver.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Hylarana_releaseTransportReceiver(
-    _env: JNIEnv,
-    _this: JClass,
-    receiver: *mut Arc<Receiver>,
-) {
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Hylarana_receiverRelease")]
+extern "system" fn receiver_release(_env: JNIEnv, _this: JClass, receiver: *mut Arc<Receiver>) {
     assert!(!receiver.is_null());
 
-    if let Err(e) = unsafe { Box::from_raw(receiver) }.close() {
-        log::error!("{:?}", e);
-    }
+    drop(unsafe { Box::from_raw(receiver) });
 }
 
 /// Register the service, the service type is fixed, you can customize the
 /// port number, id is the identifying information of the service, used to
 /// distinguish between different publishers, in properties you can add
 /// customized data to the published service.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Discovery_create(
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Discovery_discoveryCreate")]
+extern "system" fn discovery_create(
     mut env: JNIEnv,
     _this: JClass,
-    topic: JString,
+    bind: JString,
     observer: JObject,
 ) -> *const DiscoveryService {
     ok_or_check(&mut env, |env| {
-        let topic: String = env.get_string(&topic)?.into();
+        let bind: String = env.get_string(&bind)?.into();
         let observer = DiscoveryServiceObserver(env.new_global_ref(observer)?);
 
-        Ok(Box::into_raw(Box::new(
-            get_runtime_handle().block_on(DiscoveryService::new(topic, observer))?,
-        )))
+        Ok(Box::into_raw(Box::new(get_runtime_handle().block_on(
+            DiscoveryService::new(bind.parse()?, observer),
+        )?)))
     })
     .unwrap_or_else(|| null_mut())
 }
 
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Discovery_broadcast(
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Discovery_discoverySetMetadata")]
+extern "system" fn discovery_set_metadata(
     mut env: JNIEnv,
     _this: JClass,
     discovery: *mut DiscoveryService,
@@ -320,16 +286,15 @@ extern "system" fn Java_com_github_mycrl_hylarana_Discovery_broadcast(
             })?;
         }
 
-        get_runtime_handle().block_on(unsafe { &*discovery }.broadcast(bytes))?;
+        get_runtime_handle().block_on(unsafe { &*discovery }.set_metadata(bytes));
         Ok(true)
     })
     .unwrap_or(false)
 }
 
 /// release the discovery service
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-extern "system" fn Java_com_github_mycrl_hylarana_Discovery_release(
+#[unsafe(export_name = "Java_com_github_mycrl_hylarana_Discovery_discoveryRelease")]
+extern "system" fn discovery_release(
     _env: JNIEnv,
     _this: JClass,
     discovery: *mut DiscoveryService,

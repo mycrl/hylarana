@@ -1,14 +1,13 @@
 use crate::{CaptureHandler, FrameConsumer, Source, SourceType, VideoCaptureSourceDescription};
 
 use std::{
-    sync::{Arc, atomic::AtomicBool},
+    sync::{atomic::{AtomicBool, Ordering}, Arc},
     thread,
     time::Duration,
 };
 
 use common::{
     Size,
-    atomic::EasyAtomic,
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
     win32::{EasyTexture, MediaThreadClass},
 };
@@ -194,7 +193,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
                 }
 
                 if let Some(status) = status_.upgrade() {
-                    status.set(false);
+                    status.store(false, Ordering::Relaxed);
                 }
 
                 if let Some(guard) = thread_class_guard {
@@ -214,7 +213,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
         frame: &mut Frame,
         control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        if self.status.get() {
+        if self.status.load(Ordering::Relaxed) {
             // Updates the texture in the frame to the middle texture.
             unsafe {
                 self.device_context
@@ -230,7 +229,7 @@ impl GraphicsCaptureApiHandler for WindowsCapture {
     }
 
     fn on_closed(&mut self) -> Result<(), Self::Error> {
-        self.status.set(false);
+        self.status.store(false, Ordering::Relaxed);
         Ok(())
     }
 }

@@ -1,14 +1,11 @@
-use std::{ops::DerefMut, sync::atomic::AtomicBool};
+use std::{
+    ops::DerefMut,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::{CaptureHandler, FrameConsumer, Source, SourceType, VideoCaptureSourceDescription};
 
-use thiserror::Error;
-
-use common::{
-    atomic::EasyAtomic,
-    frame::{VideoFormat, VideoFrame, VideoSubFormat},
-};
-
+use common::frame::{VideoFormat, VideoFrame, VideoSubFormat};
 use core_foundation::{base::TCFType, error::CFError};
 use core_media::cm_time::CMTime;
 use parking_lot::Mutex;
@@ -23,6 +20,8 @@ use screencapturekit::{
         output_type::SCStreamOutputType,
     },
 };
+
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ScreenCaptureError {
@@ -140,7 +139,7 @@ where
     S: FrameConsumer<Frame = VideoFrame> + 'static,
 {
     fn did_output_sample_buffer(&self, buffer: CMSampleBuffer, _: SCStreamOutputType) {
-        if !self.status.get() {
+        if !self.status.load(Ordering::Relaxed) {
             log::warn!("macos screen capture stops because sink returns false");
 
             return;
@@ -155,7 +154,9 @@ where
                 frame.data[0] = buffer_ref as _;
 
                 if !consumer.sink(&frame) {
-                    self.status.set(false);
+                    self.status.store(false, Ordering::Relaxed);
+
+                    consumer.close();
                 }
             }
         }

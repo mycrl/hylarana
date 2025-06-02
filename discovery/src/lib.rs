@@ -1,251 +1,215 @@
 use std::{
     collections::HashMap,
-    io::{Error as IoError, ErrorKind as IoErrorKind},
-    net::Ipv4Addr,
-    time::Duration,
+    io::Error,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
-use libp2p::{
-    BehaviourBuilderError, TransportError,
-    futures::StreamExt,
-    gossipsub::{self, MessageId, PublishError},
-    mdns,
-    multiaddr::{self, Protocol},
-    noise,
-    swarm::{NetworkBehaviour, SwarmEvent},
-    tcp, yamux,
+use axum::{Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use serde::{Deserialize, Serialize};
+use tokio::{
+    net::{TcpListener, UdpSocket},
+    sync::{
+        Mutex, RwLock,
+        broadcast::{Sender, channel},
+    },
+    time::sleep,
 };
 
-use thiserror::Error;
-use tokio::sync::mpsc::{Sender, channel, error::SendError};
 use uuid::Uuid;
-
-#[derive(NetworkBehaviour)]
-pub struct DiscoveryBehaviour {
-    gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
-}
-
-pub struct DiscoveryContext<'a> {
-    behaviour: &'a mut DiscoveryBehaviour,
-    topic: &'a gossipsub::IdentTopic,
-    pub local_id: &'a str,
-    pub id: String,
-    pub ip: Ipv4Addr,
-}
-
-impl<'a> DiscoveryContext<'a> {
-    pub fn broadcast(&mut self, message: Vec<u8>) -> Result<(), DiscoveryError> {
-        self.behaviour
-            .gossipsub
-            .publish(self.topic.clone(), message)?;
-
-        Ok(())
-    }
-}
 
 pub trait DiscoveryObserver {
     #[allow(unused_variables)]
-    fn online(&self, ctx: DiscoveryContext) -> impl Future<Output = ()> + Send {
+    fn online(&self, local_id: &str, id: &str, ip: IpAddr) -> impl Future<Output = ()> + Send {
         async {}
     }
 
     #[allow(unused_variables)]
-    fn offline(&self, ctx: DiscoveryContext) -> impl Future<Output = ()> + Send {
+    fn offline(&self, local_id: &str, id: &str, ip: IpAddr) -> impl Future<Output = ()> + Send {
         async {}
     }
 
     #[allow(unused_variables)]
-    fn on_message(
+    fn on_metadata(
         &self,
-        ctx: DiscoveryContext,
-        message: Vec<u8>,
+        local_id: &str,
+        id: &str,
+        ip: IpAddr,
+        metadata: Vec<u8>,
     ) -> impl Future<Output = ()> + Send {
         async {}
     }
 }
 
-#[derive(Debug, Error)]
-pub enum DiscoveryError {
-    #[error(transparent)]
-    IoError(#[from] IoError),
-    #[error(transparent)]
-    NoiseError(#[from] noise::Error),
-    #[error(transparent)]
-    BehaviourBuilderError(#[from] BehaviourBuilderError),
-    #[error(transparent)]
-    SubscriptionError(#[from] gossipsub::SubscriptionError),
-    #[error(transparent)]
-    MultiaddrError(#[from] multiaddr::Error),
-    #[error(transparent)]
-    TransportError(#[from] TransportError<IoError>),
-    #[error(transparent)]
-    PublishError(#[from] PublishError),
-}
-
 pub struct DiscoveryService {
-    channel: Sender<Vec<u8>>,
+    _t: Sender<()>,
+    metadata: Arc<RwLock<Option<Vec<u8>>>>,
+    sequence: Arc<AtomicU32>,
     local_id: String,
 }
 
 impl DiscoveryService {
-    pub async fn new<O>(topic: String, observer: O) -> Result<Self, DiscoveryError>
+    pub async fn new<O>(bind: SocketAddr, observer: O) -> Result<Self, Error>
     where
-        O: DiscoveryObserver + Send + 'static,
+        O: DiscoveryObserver + Send + Sync + 'static,
     {
-        let mut swarm = libp2p::SwarmBuilder::with_new_identity()
-            .with_tokio()
-            .with_tcp(
-                tcp::Config::default(),
-                noise::Config::new,
-                yamux::Config::default,
-            )?
-            .with_behaviour(|key| {
-                let gossipsub = gossipsub::Behaviour::new(
-                    gossipsub::MessageAuthenticity::Anonymous,
-                    gossipsub::ConfigBuilder::default()
-                        .duplicate_cache_time(Duration::from_secs(10))
-                        .heartbeat_interval(Duration::from_secs(10))
-                        .validation_mode(gossipsub::ValidationMode::None)
-                        .message_id_fn(move |_| MessageId::new(Uuid::new_v4().as_bytes()))
-                        .build()
-                        .map_err(|msg| IoError::new(IoErrorKind::Other, msg))?,
-                )?;
+        let observer = Arc::new(observer);
+        let local_id = Uuid::new_v4().to_string();
+        let sequence: Arc<AtomicU32> = Default::default();
+        let metadata: Arc<RwLock<Option<Vec<u8>>>> = Default::default();
+        let service: Arc<Mutex<HashMap<String, Service>>> = Default::default();
 
-                let mdns = mdns::tokio::Behaviour::new(
-                    mdns::Config::default(),
-                    key.public().to_peer_id(),
-                )?;
+        let (tx, mut rx) = channel::<()>(2);
 
-                Ok(DiscoveryBehaviour { gossipsub, mdns })
-            })?
-            .build();
+        // Create a TCP listener and a UDP socket for discovery
+        // The TCP listener is used for HTTP requests, and the UDP socket is used for
+        // broadcasting pings
+        let listener = TcpListener::bind(bind).await?;
+        let socket = Arc::new(UdpSocket::bind(bind).await?);
+        socket.set_broadcast(true)?;
 
-        log::info!("discovery service swarm is created");
-
-        let topic = gossipsub::IdentTopic::new(topic);
-
-        swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
-        swarm.listen_on("/ip4/0.0.0.0/tcp/60342".parse()?)?;
-
-        let local_id = swarm.local_peer_id().to_string();
-
-        log::info!(
-            "discovery service gossipsub subscribe topic={topic}, local_id={}",
-            local_id
-        );
-
-        let (tx, mut rx) = channel(1);
-        let local_id_ = local_id.clone();
-        tokio::spawn(async move {
-            let mut address: HashMap<String, Ipv4Addr> = Default::default();
-
-            loop {
-                tokio::select! {
-                    Some(message) = rx.recv() => {
-                        log::info!("discovery service loop recv a message");
-
-                        if !address.is_empty() {
-                            if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic.clone(), message) {
-                                log::warn!("discovery service gossipsub publish is failed, error={}", e);
+        {
+            let app = Router::new()
+                .route(
+                    "/metadata",
+                    get(
+                        |State(metadata): State<Arc<RwLock<Option<Vec<u8>>>>>| async move {
+                            if let Some(data) = metadata.read().await.as_ref() {
+                                data.clone().into_response()
+                            } else {
+                                StatusCode::NOT_FOUND.into_response()
                             }
-                        } else {
-                            log::info!("discovery service device table is empty, ignore message");
-                        }
-                    }
-                    event = swarm.select_next_some() => {
-                        log::info!("discovery service swarm event={:?}", event);
+                        },
+                    ),
+                )
+                .with_state(metadata.clone());
 
-                        match event {
-                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Mdns(mdns::Event::Discovered(
-                                peers,
-                            ))) => {
-                                let behaviour = swarm.behaviour_mut();
+            let mut rx = tx.subscribe();
+            tokio::spawn(async move {
+                axum::serve(listener, app)
+                    .with_graceful_shutdown(async move {
+                        let _ = rx.recv().await;
+                    })
+                    .await
+                    .unwrap();
+            });
+        }
 
-                                for (peer_id, _) in peers {
-                                    behaviour.gossipsub.add_explicit_peer(&peer_id);
+        let to_addr = {
+            let mut addr = bind.clone();
+            addr.set_ip(IpAddr::V4(Ipv4Addr::BROADCAST));
+
+            addr
+        };
+
+        {
+            let mut rx = tx.subscribe();
+            let local_id = local_id.clone();
+            let services = service.clone();
+            let socket = socket.clone();
+            let observer = observer.clone();
+            tokio::spawn(async move {
+                let mut buffer = [0u8; 1024];
+
+                loop {
+                    tokio::select! {
+                        Ok((size, addr)) = socket.recv_from(&mut buffer) => {
+                            if size == 0 {
+                                break;
+                            }
+
+                            if let Ok(ping) = serde_json::from_slice::<Ping>(&buffer[..size]) {
+                                // ignore ping from self
+                                if ping.id == local_id {
+                                    continue;
                                 }
-                            }
-                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Mdns(mdns::Event::Expired(peers))) => {
-                                let behaviour = swarm.behaviour_mut();
 
-                                for (peer_id, _) in peers {
-                                    behaviour.gossipsub.remove_explicit_peer(&peer_id);
-                                }
-                            }
-                            SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                                let mut addr = endpoint.get_remote_address().iter();
+                                let mut services = services.lock().await;
+                                if let Some(service) = services.get_mut(ping.id) {
+                                    if service.sequence != ping.sequence {
+                                        if let Some(metadata) = request_metadata(addr.ip(), to_addr.port()).await {
+                                            observer.on_metadata(&local_id, ping.id, addr.ip(), metadata).await;
+                                        }
+                                    }
 
-                                while let Some(it) = addr.next() {
-                                    if let Protocol::Ip4(ip) = it {
-                                        address.insert(peer_id.to_string(), ip);
+                                    service.update_at = Instant::now();
+                                    service.sequence = ping.sequence;
+                                } else {
+                                    services.insert(ping.id.to_string(), Service {
+                                        update_at: Instant::now(),
+                                        sequence: ping.sequence,
+                                        ip: addr.ip(),
+                                    });
 
-                                        break;
+                                    observer.online(&local_id, ping.id, addr.ip()).await;
+                                    if let Some(metadata) = request_metadata(addr.ip(), to_addr.port()).await {
+                                        observer.on_metadata(&local_id, ping.id, addr.ip(), metadata).await;
                                     }
                                 }
                             }
-                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Gossipsub(
-                                gossipsub::Event::Subscribed { peer_id, .. },
-                            )) => {
-                                let id = peer_id.to_string();
-
-                                if let Some(ip) = address.get(&id).copied() {
-                                    observer.online(DiscoveryContext {
-                                        behaviour: swarm.behaviour_mut(),
-                                        local_id: &local_id_,
-                                        topic: &topic,
-                                        id,
-                                        ip,
-                                    }).await;
-                                }
-                            }
-                            SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                                let id = peer_id.to_string();
-
-                                let behaviour = swarm.behaviour_mut();
-                                if let Some(ip) = address.remove(&id) {
-                                    observer.offline(DiscoveryContext {
-                                        local_id: &local_id_,
-                                        topic: &topic,
-                                        behaviour,
-                                        id,
-                                        ip,
-                                    }).await;
-                                }
-
-                                behaviour.gossipsub.remove_explicit_peer(&peer_id);
-                            }
-                            SwarmEvent::Behaviour(DiscoveryBehaviourEvent::Gossipsub(
-                                gossipsub::Event::Message { propagation_source, message, .. },
-                            )) => {
-                                let id = propagation_source.to_string();
-
-                                if let Some(ip) = address.get(&id).copied() {
-                                    observer.on_message(DiscoveryContext {
-                                        behaviour: swarm.behaviour_mut(),
-                                        local_id: &local_id_,
-                                        topic: &topic,
-                                        id,
-                                        ip,
-                                    }, message.data).await;
-                                }
-                            }
-                            _ => (),
+                        }
+                        _ = rx.recv() => {
+                            break;
+                        }
+                        else => {
+                            break;
                         }
                     }
-                    else => {
-                        swarm.behaviour_mut().gossipsub.unsubscribe(&topic);
+                }
+            });
+        }
 
-                        break;
+        {
+            let local_id = local_id.clone();
+            let sequence = sequence.clone();
+            let services = service.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = sleep(Duration::from_secs(1)) => {
+                            if let Err(e) = socket.send_to(&serde_json::to_vec(&Ping {
+                                sequence: sequence.load(Ordering::Relaxed),
+                                id: &local_id,
+                            }).unwrap(), to_addr).await {
+                                log::error!("discovery service send ping failed, err={:?}", e);
+                            }
+
+                            {
+                                let mut offlines = Vec::new();
+                                let mut services = services.lock().await;
+
+                                for (k, v) in services.iter() {
+                                    if v.update_at.elapsed().as_secs() >= 3 {
+                                        offlines.push(k.clone());
+
+                                        observer.offline(&local_id, k, v.ip).await;
+                                    }
+                                }
+
+                                for k in &offlines {
+                                    services.remove(k);
+                                }
+                            }
+                        }
+                        _ = rx.recv() => {
+                            break;
+                        }
+                        else => {
+                            break;
+                        }
                     }
                 }
-            }
-
-            log::info!("discovery service message loop is exited");
-        });
+            });
+        }
 
         Ok(Self {
-            channel: tx,
+            _t: tx,
+            metadata,
+            sequence,
             local_id,
         })
     }
@@ -254,9 +218,34 @@ impl DiscoveryService {
         &self.local_id
     }
 
-    pub async fn broadcast(&self, message: Vec<u8>) -> Result<(), SendError<Vec<u8>>> {
-        log::info!("discovery service broadcast message before");
+    pub async fn set_metadata(&self, metadata: Vec<u8>) {
+        log::info!("discovery service set metadata");
 
-        self.channel.send(message).await
+        self.sequence.fetch_add(1, Ordering::Relaxed);
+        self.metadata.write().await.replace(metadata);
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Ping<'a> {
+    id: &'a str,
+    sequence: u32,
+}
+
+struct Service {
+    ip: IpAddr,
+    sequence: u32,
+    update_at: Instant,
+}
+
+async fn request_metadata(ip: IpAddr, port: u16) -> Option<Vec<u8>> {
+    let res = reqwest::get(format!("http://{}:{}/metadata", ip, port))
+        .await
+        .ok()?;
+
+    if res.status() != StatusCode::OK {
+        return None;
+    }
+
+    Some(res.bytes().await.ok()?.to_vec())
 }

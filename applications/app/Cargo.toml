@@ -1,0 +1,31 @@
+[package]
+name = "hylarana-app"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "hylarana-app"
+path = "./src/main.rs"
+
+[[bin]]
+name = "hylarana-app-helper"
+path = "./src/helper.rs"
+
+[dependencies]
+common = { workspace = true, features = ["serde"] }
+hylarana = { workspace = true, features = ["serde"] }
+mimalloc = "0.1"
+winit = { version = "=0.30.9", features = ["rwh_05"] }
+raw-window-handle = "0.6"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+log = "0.4"
+webview = { git = "https://github.com/mycrl/webview-rs", branch = "main" }
+clap = { version = "4.5", features = ["derive", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+parking_lot = "0.12"
+dirs = "6.0"
+
+[build-dependencies]
+cc = "1.2"

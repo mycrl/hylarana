@@ -13,7 +13,7 @@ pub enum VideoDecoderType {
     /// [Open H264](https://www.openh264.org/)
     ///
     /// OpenH264 is a codec library which supports H.264 encoding and decoding.
-    H264,
+    HEVC,
     /// [D3D11VA](https://learn.microsoft.com/en-us/windows/win32/medfound/direct3d-11-video-apis)
     ///
     /// Accelerated video decoding using Direct3D 11 Video APIs.
@@ -33,10 +33,10 @@ pub enum VideoDecoderType {
 impl ToString for VideoDecoderType {
     fn to_string(&self) -> String {
         match self {
-            Self::H264 => "h264",
+            Self::HEVC => "hevc",
             Self::D3D11 => "d3d11va",
-            Self::Qsv => "h264_qsv",
-            Self::VideoToolBox => "h264_videotoolbox",
+            Self::Qsv => "hevc_qsv",
+            Self::VideoToolBox => "hevc_videotoolbox",
         }
         .to_string()
     }
@@ -47,10 +47,10 @@ impl FromStr for VideoDecoderType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Ok(match value {
-            "h264" => Self::H264,
+            "hevc" => Self::HEVC,
             "d3d11va" => Self::D3D11,
-            "h264_qsv" => Self::Qsv,
-            "h264_videotoolbox" => Self::VideoToolBox,
+            "hevc_qsv" => Self::Qsv,
+            "hevc_videotoolbox" => Self::VideoToolBox,
             _ => return Err(Error::new(ErrorKind::InvalidInput, value)),
         })
     }
@@ -65,7 +65,7 @@ pub enum VideoEncoderType {
     /// x264 is a free software library and application for encoding video
     /// streams into the H.264/MPEG-4 AVC compression format, and is released
     /// under the terms of the GNU GPL.
-    X264,
+    X265,
     /// [H264 QSV](https://en.wikipedia.org/wiki/Intel_Quick_Sync_Video)
     ///
     /// Intel Quick Sync Video is Intel's brand for its dedicated video encoding
@@ -81,9 +81,9 @@ pub enum VideoEncoderType {
 impl ToString for VideoEncoderType {
     fn to_string(&self) -> String {
         match self {
-            Self::X264 => "libx264",
-            Self::Qsv => "h264_qsv",
-            Self::VideoToolBox => "h264_videotoolbox",
+            Self::X265 => "libx265",
+            Self::Qsv => "hevc_qsv",
+            Self::VideoToolBox => "hevc_videotoolbox",
         }
         .to_string()
     }
@@ -94,9 +94,9 @@ impl FromStr for VideoEncoderType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Ok(match value {
-            "libx264" => Self::X264,
-            "h264_qsv" => Self::Qsv,
-            "h264_videotoolbox" => Self::VideoToolBox,
+            "libx265" => Self::X265,
+            "hevc_qsv" => Self::Qsv,
+            "hevc_videotoolbox" => Self::VideoToolBox,
             _ => return Err(Error::new(ErrorKind::InvalidInput, value)),
         })
     }

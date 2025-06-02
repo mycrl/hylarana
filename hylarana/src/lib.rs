@@ -3,6 +3,8 @@ mod receiver;
 mod sender;
 mod util;
 
+use std::net::SocketAddr;
+
 use thiserror::Error;
 
 pub use self::{player::*, receiver::*, sender::*};
@@ -10,11 +12,12 @@ pub use self::{player::*, receiver::*, sender::*};
 pub use capture::{Capture, Source, SourceType};
 pub use common::{
     MediaAudioStreamDescription, MediaStreamDescription, MediaVideoStreamDescription, Size,
-    TransportOptions, TransportStrategy, codec::*, frame::*, runtime::*,
+    codec::*, frame::*, runtime::*,
 };
 
-pub use discovery::{DiscoveryContext, DiscoveryError, DiscoveryObserver, DiscoveryService};
+pub use discovery::{DiscoveryObserver, DiscoveryService};
 pub use renderer::{SurfaceTarget, raw_window_handle};
+pub use transport::TransportOptions;
 
 #[cfg(target_os = "windows")]
 use common::win32::{
@@ -109,10 +112,6 @@ pub trait MediaStreamSink: Sync + Send {
     fn audio(&self, frame: &AudioFrame) -> bool {
         true
     }
-
-    /// Callback occurs when the video renderer is resized.
-    #[allow(unused_variables)]
-    fn resize(&self, size: Size) {}
 }
 
 // impl empty type for default
@@ -121,27 +120,29 @@ impl MediaStreamSink for () {}
 /// Creates a sender that can specify the audio source or video source to be
 /// captured.
 pub fn create_sender<S, O>(
+    bind: SocketAddr,
     options: &HylaranaSenderOptions,
     sink: S,
     observer: O,
-) -> Result<HylaranaSender<S, O>, HylaranaSenderError>
+) -> Result<HylaranaSender, HylaranaSenderError>
 where
     S: MediaStreamSink + 'static,
     O: MediaStreamObserver + 'static,
 {
     log::info!("create sender: options={:?}", options);
 
-    HylaranaSender::new(options, sink, observer)
+    HylaranaSender::new(bind, options, sink, observer)
 }
 
 /// To create a receiver, you need to specify the sender's ID to associate
 /// with it.
 pub fn create_receiver<S, O>(
-    description: &MediaStreamDescription,
+    addr: SocketAddr,
     options: &HylaranaReceiverOptions,
+    description: &MediaStreamDescription,
     sink: S,
     observer: O,
-) -> Result<HylaranaReceiver<S, O>, HylaranaReceiverError>
+) -> Result<HylaranaReceiver, HylaranaReceiverError>
 where
     S: MediaStreamSink + 'static,
     O: MediaStreamObserver + 'static,
@@ -152,5 +153,5 @@ where
         options
     );
 
-    HylaranaReceiver::new(description, options, sink, observer)
+    HylaranaReceiver::new(addr, options, description, sink, observer)
 }

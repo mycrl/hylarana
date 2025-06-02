@@ -14,7 +14,10 @@ import android.view.Surface
 import java.nio.ByteBuffer
 
 abstract class ByteArraySinker {
-    abstract fun sink(info: StreamBufferInfo, buf: ByteArray)
+    abstract fun sink(kind: Int,
+                      flags: Int,
+                      timestamp: Long,
+                      buf: ByteArray)
 }
 
 class Video {
@@ -25,16 +28,39 @@ class Video {
         private var isRunning: Boolean = false
         private var videoFormat: VideoFormat = VideoFormat.NV12
 
-        private val codec: MediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        private var codec: MediaCodec
         private val bufferInfo = MediaCodec.BufferInfo()
         private var surface: Surface? = null
         private var worker: Thread
 
         init {
-            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, configure.width, configure.height)
+            var codecName: String? = null
+            run {
+                val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                val codecInfos = codecList.codecInfos
+
+                for (codecInfo in codecInfos) {
+                    if (codecInfo.isEncoder && codecInfo.isHardwareAccelerated) {
+                        for (type in codecInfo.supportedTypes) {
+                            if (type == "video/hevc") {
+                                codecName = codecInfo.name
+                            }
+                        }
+                    }
+                }
+            }
+
+            codec = if (codecName != null) {
+                MediaCodec.createByCodecName(codecName)
+            } else {
+                MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC)
+            }
+
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, configure.width, configure.height)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
-            format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+            format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.HEVCProfileMain)
             format.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 1_000_000 / configure.frameRate.toLong())
+            format.setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT709)
             format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
             format.setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, configure.frameRate.toFloat())
             format.setInteger(MediaFormat.KEY_OPERATING_RATE, configure.frameRate)
@@ -47,17 +73,13 @@ class Video {
             format.setInteger(MediaFormat.KEY_LATENCY, 2)
             format.setInteger(
                 MediaFormat.KEY_LEVEL, if (configure.width <= 1280 && configure.height <= 720) {
-                    MediaCodecInfo.CodecProfileLevel.AVCLevel31
+                    MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel3
                 } else if (configure.width <= 2048 && configure.height <= 1024) {
-                    MediaCodecInfo.CodecProfileLevel.AVCLevel4
+                    MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel4
                 } else {
-                    MediaCodecInfo.CodecProfileLevel.AVCLevel5
+                    MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel5
                 }
             )
-
-            if (codec.name.indexOf(".qti.") >= 0) {
-                videoFormat = VideoFormat.I420
-            }
 
             if (codec.name.indexOf(".rk.") >= 0) {
                 format.setInteger(MediaFormat.KEY_COMPLEXITY, 0)
@@ -80,7 +102,6 @@ class Video {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_VIDEO)
 
                 val buffer = ByteArray(2 * 1024 * 1024)
-                val streamBufferInfo = StreamBufferInfo(StreamType.VIDEO.flag)
 
                 while (isRunning) {
                     try {
@@ -88,12 +109,12 @@ class Video {
                         if (index >= 0) {
                             val outputBuffer = codec.getOutputBuffer(index)
                             if (outputBuffer != null && bufferInfo.size > 0) {
-                                streamBufferInfo.flags = bufferInfo.flags
-                                streamBufferInfo.timestamp = bufferInfo.presentationTimeUs
                                 outputBuffer.get(buffer, 0, bufferInfo.size)
 
                                 sinker.sink(
-                                    streamBufferInfo,
+                                    StreamType.VIDEO.flag,
+                                    bufferInfo.flags,
+                                    bufferInfo.presentationTimeUs,
                                     buffer.sliceArray(bufferInfo.offset until bufferInfo.size),
                                 )
                             }
@@ -106,15 +127,6 @@ class Video {
                         release()
                     }
                 }
-            }
-        }
-
-        fun sink(buf: ByteArray) {
-            val index = codec.dequeueInputBuffer(-1)
-            if (index >= 0) {
-                codec.getInputBuffer(index)?.clear()
-                codec.getInputBuffer(index)?.put(buf)
-                codec.queueInputBuffer(index, 0, buf.size, 0, 0)
             }
         }
 
@@ -173,7 +185,6 @@ class Video {
         private var worker: Thread
 
         init {
-
             var codecName: String? = null
             run {
                 val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
@@ -182,7 +193,7 @@ class Video {
                 for (codecInfo in codecInfos) {
                     if (!codecInfo.isEncoder && codecInfo.isHardwareAccelerated) {
                         for (type in codecInfo.supportedTypes) {
-                            if (type == "video/avc" && codecInfo.name.indexOf("low_latency") > 0) {
+                            if (type == "video/hevc" && codecInfo.name.indexOf("low_latency") > 0) {
                                 codecName = codecInfo.name
                             }
                         }
@@ -191,12 +202,12 @@ class Video {
             }
 
             codec = if (codecName != null) {
-                MediaCodec.createByCodecName(codecName!!)
+                MediaCodec.createByCodecName(codecName)
             } else {
-                MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+                MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC)
             }
 
-            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
 
@@ -304,7 +315,7 @@ class Audio {
 
         init {
             val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 2)
-            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
 
             codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_OPUS)
@@ -386,7 +397,7 @@ class Audio {
 
         init {
             val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_OPUS, 48000, 2)
-            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
             format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, minBufferSize);
             format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 2)
@@ -401,7 +412,6 @@ class Audio {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
                 val buffer = ByteArray(1024 * 1024)
-                val streamBufferInfo = StreamBufferInfo(StreamType.AUDIO.flag)
 
                 while (isRunning) {
                     try {
@@ -409,12 +419,12 @@ class Audio {
                         if (index >= 0) {
                             val outputBuffer = codec.getOutputBuffer(index)
                             if (outputBuffer != null && bufferInfo.size > 0) {
-                                streamBufferInfo.flags = bufferInfo.flags
-                                streamBufferInfo.timestamp = bufferInfo.presentationTimeUs
                                 outputBuffer.get(buffer, 0, bufferInfo.size)
 
                                 sinker.sink(
-                                    streamBufferInfo,
+                                    StreamType.AUDIO.flag,
+                                    bufferInfo.flags,
+                                    bufferInfo.presentationTimeUs,
                                     buffer.sliceArray(bufferInfo.offset until bufferInfo.size),
                                 )
                             }
@@ -451,15 +461,6 @@ class Audio {
                         }
                     }
                 }
-            }
-        }
-
-        fun sink(buf: ByteArray) {
-            val index = codec.dequeueInputBuffer(-1)
-            if (index >= 0) {
-                codec.getInputBuffer(index)?.clear()
-                codec.getInputBuffer(index)?.put(buf)
-                codec.queueInputBuffer(index, 0, buf.size, 0, 0)
             }
         }
 

@@ -1,10 +1,13 @@
-use std::{slice::from_raw_parts, sync::atomic::AtomicBool};
+use std::{
+    slice::from_raw_parts,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::{AudioCaptureSourceDescription, CaptureHandler, FrameConsumer, Source, SourceType};
 
 use thiserror::Error;
 
-use common::{atomic::EasyAtomic, frame::AudioFrame};
+use common::frame::AudioFrame;
 use core_foundation::error::CFError;
 use parking_lot::Mutex;
 use resample::{
@@ -120,7 +123,7 @@ struct Capture {
 
 impl SCStreamOutputTrait for Capture {
     fn did_output_sample_buffer(&self, buffer: CMSampleBuffer, _: SCStreamOutputType) {
-        if !self.status.get() {
+        if !self.status.load(Ordering::Relaxed) {
             log::warn!("macos screen audio capture stops because sink returns false");
 
             return;
@@ -136,7 +139,7 @@ impl SCStreamOutputTrait for Capture {
                     }) {
                         log::error!("resample audio buffer error={:?}", e);
 
-                        self.status.set(false);
+                        self.status.store(false, Ordering::Relaxed);
                         return;
                     }
                 }
@@ -158,6 +161,12 @@ where
         self.frame.data = buffer.as_ptr();
         self.frame.frames = frames;
 
-        self.consumer.sink(&self.frame)
+        if !self.consumer.sink(&self.frame) {
+            self.consumer.close();
+
+            false
+        } else {
+            true
+        }
     }
 }

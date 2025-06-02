@@ -1,5 +1,6 @@
+use std::net::IpAddr;
+
 use anyhow::Error;
-use discovery::DiscoveryContext;
 use jni::objects::{GlobalRef, JValue};
 
 pub use discovery::{DiscoveryObserver, DiscoveryService};
@@ -12,12 +13,8 @@ unsafe impl Send for DiscoveryServiceObserver {}
 unsafe impl Sync for DiscoveryServiceObserver {}
 
 impl DiscoveryObserver for DiscoveryServiceObserver {
-    async fn online(&self, ctx: DiscoveryContext<'_>) {
-        log::info!(
-            "devices manager device online, id={}, ip={}",
-            ctx.id,
-            ctx.ip
-        );
+    async fn online(&self, local_id: &str, id: &str, ip: IpAddr) {
+        log::info!("devices manager device online, id={}, ip={}", id, ip);
 
         let mut env = get_current_env();
         if let Err(e) = (|| {
@@ -26,9 +23,9 @@ impl DiscoveryObserver for DiscoveryServiceObserver {
                 "onLine",
                 "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
                 &[
-                    JValue::Object(&env.new_string(ctx.local_id)?.into()),
-                    JValue::Object(&env.new_string(ctx.id)?.into()),
-                    JValue::Object(&env.new_string(ctx.ip.to_string())?.into()),
+                    JValue::Object(&env.new_string(local_id)?.into()),
+                    JValue::Object(&env.new_string(id)?.into()),
+                    JValue::Object(&env.new_string(ip.to_string())?.into()),
                 ],
             )?;
 
@@ -38,8 +35,8 @@ impl DiscoveryObserver for DiscoveryServiceObserver {
         }
     }
 
-    async fn offline(&self, ctx: DiscoveryContext<'_>) {
-        log::info!("devices manager device offline, id={}", ctx.id);
+    async fn offline(&self, local_id: &str, id: &str, ip: IpAddr) {
+        log::info!("devices manager device offline, id={}, ip={}", id, ip);
 
         let mut env = get_current_env();
         if let Err(e) = (|| {
@@ -48,9 +45,9 @@ impl DiscoveryObserver for DiscoveryServiceObserver {
                 "offLine",
                 "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
                 &[
-                    JValue::Object(&env.new_string(ctx.local_id)?.into()),
-                    JValue::Object(&env.new_string(ctx.id)?.into()),
-                    JValue::Object(&env.new_string(ctx.ip.to_string())?.into()),
+                    JValue::Object(&env.new_string(local_id)?.into()),
+                    JValue::Object(&env.new_string(id)?.into()),
+                    JValue::Object(&env.new_string(ip.to_string())?.into()),
                 ],
             )?;
 
@@ -60,30 +57,31 @@ impl DiscoveryObserver for DiscoveryServiceObserver {
         }
     }
 
-    async fn on_message(&self, ctx: DiscoveryContext<'_>, message: Vec<u8>) {
+    async fn on_metadata(&self, local_id: &str, id: &str, ip: IpAddr, metadata: Vec<u8>) {
         log::info!(
-            "devices manager device onmessage, id={}, message={:?}",
-            ctx.id,
-            std::str::from_utf8(&message)
+            "devices manager device on metadata, id={}, ip={} metadata={:?}",
+            id,
+            ip,
+            std::str::from_utf8(&metadata)
         );
 
         let mut env = get_current_env();
         if let Err(e) = (|| {
             env.call_method(
                 self.0.as_obj(),
-                "onMessage",
+                "onMetadata",
                 "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[B)V",
                 &[
-                    JValue::Object(&env.new_string(ctx.local_id)?.into()),
-                    JValue::Object(&env.new_string(ctx.id)?.into()),
-                    JValue::Object(&env.new_string(ctx.ip.to_string())?.into()),
-                    JValue::Object(&env.byte_array_from_slice(&message)?.into()),
+                    JValue::Object(&env.new_string(local_id)?.into()),
+                    JValue::Object(&env.new_string(id)?.into()),
+                    JValue::Object(&env.new_string(ip.to_string())?.into()),
+                    JValue::Object(&env.byte_array_from_slice(&metadata)?.into()),
                 ],
             )?;
 
             Ok::<(), Error>(())
         })() {
-            log::error!("DiscoveryObserver on message error={:?}", e);
+            log::error!("DiscoveryObserver on metadata error={:?}", e);
         }
     }
 }

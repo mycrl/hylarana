@@ -3,13 +3,12 @@ use std::{
     ptr::null_mut,
     sync::{
         Arc,
-        atomic::AtomicBool,
+        atomic::{AtomicBool, Ordering},
         mpsc::{Sender, channel},
     },
     thread,
 };
 
-use common::atomic::EasyAtomic;
 use ffmpeg::*;
 use thiserror::Error;
 
@@ -110,7 +109,7 @@ where
                 }
             }
 
-            status_.set(false);
+            status_.store(false, Ordering::Relaxed);
         });
 
         Ok(Self {
@@ -121,7 +120,7 @@ where
     }
 
     pub fn resample<'a>(&'a mut self, buffer: &'a [I]) -> Result<(), AudioResamplerError> {
-        if !self.status.get() {
+        if !self.status.load(Ordering::Relaxed) {
             return Err(AudioResamplerError::QueueClosed);
         }
 

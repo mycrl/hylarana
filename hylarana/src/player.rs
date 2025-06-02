@@ -1,4 +1,4 @@
-use std::slice::from_raw_parts;
+use std::{slice::from_raw_parts, sync::Arc};
 
 use super::{
     HylaranaReceiverOptions, MediaStreamDescription, MediaStreamSink, sender::HylaranaSenderOptions,
@@ -112,7 +112,7 @@ impl<T> VideoRenderOptionsBuilder<T> {
     pub fn from_sender(mut self, options: &HylaranaSenderOptions) -> Self {
         if let Some(it) = &options.media.video {
             self.0.source.sub_format = match it.options.codec {
-                VideoEncoderType::X264 => VideoSubFormat::SW,
+                VideoEncoderType::X265 => VideoSubFormat::SW,
                 VideoEncoderType::Qsv => VideoSubFormat::D3D11,
                 VideoEncoderType::VideoToolBox => VideoSubFormat::CvPixelBufferRef,
             };
@@ -134,8 +134,8 @@ impl<T> VideoRenderOptionsBuilder<T> {
         if let Some(it) = description.video {
             self.0.source.format = it.format;
             self.0.source.size = it.size;
-            self.0.source.sub_format = match options.video_decoder {
-                VideoDecoderType::H264 => VideoSubFormat::SW,
+            self.0.source.sub_format = match options.codec {
+                VideoDecoderType::HEVC => VideoSubFormat::SW,
                 VideoDecoderType::Qsv | VideoDecoderType::D3D11 => {
                     if it.format == VideoFormat::I420 {
                         VideoSubFormat::SW
@@ -172,11 +172,13 @@ pub struct AVFrameStreamPlayer<'a> {
 }
 
 impl<'a> AVFrameStreamPlayer<'a> {
-    pub fn new<T>(options: AVFrameStreamPlayerOptions<T>) -> Result<Self, AVFrameStreamPlayerError>
+    pub fn new<T>(
+        options: AVFrameStreamPlayerOptions<T>,
+    ) -> Result<Arc<Self>, AVFrameStreamPlayerError>
     where
         T: Into<SurfaceTarget<'a>>,
     {
-        Ok(Self {
+        Ok(Arc::new(Self {
             audio: match options {
                 AVFrameStreamPlayerOptions::All(_) | AVFrameStreamPlayerOptions::OnlyAudio => {
                     Some(AudioRender::new()?)
@@ -190,11 +192,17 @@ impl<'a> AVFrameStreamPlayer<'a> {
                 }
                 _ => None,
             },
-        })
+        }))
+    }
+
+    pub fn resize(&self, size: Size) {
+        if let Some(player) = &self.video {
+            player.lock().resize(size);
+        }
     }
 }
 
-impl<'a> MediaStreamSink for AVFrameStreamPlayer<'a> {
+impl<'a> MediaStreamSink for Arc<AVFrameStreamPlayer<'a>> {
     fn audio(&self, frame: &AudioFrame) -> bool {
         if let Some(player) = &self.audio {
             if let Err(e) = player.send(frame) {
@@ -219,12 +227,6 @@ impl<'a> MediaStreamSink for AVFrameStreamPlayer<'a> {
         }
 
         true
-    }
-
-    fn resize(&self, size: Size) {
-        if let Some(player) = &self.video {
-            player.lock().resize(size);
-        }
     }
 }
 
@@ -374,39 +376,37 @@ impl<'a> VideoRender<'a> {
                 self.0.submit(texture)?;
             }
             #[cfg(target_os = "macos")]
-            VideoSubFormat::CvPixelBufferRef => {
-                match frame.format {
-                    VideoFormat::BGRA => {
-                        self.0.submit(Texture::Bgra(Texture2DResource::Texture(
-                            Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
-                        )))?;
-                    }
-                    VideoFormat::RGBA => {
-                        self.0.submit(Texture::Rgba(Texture2DResource::Texture(
-                            Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
-                        )))?;
-                    }
-                    _ => {
-                        let pixel_buffer = PixelMomeryBuffer::from((
-                            frame.data[0] as CVPixelBufferRef,
-                            frame.format,
-                            Size {
-                                width: frame.width,
-                                height: frame.height,
-                            },
-                        ));
+            VideoSubFormat::CvPixelBufferRef => match frame.format {
+                VideoFormat::BGRA => {
+                    self.0.submit(Texture::Bgra(Texture2DResource::Texture(
+                        Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
+                    )))?;
+                }
+                VideoFormat::RGBA => {
+                    self.0.submit(Texture::Rgba(Texture2DResource::Texture(
+                        Texture2DRaw::CVPixelBufferRef(frame.data[0] as CVPixelBufferRef),
+                    )))?;
+                }
+                _ => {
+                    let pixel_buffer = PixelMomeryBuffer::from((
+                        frame.data[0] as CVPixelBufferRef,
+                        frame.format,
+                        Size {
+                            width: frame.width,
+                            height: frame.height,
+                        },
+                    ));
 
-                        let buffer = Texture2DBuffer {
-                            buffers: &pixel_buffer.data,
-                            linesize: &frame.linesize,
-                        };
+                    let buffer = Texture2DBuffer {
+                        buffers: &pixel_buffer.data,
+                        linesize: &frame.linesize,
+                    };
 
-                        self.0.submit(match frame.format {
-                            VideoFormat::NV12 => Texture::Nv12(Texture2DResource::Buffer(buffer)),
-                            VideoFormat::I420 => Texture::I420(buffer),
-                            _ => unreachable!(),
-                        })?;
-                    }
+                    self.0.submit(match frame.format {
+                        VideoFormat::NV12 => Texture::Nv12(Texture2DResource::Buffer(buffer)),
+                        VideoFormat::I420 => Texture::I420(buffer),
+                        _ => unreachable!(),
+                    })?;
                 }
             },
             VideoSubFormat::SW => {

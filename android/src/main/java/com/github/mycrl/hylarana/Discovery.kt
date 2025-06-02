@@ -9,15 +9,15 @@ abstract class DiscoveryServiceObserver {
 
     abstract fun offLine(localId: String, id: String, ip: String)
 
-    abstract fun onMessage(localId: String, id: String, ip: String, message: ByteArray)
+    abstract fun onMetadata(localId: String, id: String, ip: String, metadata: ByteArray)
 }
 
 class DiscoveryService(
-    private val broadcastHandle: (ByteArray) -> Boolean,
+    private val setMetadataHandle: (ByteArray) -> Boolean,
     private val releaseHandle: () -> Unit
 ) {
-    fun broadcast(message: ByteArray): Boolean {
-        return broadcastHandle(message)
+    fun setMetadata(metadata: ByteArray): Boolean {
+        return setMetadataHandle(metadata)
     }
 
     /**
@@ -45,16 +45,16 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    fun createService(topic: String, observer: DiscoveryServiceObserver): DiscoveryService {
-        val discovery = create(topic, observer)
+    fun createService(bind: String, observer: DiscoveryServiceObserver): DiscoveryService {
+        val discovery = discoveryCreate(bind, observer)
         if (discovery == 0L) {
             throw Exception("failed to create discovery service")
         }
 
-        return DiscoveryService({ message ->
-            broadcast(discovery, message)
+        return DiscoveryService({ metadata ->
+            discoverySetMetadata(discovery, metadata)
         }, { ->
-            release(discovery)
+            discoveryRelease(discovery)
         })
     }
 
@@ -64,17 +64,17 @@ class Discovery {
      * distinguish between different publishers, in properties you can add
      * customized data to the published service.
      */
-    private external fun create(topic: String, observer: DiscoveryServiceObserver): Long
+    private external fun discoveryCreate(bind: String, observer: DiscoveryServiceObserver): Long
 
     /**
      * Query the registered service, the service type is fixed, when the query
      * is published the callback function will call back all the network
      * addresses of the service publisher as well as the attribute information.
      */
-    private external fun broadcast(discovery: Long, message: ByteArray): Boolean
+    private external fun discoverySetMetadata(discovery: Long, metadata: ByteArray): Boolean
 
     /**
      * release the discovery service
      */
-    private external fun release(discovery: Long)
+    private external fun discoveryRelease(discovery: Long)
 }

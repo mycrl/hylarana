@@ -1,6 +1,6 @@
 [package]
 name = "hylarana-discovery"
-version = "0.3.1"
+version = "0.5.0"
 edition = "2024"
 description = "A cross-platform screen casting library implemented by Rust."
 license = "LGPL-2.1-only"
@@ -8,8 +8,13 @@ readme = "../README.md"
 repository = "https://github.com/mycrl/hylarana"
 
 [dependencies]
-thiserror = "2.0"
 log = "0.4"
+serde_json = "1.0"
 uuid = { version = "1.11", features = ["v4"] }
-tokio = { version = "1", features = ["sync", "macros"] }
-libp2p = { version = "0.55.0", default-features = false, features = ["mdns", "gossipsub", "noise", "tcp", "yamux", "tokio", "macros"]}
+tokio = { version = "1", features = ["sync", "macros", "net", "time"] }
+serde = { version = "1.0", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false }
+axum = { version = "0.7", default-features = false, features = [
+    "http1",
+    "tokio",
+] }

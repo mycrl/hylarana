@@ -1,42 +1,36 @@
 #[cfg(target_os = "windows")]
 mod win32 {
     pub mod audio;
-    pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "linux")]
 mod linux {
     pub mod audio;
-    pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "macos")]
 mod macos {
     pub mod audio;
-    pub mod camera;
     pub mod screen;
 }
 
 #[cfg(target_os = "windows")]
 pub use self::win32::{
     audio::{AudioCapture, AudioCaptureError},
-    camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
 #[cfg(target_os = "linux")]
 pub use self::linux::{
     audio::{AudioCapture, AudioCaptureError},
-    camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
 #[cfg(target_os = "macos")]
 pub use self::macos::{
     audio::{AudioCapture, AudioCaptureError},
-    camera::{CameraCapture, CameraCaptureError},
     screen::{ScreenCapture, ScreenCaptureError},
 };
 
@@ -59,8 +53,6 @@ pub enum CaptureError {
     AudioCaptureError(#[from] AudioCaptureError),
     #[error(transparent)]
     ScreenCaptureError(#[from] ScreenCaptureError),
-    #[error(transparent)]
-    CameraCaptureError(#[from] CameraCaptureError),
 }
 
 pub trait FrameConsumer: Sync + Send {
@@ -70,6 +62,8 @@ pub trait FrameConsumer: Sync + Send {
     /// This method is called when the capture source captures new data. If it
     /// returns false, the source stops capturing.
     fn sink(&mut self, frame: &Self::Frame) -> bool;
+
+    fn close(&mut self);
 }
 
 pub trait CaptureHandler: Sync + Send {
@@ -176,7 +170,6 @@ where
 }
 
 enum CaptureImplement {
-    Camera(CameraCapture),
     Screen(ScreenCapture),
     Audio(AudioCapture),
 }
@@ -193,7 +186,6 @@ impl Capture {
         log::info!("capture get sources, kind={:?}", kind);
 
         Ok(match kind {
-            SourceType::Camera => CameraCapture::get_sources()?,
             SourceType::Screen => ScreenCapture::get_sources()?,
             SourceType::Audio => AudioCapture::get_sources()?,
             _ => Vec::new(),
@@ -216,19 +208,9 @@ impl Capture {
             consumer,
         }) = video
         {
-            match description.source.kind {
-                SourceType::Camera => {
-                    let camera = CameraCapture::default();
-                    camera.start(description, consumer)?;
-                    devices.push(CaptureImplement::Camera(camera));
-                }
-                SourceType::Screen => {
-                    let screen = ScreenCapture::default();
-                    screen.start(description, consumer)?;
-                    devices.push(CaptureImplement::Screen(screen));
-                }
-                _ => (),
-            }
+            let screen = ScreenCapture::default();
+            screen.start(description, consumer)?;
+            devices.push(CaptureImplement::Screen(screen));
         }
 
         if let Some(SourceCaptureOptions {
@@ -249,7 +231,6 @@ impl Capture {
         for item in self.0.iter() {
             match item {
                 CaptureImplement::Screen(it) => it.stop()?,
-                CaptureImplement::Camera(it) => it.stop()?,
                 CaptureImplement::Audio(it) => it.stop()?,
             };
         }

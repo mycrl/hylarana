@@ -1,20 +1,15 @@
+use std::net::SocketAddr;
+
 use super::{MediaStreamDescription, MediaStreamObserver, MediaStreamSink};
 
-use std::{
-    sync::{Arc, atomic::AtomicBool},
-    thread,
-};
-
+use bytes::Bytes;
 use codec::{AudioDecoder, VideoDecoder, VideoDecoderSettings};
-use common::{Size, atomic::EasyAtomic, codec::VideoDecoderType};
+use common::codec::VideoDecoderType;
 use thiserror::Error;
-use transport::{StreamKind, StreamMultiReceiverAdapter, TransportReceiver};
+use transport::{Buffer, StreamType, TransportOptions, TransportReceiver, TransportReceiverSink};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-#[cfg(target_os = "windows")]
-use common::win32::MediaThreadClass;
 
 #[cfg(target_os = "windows")]
 use super::util::get_direct3d;
@@ -33,210 +28,111 @@ pub enum HylaranaReceiverError {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct HylaranaReceiverOptions {
-    pub video_decoder: VideoDecoderType,
+    pub codec: VideoDecoderType,
+    pub transport: TransportOptions,
 }
 
-fn create_video_decoder<S, O>(
-    transport: &TransportReceiver<StreamMultiReceiverAdapter>,
-    status: Arc<AtomicBool>,
-    settings: VideoDecoderSettings,
-    sink: &Arc<S>,
-    observer: &Arc<O>,
-) -> Result<(), HylaranaReceiverError>
+struct ReceiverSinker<S, O> {
+    audio_decoder: AudioDecoder,
+    video_decoder: VideoDecoder,
+    observer: O,
+    sink: S,
+}
+
+impl<S, O> TransportReceiverSink for ReceiverSinker<S, O>
 where
     S: MediaStreamSink + 'static,
     O: MediaStreamObserver + 'static,
 {
-    let sink_ = Arc::downgrade(sink);
-    let observer_ = Arc::downgrade(observer);
-    let adapter = transport.get_adapter();
-    let mut codec = VideoDecoder::new(settings)?;
+    fn sink(&mut self, buffer: Buffer<Bytes>) -> bool {
+        match buffer.stream {
+            StreamType::Video => {
+                if let Err(e) = self.video_decoder.decode(&buffer.data, buffer.timestamp) {
+                    log::error!("video decode error={:?}", e);
 
-    thread::Builder::new()
-        .name("VideoDecoderThread".to_string())
-        .spawn(move || {
-            #[cfg(target_os = "windows")]
-            let thread_class_guard = MediaThreadClass::Playback.join().ok();
+                    return false;
+                } else {
+                    while let Some(frame) = self.video_decoder.read() {
+                        if !self.sink.video(frame) {
+                            log::warn!("video sink return false!");
 
-            'a: while let Some(sink) = sink_.upgrade() {
-                if let Some((packet, _, timestamp)) = adapter.next(StreamKind::Video) {
-                    if let Err(e) = codec.decode(&packet, timestamp) {
-                        log::error!("video decode error={:?}", e);
-
-                        break;
-                    } else {
-                        while let Some(frame) = codec.read() {
-                            if !sink.video(frame) {
-                                log::warn!("video sink return false!");
-
-                                break 'a;
-                            }
+                            return false;
                         }
                     }
+                }
+            }
+            StreamType::Audio => {
+                if let Err(e) = self.audio_decoder.decode(&buffer.data, buffer.timestamp) {
+                    log::error!("audio decode error={:?}", e);
+
+                    return false;
                 } else {
-                    log::warn!("video adapter next is none!");
+                    while let Some(frame) = self.audio_decoder.read() {
+                        if !self.sink.audio(frame) {
+                            log::warn!("audio sink return false!");
 
-                    break;
-                }
-            }
-
-            log::warn!("video decoder thread is closed!");
-            if let Some(observer) = observer_.upgrade() {
-                if !status.get() {
-                    status.set(true);
-                    observer.close();
-                }
-            }
-
-            #[cfg(target_os = "windows")]
-            if let Some(guard) = thread_class_guard {
-                drop(guard)
-            }
-        })?;
-
-    Ok(())
-}
-
-fn create_audio_decoder<S, O>(
-    transport: &TransportReceiver<StreamMultiReceiverAdapter>,
-    status: Arc<AtomicBool>,
-    sink: &Arc<S>,
-    observer: &Arc<O>,
-) -> Result<(), HylaranaReceiverError>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
-    let sink_ = Arc::downgrade(sink);
-    let observer_ = Arc::downgrade(observer);
-    let adapter = transport.get_adapter();
-    let mut codec = AudioDecoder::new()?;
-
-    thread::Builder::new()
-        .name("AudioDecoderThread".to_string())
-        .spawn(move || {
-            #[cfg(target_os = "windows")]
-            let thread_class_guard = MediaThreadClass::ProAudio.join().ok();
-
-            'a: while let Some(sink) = sink_.upgrade() {
-                if let Some((packet, _, timestamp)) = adapter.next(StreamKind::Audio) {
-                    if let Err(e) = codec.decode(&packet, timestamp) {
-                        log::error!("audio decode error={:?}", e);
-
-                        break;
-                    } else {
-                        while let Some(frame) = codec.read() {
-                            if !sink.audio(frame) {
-                                log::warn!("audio sink return false!");
-
-                                break 'a;
-                            }
+                            return false;
                         }
                     }
-                } else {
-                    log::warn!("audio adapter next is none!");
-
-                    break;
                 }
             }
+        }
 
-            log::warn!("audio decoder thread is closed!");
-            if let Some(observer) = observer_.upgrade() {
-                if !status.get() {
-                    status.set(true);
-                    observer.close();
-                }
-            }
+        true
+    }
 
-            #[cfg(target_os = "windows")]
-            if let Some(guard) = thread_class_guard {
-                drop(guard)
-            }
-        })?;
+    fn close(&mut self) {
+        log::info!("receiver is closed");
 
-    Ok(())
+        self.observer.close();
+    }
 }
 
 /// Screen casting receiver.
-pub struct HylaranaReceiver<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
+pub struct HylaranaReceiver {
     description: MediaStreamDescription,
     #[allow(unused)]
-    transport: TransportReceiver<StreamMultiReceiverAdapter>,
-    status: Arc<AtomicBool>,
-    #[allow(unused)]
-    sink: Arc<S>,
-    observer: Arc<O>,
+    transport: TransportReceiver,
 }
 
-impl<S, O> HylaranaReceiver<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
+impl HylaranaReceiver {
     /// Create a receiving end. The receiving end is much simpler to implement.
     /// You only need to decode the data in the queue and call it back to the
     /// sink.
-    pub(crate) fn new(
-        description: &MediaStreamDescription,
+    pub(crate) fn new<S, O>(
+        addr: SocketAddr,
         options: &HylaranaReceiverOptions,
+        description: &MediaStreamDescription,
         sink: S,
         observer: O,
-    ) -> Result<Self, HylaranaReceiverError> {
+    ) -> Result<Self, HylaranaReceiverError>
+    where
+        S: MediaStreamSink + 'static,
+        O: MediaStreamObserver + 'static,
+    {
         log::info!("create receiver");
-
-        let transport = transport::create_split_receiver(&description.id, description.transport)?;
-        let status = Arc::new(AtomicBool::new(false));
-        let observer = Arc::new(observer);
-        let sink = Arc::new(sink);
-
-        create_audio_decoder(&transport, status.clone(), &sink, &observer)?;
-        create_video_decoder(
-            &transport,
-            status.clone(),
-            VideoDecoderSettings {
-                codec: options.video_decoder,
-                #[cfg(target_os = "windows")]
-                direct3d: Some(get_direct3d()),
-            },
-            &sink,
-            &observer,
-        )?;
 
         Ok(Self {
             description: description.clone(),
-            transport,
-            observer,
-            status,
-            sink,
+            transport: TransportReceiver::new(
+                addr,
+                options.transport.clone(),
+                ReceiverSinker {
+                    video_decoder: VideoDecoder::new(VideoDecoderSettings {
+                        codec: options.codec,
+                        #[cfg(target_os = "windows")]
+                        direct3d: Some(get_direct3d()),
+                    })?,
+                    audio_decoder: AudioDecoder::new()?,
+                    observer,
+                    sink,
+                },
+            )?,
         })
     }
 
     /// Get the media description information of the current receiver.
     pub fn get_description(&self) -> &MediaStreamDescription {
         &self.description
-    }
-
-    /// Resize the video renderer.
-    pub fn resize(&self, size: Size) {
-        self.sink.resize(size);
-    }
-}
-
-impl<S, O> Drop for HylaranaReceiver<S, O>
-where
-    S: MediaStreamSink + 'static,
-    O: MediaStreamObserver + 'static,
-{
-    fn drop(&mut self) {
-        log::info!("receiver drop");
-
-        if !self.status.get() {
-            self.status.set(true);
-            self.observer.close();
-        }
     }
 }

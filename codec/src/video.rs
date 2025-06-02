@@ -1,16 +1,11 @@
-use crate::{
-    VideoDecoderSettings, VideoEncoderSettings,
-    codec::{
-        CodecError, CodecType, CreateVideoContextError, CreateVideoFrameError,
-        create_video_context, create_video_frame, set_option, set_str_option,
-    },
-};
+use crate::{VideoDecoderSettings, VideoEncoderSettings, set_option, set_str_option};
 
 use std::{ffi::c_int, ptr::null_mut};
 
 use common::{
     codec::{VideoDecoderType, VideoEncoderType},
     frame::{VideoFormat, VideoFrame, VideoSubFormat},
+    strings::PSTR,
 };
 
 use ffmpeg::*;
@@ -18,6 +13,9 @@ use thiserror::Error;
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use common::Size;
+
+#[cfg(target_os = "windows")]
+use common::win32::{Direct3DDevice, windows::core::Interface};
 
 #[cfg(target_os = "macos")]
 use common::macos::get_pixel_buffer_format;
@@ -353,9 +351,12 @@ impl VideoEncoder {
         context_mut.max_samples = 1;
         context_mut.has_b_frames = 0;
         context_mut.max_b_frames = 0;
+        context_mut.color_primaries = AVColorPrimaries::AVCOL_PRI_BT709;
+        context_mut.color_trc = AVColorTransferCharacteristic::AVCOL_TRC_BT709;
+        context_mut.colorspace = AVColorSpace::AVCOL_SPC_BT709;
         context_mut.flags2 |= AV_CODEC_FLAG2_FAST as i32;
         context_mut.flags |= AV_CODEC_FLAG_LOW_DELAY as i32 | AV_CODEC_FLAG_GLOBAL_HEADER as i32;
-        context_mut.profile = FF_PROFILE_H264_BASELINE as i32;
+        context_mut.profile = FF_PROFILE_HEVC_MAIN as i32;
 
         // The QSV encoder can only use qsv frames. Although the internal structure is a
         // platform-specific hardware texture, you cannot directly tell qsv a specific
@@ -382,20 +383,19 @@ impl VideoEncoder {
         context_mut.bit_rate = bit_rate;
         context_mut.rc_max_rate = bit_rate;
         context_mut.rc_buffer_size = bit_rate as i32;
-        context_mut.bit_rate_tolerance = bit_rate as i32;
+        context_mut.bit_rate_tolerance = (bit_rate / 10) as i32;
         context_mut.rc_initial_buffer_occupancy = (bit_rate * 3 / 4) as i32;
         context_mut.framerate = unsafe { av_make_q(options.frame_rate as i32, 1) };
         context_mut.time_base = unsafe { av_make_q(1, options.frame_rate as i32) };
         context_mut.pkt_timebase = unsafe { av_make_q(1, options.frame_rate as i32) };
-        context_mut.gop_size = options.key_frame_interval as i32 / 2;
+        context_mut.gop_size = options.frame_rate as i32 / 2;
         context_mut.height = options.height as i32;
         context_mut.width = options.width as i32;
 
         match options.codec {
-            VideoEncoderType::X264 => {
+            VideoEncoderType::X265 => {
                 set_str_option(context_mut, "preset", "superfast");
                 set_str_option(context_mut, "tune", "zerolatency");
-                set_option(context_mut, "nal-hrd", 2);
                 set_option(
                     context_mut,
                     "sc_threshold",
@@ -409,6 +409,7 @@ impl VideoEncoder {
             }
             VideoEncoderType::VideoToolBox => {
                 set_option(context_mut, "realtime", 1);
+                set_option(context_mut, "coder", 1); // vlc
             }
         };
 
@@ -544,6 +545,23 @@ impl VideoEncoder {
             packet_ref.pts as u64,
         ))
     }
+
+    pub fn frame_count(&mut self) -> u64 {
+        unsafe { &*self.context }.frame_num as u64
+    }
+
+    pub fn bit_rate(&mut self) -> u64 {
+        unsafe { &*self.context }.bit_rate as u64
+    }
+
+    pub fn set_bit_rate(&mut self, bit_rate: u64) {
+        let context_mut = unsafe { &mut *self.context };
+
+        context_mut.bit_rate = bit_rate as i64;
+        context_mut.rc_max_rate = bit_rate as i64;
+        context_mut.rc_buffer_size = bit_rate as i32;
+        context_mut.rc_initial_buffer_occupancy = (bit_rate * 3 / 4) as i32;
+    }
 }
 
 impl Drop for VideoEncoder {
@@ -579,4 +597,349 @@ impl Drop for VideoEncoder {
             }
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum CreateVideoContextError {
+    #[error("not found av codec")]
+    NotFoundAVCodec,
+    #[error("failed to alloc av context")]
+    AllocAVContextError,
+    #[error("failed to alloc av hardware device context")]
+    AllocAVHardwareDeviceContextError,
+    #[error("missing direct3d device")]
+    MissingDirect3DDevice,
+    #[cfg(target_os = "windows")]
+    #[error(transparent)]
+    SetMultithreadProtectedError(#[from] common::win32::windows::core::Error),
+    #[error("failed to init av hardware device context")]
+    InitAVHardwareDeviceContextError,
+    #[error("failed to init qsv device context")]
+    InitQsvDeviceContextError,
+    #[error("failed to alloc av hardware frame context")]
+    AllocAVHardwareFrameContextError,
+    #[error("failed to init av hardware frame context")]
+    InitAVHardwareFrameContextError,
+}
+
+#[derive(Debug, Error, Clone, Copy)]
+pub enum CodecError {
+    #[error("unsupported codecs")]
+    NotSupportCodec,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodecType {
+    Encoder(VideoEncoderType),
+    Decoder(VideoDecoderType),
+}
+
+impl From<VideoEncoderType> for CodecType {
+    fn from(value: VideoEncoderType) -> Self {
+        Self::Encoder(value)
+    }
+}
+
+impl From<VideoDecoderType> for CodecType {
+    fn from(value: VideoDecoderType) -> Self {
+        Self::Decoder(value)
+    }
+}
+
+impl CodecType {
+    pub fn is_supported(&self) -> bool {
+        match self {
+            CodecType::Encoder(kind) => {
+                if cfg!(target_os = "windows") {
+                    *kind != VideoEncoderType::VideoToolBox
+                } else if cfg!(target_os = "linux") {
+                    *kind == VideoEncoderType::X265
+                } else {
+                    *kind == VideoEncoderType::X265 || *kind == VideoEncoderType::VideoToolBox
+                }
+            }
+            CodecType::Decoder(kind) => {
+                if cfg!(target_os = "windows") {
+                    *kind != VideoDecoderType::VideoToolBox
+                } else if cfg!(target_os = "linux") {
+                    *kind == VideoDecoderType::HEVC
+                } else {
+                    *kind == VideoDecoderType::HEVC || *kind == VideoDecoderType::VideoToolBox
+                }
+            }
+        }
+    }
+
+    pub const fn is_encoder(&self) -> bool {
+        if let Self::Encoder(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_qsv(self) -> bool {
+        match self {
+            CodecType::Encoder(kind) => kind == VideoEncoderType::Qsv,
+            CodecType::Decoder(kind) => kind == VideoDecoderType::Qsv,
+        }
+    }
+
+    pub fn is_hardware(&self) -> bool {
+        match self {
+            Self::Decoder(codec) => *codec != VideoDecoderType::HEVC,
+            Self::Encoder(codec) => *codec != VideoEncoderType::X265,
+        }
+    }
+
+    pub unsafe fn find_av_codec(&self) -> *const AVCodec {
+        match self {
+            Self::Encoder(kind) => unsafe {
+                avcodec_find_encoder_by_name(PSTR::from(kind.to_string()).as_ptr())
+            },
+            Self::Decoder(kind) => {
+                if *kind == VideoDecoderType::D3D11 || *kind == VideoDecoderType::VideoToolBox {
+                    unsafe { avcodec_find_decoder(AVCodecID::AV_CODEC_ID_HEVC) }
+                } else {
+                    unsafe { avcodec_find_decoder_by_name(PSTR::from(kind.to_string()).as_ptr()) }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn create_video_context(
+    context: &mut *mut AVCodecContext,
+    kind: CodecType,
+    size: Option<Size>,
+    direct3d: Option<Direct3DDevice>,
+) -> Result<*const AVCodec, CreateVideoContextError> {
+    // It is not possible to directly find the d3d11va decoder, so special
+    // processing is required here. For d3d11va, the hardware context is initialized
+    // below.
+    let codec = unsafe { kind.find_av_codec() };
+    if codec.is_null() {
+        return Err(CreateVideoContextError::NotFoundAVCodec);
+    }
+
+    *context = unsafe { avcodec_alloc_context3(codec) };
+    if context.is_null() {
+        return Err(CreateVideoContextError::AllocAVContextError);
+    }
+
+    // The hardware codec is used, and the hardware context is initialized here for
+    // the hardware codec.
+    if kind.is_hardware() {
+        let hw_device_ctx =
+            unsafe { av_hwdevice_ctx_alloc(AVHWDeviceType::AV_HWDEVICE_TYPE_D3D11VA) };
+        if hw_device_ctx.is_null() {
+            return Err(CreateVideoContextError::AllocAVHardwareDeviceContextError);
+        }
+
+        // Use externally created d3d devices and do not let ffmpeg create d3d devices
+        // itself.
+        let direct3d = if let Some(direct3d) = direct3d {
+            direct3d
+        } else {
+            return Err(CreateVideoContextError::MissingDirect3DDevice);
+        };
+
+        // Special handling is required for qsv, which requires multithreading to be
+        // enabled for the d3d device.
+        if kind.is_qsv() {
+            if let Err(e) = direct3d.set_multithread_protected(true) {
+                return Err(CreateVideoContextError::SetMultithreadProtectedError(e));
+            }
+        }
+
+        let d3d11_hwctx = unsafe {
+            let hwctx = (&mut *hw_device_ctx).data as *mut AVHWDeviceContext;
+            &mut *((&mut *hwctx).hwctx as *mut AVD3D11VADeviceContext)
+        };
+
+        d3d11_hwctx.device = direct3d.device.as_raw() as *mut _;
+        d3d11_hwctx.device_context = direct3d.context.as_raw() as *mut _;
+
+        if unsafe { av_hwdevice_ctx_init(hw_device_ctx) } != 0 {
+            return Err(CreateVideoContextError::InitAVHardwareDeviceContextError);
+        }
+
+        // Creating a qsv device is a little different, the qsv hardware context needs
+        // to be derived from the platform's native hardware context.
+        let context_mut = unsafe { &mut **context };
+        if kind.is_qsv() {
+            let mut qsv_device_ctx = std::ptr::null_mut();
+            if unsafe {
+                av_hwdevice_ctx_create_derived(
+                    &mut qsv_device_ctx,
+                    AVHWDeviceType::AV_HWDEVICE_TYPE_QSV,
+                    hw_device_ctx,
+                    0,
+                )
+            } != 0
+            {
+                return Err(CreateVideoContextError::InitQsvDeviceContextError);
+            }
+
+            unsafe {
+                context_mut.hw_device_ctx = av_buffer_ref(qsv_device_ctx);
+            }
+
+            // Similarly, the qsv hardware frame also needs to be created and initialized
+            // independently.
+            if kind.is_encoder() {
+                let hw_frames_ctx = unsafe { av_hwframe_ctx_alloc(context_mut.hw_device_ctx) };
+                if hw_frames_ctx.is_null() {
+                    return Err(CreateVideoContextError::AllocAVHardwareFrameContextError);
+                }
+
+                let size = size.expect("encoder needs init hardware frame for size");
+                unsafe {
+                    let frames_ctx = &mut *((&mut *hw_frames_ctx).data as *mut AVHWFramesContext);
+                    frames_ctx.sw_format = AVPixelFormat::AV_PIX_FMT_NV12;
+                    frames_ctx.format = AVPixelFormat::AV_PIX_FMT_QSV;
+                    frames_ctx.width = size.width as i32;
+                    frames_ctx.height = size.height as i32;
+                    frames_ctx.initial_pool_size = 5;
+                }
+
+                if unsafe { av_hwframe_ctx_init(hw_frames_ctx) } != 0 {
+                    return Err(CreateVideoContextError::InitAVHardwareFrameContextError);
+                }
+
+                unsafe {
+                    context_mut.hw_frames_ctx = av_buffer_ref(hw_frames_ctx);
+                }
+            }
+        } else {
+            unsafe {
+                context_mut.hw_device_ctx = av_buffer_ref(hw_device_ctx);
+            }
+        }
+    }
+
+    Ok(codec)
+}
+
+#[cfg(target_os = "linux")]
+pub fn create_video_context(
+    context: &mut *mut AVCodecContext,
+    kind: CodecType,
+) -> Result<*const AVCodec, CreateVideoContextError> {
+    let codec = unsafe { kind.find_av_codec() };
+    if codec.is_null() {
+        return Err(CreateVideoContextError::NotFoundAVCodec);
+    }
+
+    *context = unsafe { avcodec_alloc_context3(codec) };
+    if context.is_null() {
+        return Err(CreateVideoContextError::AllocAVContextError);
+    }
+
+    Ok(codec)
+}
+
+#[cfg(target_os = "macos")]
+pub fn create_video_context(
+    context: &mut *mut AVCodecContext,
+    kind: CodecType,
+    size: Option<Size>,
+) -> Result<*const AVCodec, CreateVideoContextError> {
+    let codec = unsafe { kind.find_av_codec() };
+    if codec.is_null() {
+        return Err(CreateVideoContextError::NotFoundAVCodec);
+    }
+
+    *context = unsafe { avcodec_alloc_context3(codec) };
+    if context.is_null() {
+        return Err(CreateVideoContextError::AllocAVContextError);
+    }
+
+    if kind.is_hardware() {
+        let mut hw_device_ctx = std::ptr::null_mut();
+        if unsafe {
+            av_hwdevice_ctx_create(
+                &mut hw_device_ctx,
+                AVHWDeviceType::AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+            )
+        } != 0
+        {
+            return Err(CreateVideoContextError::InitAVHardwareDeviceContextError);
+        }
+
+        let context_mut = unsafe { &mut **context };
+        context_mut.hw_device_ctx = unsafe { av_buffer_ref(hw_device_ctx) };
+
+        if kind.is_encoder() {
+            let hw_frames_ctx = unsafe { av_hwframe_ctx_alloc(context_mut.hw_device_ctx) };
+            if hw_frames_ctx.is_null() {
+                return Err(CreateVideoContextError::AllocAVHardwareFrameContextError);
+            }
+
+            let size = size.expect("encoder needs init hardware frame for size");
+            unsafe {
+                let frames_ctx = &mut *((&mut *hw_frames_ctx).data as *mut AVHWFramesContext);
+                frames_ctx.sw_format = AVPixelFormat::AV_PIX_FMT_NV12;
+                frames_ctx.format = AVPixelFormat::AV_PIX_FMT_VIDEOTOOLBOX;
+                frames_ctx.width = size.width as i32;
+                frames_ctx.height = size.height as i32;
+                frames_ctx.initial_pool_size = 5;
+            }
+
+            if unsafe { av_hwframe_ctx_init(hw_frames_ctx) } != 0 {
+                return Err(CreateVideoContextError::InitAVHardwareFrameContextError);
+            }
+
+            unsafe {
+                context_mut.hw_frames_ctx = av_buffer_ref(hw_frames_ctx);
+            }
+        }
+    }
+
+    Ok(codec)
+}
+
+#[derive(Error, Debug)]
+pub enum CreateVideoFrameError {
+    #[error("failed to alloc av frame")]
+    AllocAVFrameError,
+    #[error("failed to alloc hardware av frame buffer")]
+    AllocHardwareAVFrameBufferError,
+    #[error("failed to alloc av frame buffer")]
+    AllocAVFrameBufferError,
+}
+
+pub fn create_video_frame(
+    frame: &mut *mut AVFrame,
+    context: *const AVCodecContext,
+) -> Result<(), CreateVideoFrameError> {
+    *frame = unsafe { av_frame_alloc() };
+    if frame.is_null() {
+        return Err(CreateVideoFrameError::AllocAVFrameError);
+    }
+
+    let context_ref = unsafe { &*context };
+    let frame_mut = unsafe { &mut **frame };
+
+    frame_mut.width = context_ref.width;
+    frame_mut.height = context_ref.height;
+    frame_mut.format = context_ref.pix_fmt as i32;
+
+    // qsv needs to indicate the use of hardware textures, otherwise qsv will return
+    // software textures.
+    if !context_ref.hw_device_ctx.is_null() {
+        if unsafe { av_hwframe_get_buffer(context_ref.hw_frames_ctx, *frame, 0) } != 0 {
+            return Err(CreateVideoFrameError::AllocHardwareAVFrameBufferError);
+        }
+    } else {
+        if unsafe { av_frame_get_buffer(*frame, 0) } != 0 {
+            return Err(CreateVideoFrameError::AllocAVFrameBufferError);
+        }
+    }
+
+    Ok(())
 }

@@ -1,75 +1,58 @@
-use std::sync::Arc;
-
-use anyhow::{Result, anyhow};
-use bytes::BytesMut;
-use transport::{
-    StreamBufferInfo, StreamKind, StreamSenderAdapter, TransportSender, create_sender,
-    with_capacity as package_with_capacity,
-};
+use anyhow::Result;
+use transport::{Buffer, BufferType, StreamType, TransportSender};
 
 use jni::{
     JNIEnv,
-    objects::{JByteArray, JObject, JString, JValueGen},
+    objects::{JByteArray, JString},
 };
 
-pub struct Sender {
-    sender: TransportSender,
-    adapter: Arc<StreamSenderAdapter>,
-}
+pub struct Sender(TransportSender);
 
 impl Sender {
-    pub fn new(env: &mut JNIEnv, options: &JString) -> Result<Self> {
+    pub fn new(env: &mut JNIEnv, bind: &JString, options: &JString) -> Result<Self> {
+        let bind: String = env.get_string(bind)?.into();
         let options: String = env.get_string(options)?.into();
-        let sender = create_sender(serde_json::from_str(&options)?)?;
-        Ok(Self {
-            adapter: sender.get_adapter(),
-            sender,
-        })
+
+        Ok(Self(TransportSender::new(
+            bind.parse()?,
+            serde_json::from_str(&options)?,
+        )?))
     }
 
-    pub fn get_id(&self) -> &str {
-        self.sender.get_id()
+    pub fn sink(
+        &self,
+        env: &mut JNIEnv,
+        ty: i32,
+        flags: i32,
+        timestamp: i64,
+        array: JByteArray,
+    ) -> Result<bool> {
+        Ok(self
+            .0
+            .send(Buffer {
+                data: {
+                    let size = env.get_array_length(&array)? as usize;
+                    let mut bytes = Buffer::<()>::with_capacity(size);
+                    let start = bytes.len() - size;
+
+                    env.get_byte_array_region(array, 0, unsafe {
+                        std::mem::transmute::<&mut [u8], &mut [i8]>(&mut bytes[start..])
+                    })?;
+
+                    bytes
+                },
+                stream: StreamType::try_from(ty as u8)?,
+                ty: BufferType::try_from(flags as u8)?,
+                timestamp: timestamp as u64,
+            })
+            .is_ok())
     }
 
-    pub fn sink(&self, env: &mut JNIEnv, info: JObject, array: JByteArray) -> Result<bool> {
-        let bytes = copy_from_byte_array(env, &array)?;
-        let info = {
-            let kind = if let JValueGen::Int(it) = env.get_field(&info, "type", "I")? {
-                StreamKind::try_from(it as u8)?
-            } else {
-                return Err(anyhow!("StreamBufferInfo type not a int"));
-            };
-
-            let flags = if let JValueGen::Int(it) = env.get_field(&info, "flags", "I")? {
-                it
-            } else {
-                return Err(anyhow!("StreamBufferInfo flags not a int"));
-            };
-
-            let timestamp = if let JValueGen::Long(it) = env.get_field(&info, "timestamp", "J")? {
-                it as u64
-            } else {
-                return Err(anyhow!("StreamBufferInfo timestamp not a long"));
-            };
-
-            match kind {
-                StreamKind::Video => StreamBufferInfo::Video(flags, timestamp),
-                StreamKind::Audio => StreamBufferInfo::Audio(flags, timestamp),
-            }
-        };
-
-        Ok(self.adapter.send(bytes, info))
+    pub fn get_pkt_lose_rate(&self) -> f64 {
+        self.0.get_pkt_lose_rate()
     }
-}
 
-fn copy_from_byte_array(env: &JNIEnv, array: &JByteArray) -> Result<BytesMut> {
-    let size = env.get_array_length(array)? as usize;
-    let mut bytes = package_with_capacity(size);
-    let start = bytes.len() - size;
-
-    env.get_byte_array_region(array, 0, unsafe {
-        std::mem::transmute::<&mut [u8], &mut [i8]>(&mut bytes[start..])
-    })?;
-
-    Ok(bytes)
+    pub fn get_port(&self) -> u16 {
+        self.0.local_addr().port()
+    }
 }

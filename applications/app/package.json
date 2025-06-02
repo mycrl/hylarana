@@ -1,0 +1,22 @@
+{
+    "name": "hylarana-app-desktop",
+    "version": "1.0.0",
+    "description": "",
+    "type": "module",
+    "main": "build.js",
+    "private": true,
+    "scripts": {
+        "build:debug": "node ./build.js",
+        "build:release": "node ./build.js -- --release"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/mycrl/hylarana.git"
+    },
+    "author": "Mr.Panda",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/mycrl/hylarana/issues"
+    },
+    "homepage": "https://github.com/mycrl/hylarana#readme"
+}

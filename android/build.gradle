@@ -45,7 +45,8 @@ android {
     buildTypes {
         release {
             debuggable false
-            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
         }
 
         debug {
@@ -74,12 +75,6 @@ def nativeModulePath = project.file("src/main/rust").absolutePath
 def cargoTargetPath = project.file("../target").absolutePath
 def targetApiLevel = android.defaultConfig.targetSdkVersion.apiLevel
 def ndkPath = android.ndkDirectory.absolutePath
-
-// local.properties
-//
-// rust.cargoCommand=
-// rust.rustcCommand=
-// rust.pythonCommand=
 
 cargo {
     profile = "release"

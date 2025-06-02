@@ -7,8 +7,15 @@ import android.view.Surface
 import kotlin.Exception
 
 data class HylaranaSenderConfigure(
+    val bind: String,
     val video: Video.VideoEncoder.VideoEncoderConfigure,
     val options: TransportOptions,
+)
+
+data class HylaranaReceiverConfigure(
+    val addr: String,
+    val options: TransportOptions,
+    val description: MediaStreamDescription,
 )
 
 abstract class HylaranaReceiverObserver {
@@ -72,7 +79,7 @@ class HylaranaService {
         ): HylaranaSender {
             return HylaranaSender(
                 observer,
-                hylarana.createSender(configure.options),
+                hylarana.createSender(configure.bind, configure.options),
                 configure,
                 observer.record,
             )
@@ -85,20 +92,20 @@ class HylaranaService {
          * `port` The port number from the created sender.
          */
         fun createReceiver(
-            description: MediaStreamDescription,
+            configure: HylaranaReceiverConfigure,
             observer: HylaranaReceiverObserver
         ): HylaranaReceiver {
             return HylaranaReceiver(
                 hylarana.createReceiver(
-                    description.id,
-                    description.transport,
+                    configure.addr,
+                    configure.options,
                     object : HylaranaReceiverAdapterObserver() {
                         private var isReleased = false
                         private val audioDecoder = observer.track?.let { Audio.AudioDecoder(it) }
                         private val videoDecoder = Video.VideoDecoder(
                             observer.surface,
-                            description.video?.size?.width ?: 2560,
-                            description.video?.size?.height ?: 1440
+                            configure.description.video?.size?.width ?: 2560,
+                            configure.description.video?.size?.height ?: 1440
                         )
 
                         init {
@@ -191,9 +198,14 @@ class HylaranaSender(
 
     private val videoEncoder: Video.VideoEncoder =
         Video.VideoEncoder(configure.video, object : ByteArraySinker() {
-            override fun sink(info: StreamBufferInfo, buf: ByteArray) {
+            override fun sink(
+                kind: Int,
+                flags: Int,
+                timestamp: Long,
+                buf: ByteArray
+            ) {
                 if (!isClosed) {
-                    if (!sender.send(info, buf)) {
+                    if (!sender.send(kind, flags, timestamp, buf)) {
                         isClosed = true
                         observer.close()
                     }
@@ -203,9 +215,14 @@ class HylaranaSender(
 
     private val audioEncoder: Audio.AudioEncoder =
         Audio.AudioEncoder(record, object : ByteArraySinker() {
-            override fun sink(info: StreamBufferInfo, buf: ByteArray) {
+            override fun sink(
+                kind: Int,
+                flags: Int,
+                timestamp: Long,
+                buf: ByteArray
+            ) {
                 if (!isClosed) {
-                    if (!sender.send(info, buf)) {
+                    if (!sender.send(kind, flags, timestamp, buf)) {
                         isClosed = true
                         observer.close()
                     }
@@ -222,9 +239,10 @@ class HylaranaSender(
      * Get the surface inside the sender, you need to render the texture to this surface to pass the
      * screen to other receivers.
      */
-    val surface: Surface? get() {
-        return videoEncoder.getSurface()
-    }
+    val surface: Surface?
+        get() {
+            return videoEncoder.getSurface()
+        }
 
     /**
      * get sender stream id.
@@ -232,8 +250,6 @@ class HylaranaSender(
     fun getDescription(): MediaStreamDescription {
         val audio = Audio.getAudioCodecConfigure()
         return MediaStreamDescription(
-            sender.getId(),
-            configure.options,
             MediaVideoStreamDescription(
                 fps = configure.video.frameRate,
                 bitRate = configure.video.bitRate,
@@ -246,6 +262,10 @@ class HylaranaSender(
                 bitRate = audio.bitRate
             ),
         )
+    }
+
+    fun getPort(): Int {
+        return sender.getPort()
     }
 
     /**

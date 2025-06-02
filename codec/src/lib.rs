@@ -1,5 +1,4 @@
 mod audio;
-mod codec;
 mod video;
 
 pub use self::{
@@ -7,11 +6,16 @@ pub use self::{
         AudioDecoder, AudioDecoderError, AudioEncoder, AudioEncoderError,
         create_opus_identification_header,
     },
-    codec::{CodecError, CodecType},
-    video::{VideoDecoder, VideoDecoderError, VideoEncoder, VideoEncoderError},
+    video::{
+        CodecError, CodecType, VideoDecoder, VideoDecoderError, VideoEncoder, VideoEncoderError,
+    },
 };
 
-use common::codec::{VideoDecoderType, VideoEncoderType};
+use common::{
+    codec::{VideoDecoderType, VideoEncoderType},
+    strings::PSTR,
+};
+
 use ffmpeg::*;
 
 #[cfg(target_os = "windows")]
@@ -151,5 +155,22 @@ pub fn startup() {
 pub fn shutdown() {
     unsafe {
         av_log_set_callback(None);
+    }
+}
+
+pub(crate) fn set_option(context: &mut AVCodecContext, key: &str, value: i64) {
+    unsafe {
+        av_opt_set_int(context.priv_data, PSTR::from(key).as_ptr(), value, 0);
+    }
+}
+
+pub(crate) fn set_str_option(context: &mut AVCodecContext, key: &str, value: &str) {
+    unsafe {
+        av_opt_set(
+            context.priv_data,
+            PSTR::from(key).as_ptr(),
+            PSTR::from(value).as_ptr(),
+            0,
+        );
     }
 }
