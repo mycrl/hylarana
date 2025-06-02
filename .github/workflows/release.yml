@@ -54,6 +54,7 @@ jobs:
                   npm i -g yarn
                   yarn
                   yarn build:app:release
+                  sdkmanager --install "ndk;27.0.12077973"
                   yarn build:android
 
             # compress shared libraries
