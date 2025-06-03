@@ -18,6 +18,8 @@ android {
     namespace "com.github.mycrl"
     compileSdk 35
 
+    ndkVersion "27.0.12077973"
+
     publishing {
         singleVariant("release") {
             withSourcesJar()
@@ -27,19 +29,6 @@ android {
     defaultConfig {
         minSdk 29
         targetSdk 35
-
-        ndk {
-            //noinspection ChromeOsAbiSupport
-            abiFilters "arm64-v8a"
-        }
-
-        consumerProguardFiles "consumer-rules.pro"
-        externalNativeBuild {
-            cmake {
-                arguments "-DANDROID_STL=c++_shared"
-                cppFlags ""
-            }
-        }
     }
 
     buildTypes {
@@ -62,13 +51,6 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-
-    externalNativeBuild {
-        cmake {
-            path file("src/main/cpp/CMakeLists.txt")
-            version "3.22.1"
-        }
-    }
 }
 
 def nativeModulePath = project.file("src/main/rust").absolutePath
@@ -79,7 +61,6 @@ def ndkPath = android.ndkDirectory.absolutePath
 cargo {
     profile = "release"
     apiLevel = targetApiLevel
-    prebuiltToolchains = true
     pythonCommand = "python3"
     module = nativeModulePath
     libname = "android-native"

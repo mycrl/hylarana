@@ -16,7 +16,6 @@ import android.media.AudioTrack
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.view.Surface
 import androidx.annotation.RequiresPermission
@@ -203,11 +202,7 @@ class HylaranaCoreService : Service() {
         }
 
         fun close() {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
-            } else {
-                service.stopForeground(true)
-            }
+            service.stopForeground(STOP_FOREGROUND_REMOVE)
         }
     }
 }

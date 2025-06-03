@@ -26,6 +26,16 @@ jobs:
                       target/
                   key: "${{ matrix.os }}-cargo"
 
+            # installation of dependencies
+            - name: Installation of dependencies
+              id: dependencies
+              if: runner.os == 'Macos'
+              run: |
+                  brew install ffmpeg@7 cmake wget
+                  echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
+                  echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
+                  sdkmanager "ndk;27.0.12077973"
+
             - name: Set up JDK
               if: runner.os == 'Macos'
               uses: actions/setup-java@v3
@@ -35,27 +45,12 @@ jobs:
 
             - name: Set up Android SDK and NDK
               if: runner.os == 'Macos'
-              uses: android-actions/setup-android@v2
-              with:
-                  sdk-version: 35
-                  ndk-version: 27.0.12077973
+              uses: android-actions/setup-android@v3
 
             - name: Setup project
               run: |
                   npm i -g yarn
                   yarn
-
-            # installation of dependencies
-            - name: Installation of dependencies
-              id: dependencies
-              if: runner.os == 'Macos'
-              run: |
-                  brew install ffmpeg@7 cmake wget
-                  echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
-                  echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
-                  echo "sdk.dir=$ANDROID_SDK_ROOT" > ./applications/android/local.properties
-                  echo "ndk.dir=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> ./applications/android/local.properties
-                  echo $(ls $ANDROID_SDK_ROOT/ndk)
 
             # use auto build script
             - name: Build distributions (Windows)
