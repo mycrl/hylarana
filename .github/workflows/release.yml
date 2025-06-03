@@ -51,6 +51,7 @@ jobs:
                   echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
                   echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
                   sdkmanager "ndk;27.0.12077973"
+                  rustup target add aarch64-linux-android
 
             # use auto build script
             - name: Build distributions (Windows)
