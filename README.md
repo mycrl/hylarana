@@ -28,38 +28,47 @@
 
 ## Introduction
 
-Unlike implementations such as Miracast, AirPlay, etc. that rely on hardware support (WIFI Direct), this library works on most common hardware.
+This project is both an application and a library, with the application relying on the core library to implement screen mirroring functionality.
 
-The project is cross-platform, but the prioritized supported platforms are Windows, Android, Macos, with Linux only supported for reception. Unlike solutions such as DLNA, this project is more similar to airplay, so low latency is the main goal, currently the latency is controlled at around 80-250ms (it will be different on different platforms with different codecs), and maintains a very easy to use API and few external dependencies.
+Unlike Miracast, AirPlay, and other implementations that depend on hardware support (Wi-Fi Direct), this project can run on most common hardware.
 
-Unlike traditional screen casting implementations, this project can work in forwarding mode, in which it can support casting to hundreds or thousands of devices at the same time, which can be useful in some specific scenarios (e.g., all advertising screens in a building).
-
-At the heart of hylarana is an SDK that provides rust crate on desktop and a kotlin implementation on android. And, this project uses the hylarana SDK and CEF to create a screen casting application that supports Macos and Windows. So, hylarana is not a mere application project, the main core is the SDK and the development is focused around the SDK.
+The project is cross-platform, but prioritizes support for Windows, Android, and macOS platforms, with Linux currently only supporting reception. Unlike solutions like DLNA, this project is more akin to AirPlay, with low latency as the primary goal. Currently, latency is maintained at approximately 80-250 milliseconds (with variations depending on the platform and codec used), and it features a highly user-friendly API with minimal external dependencies.
 
 ## Technical overview
 
-The first is screen capture, this part of each platform independently separate implementation, but all use hardware accelerated texture, Android use virtual display, Windows use WGC, and Macos use screenshencapturekit.
+#### capture
 
-In terms of audio and video codecs, H264 is used for video and Opus is used for audio. Similarly, Windows, Android and Macos all provide hardware accelerated codecs, and the current hardware codecs on Windows are adapted to Qsv and D3D11VA, Android is adapted to Qualcomm, Kirin, and RK series of socs, while Macos uses the Video Toolbox.
+On Android, use a virtual display; on Windows, use WGC; on macOS, use Screen Capture Kit. These capture and screen recording methods are all low-overhead and high-performance, and output hardware-accelerated textures.
 
-Both SRT and UDP multicast schemes are used for the transport layer of the data. The audio and video data transmitted by the transport layer are bare streams and do not contain similar encapsulations such as FLV. For SRT, many parameters have been adjusted in detail to suit the LAN environment, so that when using the SRT transport layer, the delay can be controlled at about 20-40 ms. The UDP multicast scheme has only a receive buffer and no transmit buffer, and the fixed maximum delay of UDP multicast is 40 ms, which is used to sort and wait for packets in the buffer.
+#### encoding and decoding
 
-The graphics interface also uses two solutions, Direct3D11 and WebGPU. WebGPU is a cross-platform graphics interface wrapper library, but WebGPU can't work on some old devices on Windows, because WebGPU needs at least Direct3D12 support, so Direct3D11 is provided on Windows. Similarly, the graphics implementations for Windows, Android, Macos are all fully hardware accelerated. In general, the capture, encoding, decoding and display of a video frame is performed inside the GPU, and the scaling and formatting of video frames on Windows is also fully hardware accelerated. For Macos and Android the situation is somewhat less so, except for YUV textures which are not available hardware accelerated, otherwise in line with Windows, they are fully hardware accelerated.
+The video uses HEVC, and the audio uses Opus. Hardware-accelerated encoding and decoding are supported on Windows, Android, and macOS. On Windows, you can choose between Intel QSV and D3D11VA. On macOS, Video Toolbox is always used. For Android, support has been implemented for Qualcomm, Kirin, and Rockchip.
+
+#### transmission
+
+The transport layer uses the SRT protocol, configured in low-latency mode. In this mode, SRT acts as a low-latency, semi-reliable transport layer, discarding any packets that exceed the set latency threshold. Although this project is designed to operate exclusively within a pure internal network environment, using SRT improves transmission stability in high-packet-loss network environments such as Wi-Fi.
+
+#### rendering
+
+Video rendering uses WebGPU, a cross-platform HAL layer. Video frame rendering is fully hardware-accelerated, directly rendering GPU textures from each platform to the window via an adaptation layer. This is a high-performance, low-overhead rendering method.
+
+#### hardware acceleration
+
+This project has basically achieved full hardware acceleration across all platforms. Typically, the capture-encoding-decoding-rendering process is fully hardware-accelerated, with video frames only passing between the hardware and GPU. However, this project also takes into account situations where hardware acceleration is not possible. In such cases, software textures are first swapped to the hardware texture buffer before being processed.
 
 ## Project structure
 
 -   [android](./android) - The SDK provided for Android use is a Native Module implemented using Kotlin.
--   [app](./app) - android applications and desktop applications packaged using CEF.
+-   [applications/app](./applications/app) - Directly use CEF and winit to create desktop applications. This is not Electron, nor is it Tauri.
+-   [applications/android](./applications/android) - Android app, UI implemented using WebView, and shares the WebView implementation with the desktop app.
 -   [capture](./capture) - Cross-platform screen/audio capture implementation, but no Linux support.
--   [codec](./codec) - Codec implementation that handles H264 and Opus.
+-   [codec](./codec) - Codec implementation that handles HEVC and Opus.
 -   [common](./common) - The public section, which contains public types, runtime, atomic operations, strings, logging, platform API wrappers, and more.
--   [discovery](./discovery) - LAN discovery implementation using MDNS.
--   [ffi](./ffi) - Cross-language related, providing SDK to different language packaging.
--   [hylarana](./hylarana) - Rust crate, the core SDK implementation used on desktop systems.
+-   [discovery](./discovery) - Local area network discovery implemented using UDP broadcast.
+-   [hylarana](./hylarana) - Core library implementation, desktop applications are based on this library implementation.
 -   [renderer](./renderer) - Cross-platform graphics renderer responsible for rendering video frames to the window.
 -   [resample](./resample) - Resampling module, responsible for resampling audio, as well as scaling and converting texture formats using D3D11.
--   [server](./server) - An implementation of a forwarding server, which is required when using forwarding mode.
--   [transport](./transport) - The unified transport layer, which internally uses SRT and UDP multicast, provides multiple modes of operation.
+-   [transport](./transport) - The transport layer encapsulates the SRT transport protocol and implements key frame and packet loss handling for audio and video streams.
 
 ## Build Instructions
 
@@ -95,8 +104,7 @@ brew install cmake ffmpeg@7 wget
 
 ```bash
 yarn
-cp app/desktop
-yarn build:release
+yarn build:app:release
 ```
 
 The build product is under the `target/app` directory.
