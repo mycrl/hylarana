@@ -54,7 +54,7 @@ jobs:
                   echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
                   echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
                   echo "sdk.dir=$ANDROID_SDK_ROOT" > ./applications/android/local.properties
-                  echo $(ls $ANDROID_SDK_ROOT)
+                  echo "ndk.dir=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> ./applications/android/local.properties
 
             # use auto build script
             - name: Build distributions (Windows)
