@@ -49,7 +49,8 @@ jobs:
                   echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
                   apk_release_key_file=$(pwd)/apk-release-key.jks
                   echo "apk_release_key_file=$apk_release_key_file" >> $GITHUB_OUTPUT
-                  echo "sdk.dir=$ANDROID_SDK_ROOT" > applications/android/local.properties
+                  echo "sdk.dir=$ANDROID_SDK_ROOT" > ./applications/android/local.properties
+                  cat ./applications/android/local.properties
 
             # use auto build script
             - name: Build distributions (Windows)
@@ -61,13 +62,18 @@ jobs:
 
             - name: Build distributions (Macos)
               if: runner.os == 'Macos'
-              env:
-                  ANDROID_RELEASE_KEY_FILE: ${{ steps.dependencies.outputs.apk_release_key_file }}
-                  ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
               run: |
                   npm i -g yarn
                   yarn
                   yarn build:app:release
+                  yarn build:android
+
+            - name: Build APK (Macos)
+              if: runner.os == 'Macos'
+              env:
+                  ANDROID_RELEASE_KEY_FILE: ${{ steps.dependencies.outputs.apk_release_key_file }}
+                  ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+              run: |
                   yarn build:android
 
             # compress shared libraries
