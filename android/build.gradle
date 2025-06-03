@@ -29,6 +29,11 @@ android {
     defaultConfig {
         minSdk 29
         targetSdk 35
+
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -50,6 +55,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+
+    packagingOptions {
+        pickFirst "**/libc++_shared.so"
     }
 }
 
@@ -78,6 +87,16 @@ tasks.configureEach { task ->
         task.dependsOn "cargoBuild"
     }
 }
+
+tasks.register("copyLibcxxShared", Copy) {
+    def hostOs = System.getProperty("os.name").toLowerCase()
+    def hostTag = hostOs.contains("mac") ? "darwin-x86_64" : hostOs.contains("windows") ? "windows-x86_64" : "linux-x86_64"
+
+    from "${ndkPath}/toolchains/llvm/prebuilt/${hostTag}/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+    into "src/main/jniLibs/arm64-v8a"
+}
+
+preBuild.dependsOn "copyLibcxxShared"
 
 publishing {
     repositories {
