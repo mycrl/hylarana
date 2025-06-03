@@ -27,15 +27,6 @@ jobs:
                   key: "${{ matrix.os }}-cargo"
 
             # installation of dependencies
-            - name: Installation of dependencies
-              id: dependencies
-              if: runner.os == 'Macos'
-              run: |
-                  brew install ffmpeg@7 cmake wget
-                  echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
-                  echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
-                  sdkmanager "ndk;27.0.12077973"
-
             - name: Set up JDK
               if: runner.os == 'Macos'
               uses: actions/setup-java@v3
@@ -51,6 +42,15 @@ jobs:
               run: |
                   npm i -g yarn
                   yarn
+
+            - name: Installation of dependencies
+              id: dependencies
+              if: runner.os == 'Macos'
+              run: |
+                  brew install ffmpeg@7 cmake wget
+                  echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
+                  echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
+                  sdkmanager "ndk;27.0.12077973"
 
             # use auto build script
             - name: Build distributions (Windows)
