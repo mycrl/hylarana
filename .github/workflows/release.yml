@@ -40,6 +40,11 @@ jobs:
                   sdk-version: 35
                   ndk-version: 27.0.12077973
 
+            - name: Setup project
+              run: |
+                  npm i -g yarn
+                  yarn
+
             # installation of dependencies
             - name: Installation of dependencies
               id: dependencies
@@ -47,26 +52,20 @@ jobs:
               run: |
                   brew install ffmpeg@7 cmake wget
                   echo "${{ secrets.ANDROID_RELEASE_KEY }}" | base64 -d > apk-release-key.jks
-                  apk_release_key_file=$(pwd)/apk-release-key.jks
-                  echo "apk_release_key_file=$apk_release_key_file" >> $GITHUB_OUTPUT
+                  echo "apk_release_key_file=$(pwd)/apk-release-key.jks" >> $GITHUB_OUTPUT
                   echo "sdk.dir=$ANDROID_SDK_ROOT" > ./applications/android/local.properties
-                  cat ./applications/android/local.properties
+                  echo $(ls $ANDROID_SDK_ROOT)
 
             # use auto build script
             - name: Build distributions (Windows)
               if: runner.os == 'Windows'
               run: |
-                  npm i -g yarn
-                  yarn
                   yarn build:app:release
 
             - name: Build distributions (Macos)
               if: runner.os == 'Macos'
               run: |
-                  npm i -g yarn
-                  yarn
                   yarn build:app:release
-                  yarn build:android
 
             - name: Build APK (Macos)
               if: runner.os == 'Macos'
