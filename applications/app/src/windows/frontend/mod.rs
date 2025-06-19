@@ -23,7 +23,10 @@ use raw_window_handle::HasWindowHandle;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use settings::Configure;
-use webview::{App, AppObserver, AppOptions, Page, PageObserver, PageOptions, PageState};
+use webview::{
+    Runtime, RuntimeAttributesBuilder, RuntimeHandler, WebView, WebViewAttributesBuilder,
+    WebViewHandler, WebViewState,
+};
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
@@ -39,8 +42,8 @@ pub struct Frontend {
     bridge: Arc<Bridge>,
     window: Option<Window>,
     core: Arc<CoreService>,
-    app: Option<App>,
-    page: Option<Arc<Page>>,
+    runtime: Option<Runtime>,
+    webview: Option<Arc<WebView>>,
     events: Arc<EventChannel>,
     transport: Arc<RwLock<Option<Sender<String>>>>,
     remote_window: Arc<RwLock<Option<Arc<Window>>>>,
@@ -228,8 +231,8 @@ impl Frontend {
 
         Ok(Self {
             window: None,
-            page: None,
-            app: None,
+            webview: None,
+            runtime: None,
             remote_window,
             transport,
             bridge,
@@ -248,14 +251,13 @@ impl Frontend {
             )?,
         );
 
-        self.app = App::new(
-            &AppOptions {
-                browser_subprocess_path: Some(&crate::APP_CONFIG.subprocess_path),
-                scheme_dir_path: Some(&crate::APP_CONFIG.cheme_path),
-                cache_dir_path: Some(&crate::APP_CONFIG.cache_path),
-                ..Default::default()
-            },
-            IAppObserver::new(self.events.clone()),
+        self.runtime = Some(
+            RuntimeAttributesBuilder::default()
+                .with_browser_subprocess_path(&crate::APP_CONFIG.subprocess_path)
+                .with_scheme_dir_path(&crate::APP_CONFIG.cheme_path)
+                .with_cache_dir_path(&crate::APP_CONFIG.cache_path)
+                .build()
+                .create_runtime(RuntimeObserver::new(self.events.clone()))?,
         );
 
         CoreService::init()?;
@@ -275,35 +277,34 @@ impl Frontend {
                 self.remote_window.write().replace(window.clone());
             }
             UserEvents::OnWebviewAppContextInitialized => {
-                if let (Some(app), Some(window)) = (&self.app, &self.window) {
+                if let (Some(runtime), Some(window)) = (&self.runtime, &self.window) {
                     window.set_visible(true);
 
-                    if let Some(page) = app.create_page(
+                    if let Ok(webview) = runtime.create_webview(
                         &crate::APP_CONFIG.uri,
                         &{
-                            let mut opt = PageOptions::default();
-                            opt.window_handle = Some(window.window_handle()?.as_raw());
-
                             let size = window.inner_size();
-                            opt.width = size.width;
-                            opt.height = size.height;
-                            opt
+                            WebViewAttributesBuilder::default()
+                                .with_window_handle(window.window_handle()?.as_raw())
+                                .with_width(size.width)
+                                .with_height(size.height)
+                                .build()
                         },
-                        IPageObserver::new(self.bridge.clone(), self.events.clone()),
+                        WebViewObserver::new(self.bridge.clone(), self.events.clone()),
                     ) {
-                        let page = Arc::new(page);
+                        let webview = Arc::new(webview);
                         let (tx, rx) = channel::<String>();
                         {
-                            let page_ = page.clone();
+                            let webview_ = webview.clone();
                             thread::spawn(move || {
                                 while let Ok(message) = rx.recv() {
-                                    page_.send_message(&message);
+                                    webview_.send_message(&message);
                                 }
                             });
                         }
 
                         self.transport.write().replace(tx);
-                        self.page.replace(page);
+                        self.webview.replace(webview);
                     }
                 }
             }
@@ -313,8 +314,10 @@ impl Frontend {
             }
             #[cfg(target_os = "macos")]
             UserEvents::OnMessagePumpPoll => {
-                if self.app.is_some() {
-                    App::poll();
+                if self.runtime.is_some() {
+                    use webview::RuntimeExtMacos;
+
+                    Runtime::poll();
                 }
             }
             _ => (),
@@ -338,40 +341,40 @@ impl Frontend {
     }
 }
 
-struct IPageObserver {
+struct WebViewObserver {
     bridge: Arc<Bridge>,
     events: Arc<EventChannel>,
 }
 
-impl IPageObserver {
+impl WebViewObserver {
     fn new(bridge: Arc<Bridge>, events: Arc<EventChannel>) -> Self {
         Self { bridge, events }
     }
 }
 
-impl PageObserver for IPageObserver {
-    fn on_message(&self, message: String) {
-        if let Err(e) = self.bridge.on_message(message) {
+impl WebViewHandler for WebViewObserver {
+    fn on_message(&self, message: &str) {
+        if let Err(e) = self.bridge.on_message(message.to_string()) {
             log::error!("failed to handle message for webview observer, error={}", e);
         }
     }
 
-    fn on_state_change(&self, state: PageState) {
-        if state == PageState::Close {
+    fn on_state_change(&self, state: WebViewState) {
+        if state == WebViewState::Close {
             self.events.send_to_main(MainEvents::Shutdown);
         }
     }
 }
 
-struct IAppObserver(Arc<EventChannel>);
+struct RuntimeObserver(Arc<EventChannel>);
 
-impl IAppObserver {
+impl RuntimeObserver {
     fn new(events: Arc<EventChannel>) -> Self {
         Self(events)
     }
 }
 
-impl AppObserver for IAppObserver {
+impl RuntimeHandler for RuntimeObserver {
     fn on_context_initialized(&self) {
         self.0.send(
             EventTarget::Frontend,

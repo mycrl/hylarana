@@ -1,7 +1,10 @@
 use crate::{CaptureHandler, FrameConsumer, Source, SourceType, VideoCaptureSourceDescription};
 
 use std::{
-    sync::{atomic::{AtomicBool, Ordering}, Arc},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::Duration,
 };

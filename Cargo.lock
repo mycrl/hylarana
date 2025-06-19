@@ -357,6 +357,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.72.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f72209734318d0b619a5e0f5129918b848c416e122a3c4ce054e03cb87b726f"
+dependencies = [
+ "bitflags 2.9.1",
+ "cexpr",
+ "clang-sys",
+ "itertools",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 2.1.1",
+ "shlex",
+ "syn",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -467,9 +487,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.25"
+version = "1.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0fc897dc1e865cc67c0e05a836d9d3f1df3cbe442aa4a9473b18e12624a4951"
+checksum = "d487aa071b5f64da6f19a3e848e3578944b726ee5a4854b82172f02aa876bfdc"
 dependencies = [
  "jobserver",
  "libc",
@@ -3764,21 +3784,13 @@ dependencies = [
 [[package]]
 name = "webview"
 version = "0.1.0"
-source = "git+https://github.com/mycrl/webview-rs?branch=main#016b38492478bf1dd44f6887a530392f7f24c902"
-dependencies = [
- "log",
- "raw-window-handle 0.6.2",
- "webview-sys",
-]
-
-[[package]]
-name = "webview-sys"
-version = "0.1.0"
-source = "git+https://github.com/mycrl/webview-rs?branch=main#016b38492478bf1dd44f6887a530392f7f24c902"
+source = "git+https://github.com/mycrl/webview-rs?branch=0.1.0#b1e9e3b3e96e15a499e76a6ffd920b7f7d83cd8e"
 dependencies = [
  "anyhow",
- "bindgen 0.70.1",
+ "bindgen 0.72.0",
  "cc",
+ "log",
+ "raw-window-handle 0.6.2",
 ]
 
 [[package]]

@@ -1,4 +1,5 @@
-fn main() -> anyhow::Result<()> {
-    webview::execute_subprocess()?;
-    Ok(())
+use webview::Runtime;
+
+fn main() {
+    Runtime::execute_subprocess();
 }
