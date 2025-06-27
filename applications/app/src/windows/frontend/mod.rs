@@ -19,14 +19,14 @@ use hylarana::{
 };
 
 use parking_lot::{Mutex, RwLock};
-use raw_window_handle::HasWindowHandle;
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use settings::Configure;
-use webview::{
-    Runtime, RuntimeAttributesBuilder, RuntimeHandler, WebView, WebViewAttributesBuilder,
-    WebViewHandler, WebViewState,
+use wew::{
+    request::{CustomRequestHandlerFactory, CustomSchemeAttributes, RequestHandlerWithLocalDisk}, runtime::{MessagePumpRuntimeHandler, Runtime, RuntimeHandler}, webview::{WebView, WebViewAttributesBuilder, WebViewHandler, WebViewState, WindowHandle}, MessageLoopAbstract, MessagePumpLoop, NativeWindowWebView
 };
+
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
@@ -42,11 +42,13 @@ pub struct Frontend {
     bridge: Arc<Bridge>,
     window: Option<Window>,
     core: Arc<CoreService>,
-    runtime: Option<Runtime>,
-    webview: Option<Arc<WebView>>,
     events: Arc<EventChannel>,
     transport: Arc<RwLock<Option<Sender<String>>>>,
     remote_window: Arc<RwLock<Option<Arc<Window>>>>,
+    runtime: Option<Runtime<MessagePumpLoop, NativeWindowWebView>>,
+    webview: Option<Arc<WebView<NativeWindowWebView>>>,
+    request_handler: CustomRequestHandlerFactory,
+    message_loop: MessagePumpLoop,
 }
 
 impl Frontend {
@@ -230,6 +232,10 @@ impl Frontend {
         }
 
         Ok(Self {
+            message_loop: MessagePumpLoop::default(),
+            request_handler: CustomRequestHandlerFactory::new(RequestHandlerWithLocalDisk::new(
+                &crate::APP_CONFIG.cheme_path,
+            )),
             window: None,
             webview: None,
             runtime: None,
@@ -252,10 +258,15 @@ impl Frontend {
         );
 
         self.runtime = Some(
-            RuntimeAttributesBuilder::default()
+            self.message_loop
+                .create_runtime_attributes_builder::<NativeWindowWebView>()
                 .with_browser_subprocess_path(&crate::APP_CONFIG.subprocess_path)
-                .with_scheme_dir_path(&crate::APP_CONFIG.cheme_path)
-                .with_cache_dir_path(&crate::APP_CONFIG.cache_path)
+                .with_cache_path(&crate::APP_CONFIG.cache_path)
+                .with_custom_scheme(CustomSchemeAttributes::new(
+                    "webview",
+                    "localhost",
+                    self.request_handler.clone(),
+                ))
                 .build()
                 .create_runtime(RuntimeObserver::new(self.events.clone()))?,
         );
@@ -280,12 +291,18 @@ impl Frontend {
                 if let (Some(runtime), Some(window)) = (&self.runtime, &self.window) {
                     window.set_visible(true);
 
+                    let window_handle = WindowHandle::new(match window.window_handle()?.as_raw() {
+                        RawWindowHandle::Win32(it) => it.hwnd.get() as _,
+                        RawWindowHandle::AppKit(it) => it.ns_view.as_ptr() as _,
+                        _ => unimplemented!(),
+                    });
+
                     if let Ok(webview) = runtime.create_webview(
                         &crate::APP_CONFIG.uri,
-                        &{
+                        {
                             let size = window.inner_size();
                             WebViewAttributesBuilder::default()
-                                .with_window_handle(window.window_handle()?.as_raw())
+                                .with_window_handle(window_handle)
                                 .with_width(size.width)
                                 .with_height(size.height)
                                 .build()
@@ -315,9 +332,7 @@ impl Frontend {
             #[cfg(target_os = "macos")]
             UserEvents::OnMessagePumpPoll => {
                 if self.runtime.is_some() {
-                    use webview::RuntimeExtMacos;
-
-                    Runtime::poll();
+                    self.message_loop.poll();
                 }
             }
             _ => (),
@@ -360,6 +375,8 @@ impl WebViewHandler for WebViewObserver {
     }
 
     fn on_state_change(&self, state: WebViewState) {
+        log::info!("webview state change: {:?}", state);
+
         if state == WebViewState::Close {
             self.events.send_to_main(MainEvents::Shutdown);
         }
@@ -382,6 +399,8 @@ impl RuntimeHandler for RuntimeObserver {
         );
     }
 }
+
+impl MessagePumpRuntimeHandler for RuntimeObserver {}
 
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "ty", content = "content")]

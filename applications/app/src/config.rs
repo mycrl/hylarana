@@ -44,7 +44,7 @@ impl AppConfig {
     }
 
     pub fn default_uri() -> String {
-        "webview://index.html".to_string()
+        "webview://localhost/index.html".to_string()
     }
 
     pub fn default_cheme_path() -> String {

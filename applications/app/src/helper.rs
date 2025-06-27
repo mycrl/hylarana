@@ -1,5 +1,3 @@
-use webview::Runtime;
-
 fn main() {
-    Runtime::execute_subprocess();
+    wew::execute_subprocess();
 }
