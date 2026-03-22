@@ -1,4 +1,4 @@
 fn main() -> anyhow::Result<()> {
-    webview::execute_subprocess()?;
+    let _ = wew::execute_subprocess();
     Ok(())
 }

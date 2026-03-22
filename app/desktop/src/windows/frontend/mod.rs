@@ -9,6 +9,7 @@ use std::{
         mpsc::{Sender, channel},
     },
     thread,
+    time::Duration,
 };
 
 use anyhow::{Result, anyhow};
@@ -22,7 +23,13 @@ use raw_window_handle::HasWindowHandle;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use settings::Configure;
-use webview::{App, AppObserver, AppOptions, Page, PageObserver, PageOptions, PageState};
+use wew::{
+    MessageLoopAbstract, MessagePumpLoop, NativeWindowWebView,
+    request::{CustomRequestHandlerFactory, CustomSchemeAttributes, RequestHandlerWithLocalDisk},
+    runtime::{LogLevel, MessagePumpRuntimeHandler, Runtime, RuntimeHandler},
+    webview::{WebView, WebViewAttributes, WebViewHandler, WebViewState},
+};
+
 use winit::{
     dpi::PhysicalSize,
     event::WindowEvent,
@@ -38,8 +45,8 @@ pub struct Frontend {
     bridge: Arc<Bridge>,
     window: Option<Window>,
     core: Arc<CoreService>,
-    app: Option<App>,
-    page: Option<Arc<Page>>,
+    runtime: Option<Runtime<MessagePumpLoop, NativeWindowWebView>>,
+    page: Option<Arc<WebView<NativeWindowWebView>>>,
     events: Arc<EventChannel>,
     transport: Arc<RwLock<Option<Sender<String>>>>,
     remote_window: Arc<RwLock<Option<Arc<Window>>>>,
@@ -204,7 +211,7 @@ impl Frontend {
         Ok(Self {
             window: None,
             page: None,
-            app: None,
+            runtime: None,
             remote_window,
             transport,
             bridge,
@@ -223,14 +230,22 @@ impl Frontend {
             )?,
         );
 
-        self.app = App::new(
-            &AppOptions {
-                browser_subprocess_path: Some(&crate::APP_CONFIG.subprocess_path),
-                scheme_dir_path: Some(&crate::APP_CONFIG.cheme_path),
-                cache_dir_path: Some(&crate::APP_CONFIG.cache_path),
-                ..Default::default()
-            },
-            IAppObserver::new(self.events.clone()),
+        self.runtime = Some(
+            MessagePumpLoop::default()
+                .create_runtime_attributes_builder::<NativeWindowWebView>()
+                .with_browser_subprocess_path(&crate::APP_CONFIG.subprocess_path)
+                .with_root_cache_path(&crate::APP_CONFIG.cache_path)
+                .with_cache_path(&crate::APP_CONFIG.cache_path)
+                .with_log_severity(LogLevel::Info)
+                .with_custom_scheme(CustomSchemeAttributes::new(
+                    "webview",
+                    "localhost",
+                    CustomRequestHandlerFactory::new(RequestHandlerWithLocalDisk::new(
+                        &crate::APP_CONFIG.cheme_path,
+                    )),
+                ))
+                .build()
+                .create_runtime(IRuntimeObserver::new(self.events.clone()))?,
         );
 
         CoreService::init()?;
@@ -250,46 +265,47 @@ impl Frontend {
                 self.remote_window.write().replace(window.clone());
             }
             UserEvents::OnWebviewAppContextInitialized => {
-                if let (Some(app), Some(window)) = (&self.app, &self.window) {
+                if let (Some(runtime), Some(window)) = (&self.runtime, &self.window) {
                     window.set_visible(true);
 
-                    if let Some(page) = app.create_page(
+                    let page = runtime.create_webview(
                         &crate::APP_CONFIG.uri,
-                        &{
-                            let mut opt = PageOptions::default();
-                            opt.window_handle = Some(window.window_handle()?.as_raw());
-
+                        {
                             let size = window.inner_size();
-                            opt.width = size.width;
-                            opt.height = size.height;
-                            opt
+                            WebViewAttributes {
+                                window_handle: Some(window.window_handle()?.as_raw()),
+                                width: size.width,
+                                height: size.height,
+                                ..Default::default()
+                            }
                         },
                         IPageObserver::new(self.bridge.clone(), self.events.clone()),
-                    ) {
-                        let page = Arc::new(page);
-                        let (tx, rx) = channel::<String>();
-                        {
-                            let page_ = page.clone();
-                            thread::spawn(move || {
-                                while let Ok(message) = rx.recv() {
-                                    page_.send_message(&message);
-                                }
-                            });
-                        }
+                    )?;
 
-                        self.transport.write().replace(tx);
-                        self.page.replace(page);
+                    let page = Arc::new(page);
+                    let (tx, rx) = channel::<String>();
+                    {
+                        let page_ = page.clone();
+                        thread::spawn(move || {
+                            while let Ok(message) = rx.recv() {
+                                page_.send_message(&message);
+                            }
+                        });
                     }
+
+                    self.transport.write().replace(tx);
+                    self.page.replace(page);
                 }
             }
             UserEvents::OnRemoteWindowClose => {
                 self.core.close_receiver();
                 self.bridge.send("StatusChangeNotify")?;
             }
-            #[cfg(target_os = "macos")]
             UserEvents::OnMessagePumpPoll => {
-                if self.app.is_some() {
-                    App::poll();
+                if self.runtime.is_some() {
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
                 }
             }
             _ => (),
@@ -304,11 +320,19 @@ impl Frontend {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                if let Some(window) = &self.window {
-                    window.request_redraw();
+                if self.runtime.is_some() {
+                    MessagePumpLoop::default().poll();
                 }
             }
             _ => (),
+        }
+    }
+
+    pub fn about_to_wait(&self) {
+        if self.runtime.is_some() {
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
         }
     }
 }
@@ -324,34 +348,61 @@ impl IPageObserver {
     }
 }
 
-impl PageObserver for IPageObserver {
-    fn on_message(&self, message: String) {
-        if let Err(e) = self.bridge.on_message(message) {
-            log::error!("failed to handle message for webview observer, error={}", e);
+impl WebViewHandler for IPageObserver {
+    fn on_message(&self, message: &str) {
+        if let Err(e) = self.bridge.on_message(message.to_string()) {
+            log::error!(
+                "failed to handle message for wew webview observer, error={}",
+                e
+            );
         }
     }
 
-    fn on_state_change(&self, state: PageState) {
-        if state == PageState::Close {
+    fn on_state_change(&self, state: WebViewState) {
+        if state == WebViewState::Close {
             self.events.send_to_main(MainEvents::Shutdown);
         }
     }
 }
 
-struct IAppObserver(Arc<EventChannel>);
+struct IRuntimeObserver {
+    events: Arc<EventChannel>,
+    message_pump: Sender<u64>,
+}
 
-impl IAppObserver {
+impl IRuntimeObserver {
     fn new(events: Arc<EventChannel>) -> Self {
-        Self(events)
+        let (message_pump, rx) = channel::<u64>();
+        let events_ = events.clone();
+        thread::spawn(move || {
+            while let Ok(delay) = rx.recv() {
+                if delay > 0 {
+                    thread::sleep(Duration::from_millis(delay));
+                }
+
+                events_.send(EventTarget::Frontend, UserEvents::OnMessagePumpPoll);
+            }
+        });
+
+        Self {
+            events,
+            message_pump,
+        }
     }
 }
 
-impl AppObserver for IAppObserver {
+impl RuntimeHandler for IRuntimeObserver {
     fn on_context_initialized(&self) {
-        self.0.send(
+        self.events.send(
             EventTarget::Frontend,
             UserEvents::OnWebviewAppContextInitialized,
         );
+    }
+}
+
+impl MessagePumpRuntimeHandler for IRuntimeObserver {
+    fn on_schedule_message_pump_work(&self, delay: u64) {
+        let _ = self.message_pump.send(delay);
     }
 }
 

@@ -58,4 +58,8 @@ impl WindowManager {
 
         Ok(())
     }
+
+    pub fn about_to_wait(&self) {
+        self.frontend.about_to_wait();
+    }
 }

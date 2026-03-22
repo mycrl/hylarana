@@ -32,7 +32,3 @@ codec = { path = "codec", version = "0.3.1", package = "hylarana-codec" }
 resample = { path = "resample", version = "0.3.1", package = "hylarana-resample" }
 common = { path = "common", version = "0.3.1", package = "hylarana-common" }
 hylarana = { path = "hylarana", version = "0.4.0" }
-
-[patch.crates-io]
-core-media-rs = { git = "https://github.com/mycrl/core-frameworks", branch = "main" }
-core-video-rs = { git = "https://github.com/mycrl/core-frameworks", branch = "main" }

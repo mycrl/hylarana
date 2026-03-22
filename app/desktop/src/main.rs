@@ -18,7 +18,7 @@ use winit::{
 
 use self::{
     config::AppConfig,
-    events::{EventChannel, EventTarget, Events, UserEvents},
+    events::{EventChannel, EventTarget, Events},
     windows::WindowManager,
 };
 
@@ -70,8 +70,7 @@ impl ApplicationHandler<(EventTarget, Events)> for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        self.events
-            .send(EventTarget::Frontend, UserEvents::OnMessagePumpPoll);
+        self.window_manager.about_to_wait();
     }
 }
 
@@ -92,6 +91,9 @@ fn main() -> Result<()> {
     )?;
 
     log::info!("app config = {:?}", *APP_CONFIG);
+
+    #[cfg(target_os = "macos")]
+    wew::utils::startup_nsapplication();
 
     let event_loop = EventLoop::<(EventTarget, Events)>::with_user_event().build()?;
     event_loop.set_control_flow(ControlFlow::Wait);

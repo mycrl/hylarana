@@ -93,7 +93,7 @@ void (async () => {
 
     if (process.platform == "win32") {
         const cefOutDir = join(
-            await GetCrateOutdir(`../../target/${profile}`, "webview", "./cef/Release"),
+            await GetCrateOutdir(`../../target/${profile}`, "wew", "./cef/Release"),
             "../"
         );
         const ffOutDir = await GetCrateOutdir(`../../target/${profile}`, "ffmpeg", "./ffmpeg");
@@ -122,7 +122,7 @@ void (async () => {
     } else if (process.platform == "darwin") {
         const cefReleasePath = await GetCrateOutdir(
             `../../target/${profile}`,
-            "webview",
+            "wew",
             "./cef/Release"
         );
 
