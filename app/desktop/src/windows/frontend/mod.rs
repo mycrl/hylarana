@@ -4,6 +4,7 @@ mod settings;
 
 use std::{
     collections::HashMap,
+    path::Path,
     sync::{
         Arc,
         mpsc::{Sender, channel},
@@ -25,7 +26,10 @@ use serde_json::Value;
 use settings::Configure;
 use wew::{
     MessageLoopAbstract, MessagePumpLoop, NativeWindowWebView,
-    request::{CustomRequestHandlerFactory, CustomSchemeAttributes, RequestHandlerWithLocalDisk},
+    request::{
+        CustomRequestHandlerFactory, CustomSchemeAttributes, Request, RequestHandler,
+        RequestHandlerFactory, RequestHandlerWithLocalDisk,
+    },
     runtime::{LogLevel, MessagePumpRuntimeHandler, Runtime, RuntimeHandler},
     webview::{WebView, WebViewAttributes, WebViewHandler, WebViewState},
 };
@@ -235,12 +239,12 @@ impl Frontend {
                 .create_runtime_attributes_builder::<NativeWindowWebView>()
                 .with_browser_subprocess_path(&crate::APP_CONFIG.subprocess_path)
                 .with_root_cache_path(&crate::APP_CONFIG.cache_path)
-                .with_cache_path(&crate::APP_CONFIG.cache_path)
+                .with_cache_path(&browser_cache_dir(&crate::APP_CONFIG.cache_path)?)
                 .with_log_severity(LogLevel::Info)
                 .with_custom_scheme(CustomSchemeAttributes::new(
                     "webview",
                     "localhost",
-                    CustomRequestHandlerFactory::new(RequestHandlerWithLocalDisk::new(
+                    CustomRequestHandlerFactory::new(AppRequestHandlerFactory::new(
                         &crate::APP_CONFIG.cheme_path,
                     )),
                 ))
@@ -333,6 +337,34 @@ impl Frontend {
             if let Some(window) = &self.window {
                 window.request_redraw();
             }
+        }
+    }
+}
+
+fn browser_cache_dir(root: &str) -> Result<String> {
+    let path = Path::new(root).join("webview-cache");
+    std::fs::create_dir_all(&path)?;
+
+    Ok(path.to_string_lossy().replace('\\', "/"))
+}
+
+struct AppRequestHandlerFactory(RequestHandlerWithLocalDisk);
+
+impl AppRequestHandlerFactory {
+    fn new(root_dir: &str) -> Self {
+        Self(RequestHandlerWithLocalDisk::new(root_dir))
+    }
+}
+
+impl RequestHandlerFactory for AppRequestHandlerFactory {
+    fn request(&self, request: &Request) -> Option<Box<dyn RequestHandler>> {
+        match request.url {
+            "" | "webview://localhost" | "webview://localhost/" => self.0.request(&Request {
+                url: "webview://localhost/index.html",
+                method: request.method,
+                referrer: request.referrer,
+            }),
+            _ => self.0.request(request),
         }
     }
 }
