@@ -607,7 +607,7 @@ pub mod win32 {
             &self.output_texture
         }
 
-        pub fn get_output_buffer(&mut self) -> Result<TextureBuffer, Error> {
+        pub fn get_output_buffer(&mut self) -> Result<TextureBuffer<'_>, Error> {
             if self.output_sw_texture.is_none() {
                 unsafe {
                     let mut desc = D3D11_TEXTURE2D_DESC::default();

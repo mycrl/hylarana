@@ -120,12 +120,7 @@ impl CaptureHandler for AudioCapture {
             },
             Output {
                 consumer,
-                frame: {
-                    let mut frame = AudioFrame::default();
-                    frame.sample_rate = options.sample_rate;
-
-                    frame
-                },
+                frame,
             },
         )?;
 
